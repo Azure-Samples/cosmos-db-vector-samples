@@ -25,6 +25,14 @@ async function main() {
     const { aiClient, dbClient } = getClients();
 
     try {
+        
+    if (!aiClient) {
+        throw new Error('OpenAI client is not configured properly. Please check your environment variables.');
+    }
+
+    if (!dbClient) {
+        throw new Error('Cosmos DB client is not configured properly. Please check your environment variables.');
+    }
 
         // Get database reference
         const { database } = await dbClient.databases.createIfNotExists({ id: config.dbName });

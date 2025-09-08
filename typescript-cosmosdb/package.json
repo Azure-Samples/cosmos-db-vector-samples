@@ -6,7 +6,8 @@
   "scripts": {
     "build": "tsc",
     "start:embed": "node --env-file .env dist/create-embeddings.js",
-    "start:index-and-query": "node --env-file .env dist/index-and-query.js"
+    "start:index-and-query": "node --env-file .env dist/index-and-query.js",
+    "start:insert-at-scale": "node --env-file .env dist/insert-at-scale.js"
   },
   "dependencies": {
     "@azure/ai-agents": "^1.1.0",
