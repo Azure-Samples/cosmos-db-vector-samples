@@ -1,6 +1,7 @@
-import { MongoClient } from 'mongodb';
+import { MongoClient, OIDCResponse, OIDCCallbackParams } from 'mongodb';
 import { AzureOpenAI } from 'openai/index.js';
 import { promises as fs } from "fs";
+import { AccessToken, DefaultAzureCredential, TokenCredential, getBearerTokenProvider } from '@azure/identity';
 
 // Define a type for JSON data
 export type JsonData = Record<string, any>;
@@ -22,7 +23,13 @@ export const scoreProperty = {
         nestedProperty: 'score'
     }
 }
-
+export const AzureIdentityTokenCallback = async (params: OIDCCallbackParams, credential: TokenCredential): Promise<OIDCResponse> => {
+    const tokenResponse: AccessToken | null = await credential.getToken(['https://ossrdbms-aad.database.windows.net/.default']);
+    return {
+        accessToken: tokenResponse?.token || '',
+        expiresInSeconds: (tokenResponse?.expiresOnTimestamp || 0) - Math.floor(Date.now() / 1000)
+    };
+};
 export function getClients(): { aiClient: AzureOpenAI; dbClient: MongoClient } {
     const apiKey = process.env.AZURE_OPENAI_EMBEDDING_KEY!;
     const apiVersion = process.env.AZURE_OPENAI_EMBEDDING_API_VERSION!;
@@ -49,6 +56,51 @@ export function getClients(): { aiClient: AzureOpenAI; dbClient: MongoClient } {
 
     return { aiClient, dbClient };
 }
+
+export function getClientsPasswordless(): { aiClient: AzureOpenAI | null; dbClient: MongoClient | null } {
+    let aiClient: AzureOpenAI | null = null;
+    let dbClient: MongoClient | null = null;
+
+    // For Azure OpenAI with DefaultAzureCredential
+    const apiVersion = process.env.AZURE_OPENAI_EMBEDDING_API_VERSION!;
+    const endpoint = process.env.AZURE_OPENAI_EMBEDDING_ENDPOINT!;
+    const deployment = process.env.AZURE_OPENAI_EMBEDDING_MODEL!;
+
+    if (apiVersion && endpoint && deployment) {
+        const credential = new DefaultAzureCredential();
+        const scope = "https://cognitiveservices.azure.com/.default";
+        const azureADTokenProvider = getBearerTokenProvider(credential, scope);
+        aiClient = new AzureOpenAI({
+            apiVersion,
+            endpoint,
+            deployment,
+            azureADTokenProvider 
+        });
+    }
+
+    // For Cosmos DB with DefaultAzureCredential
+    const clusterName = process.env.MONGO_CLUSTER_NAME!;
+
+    if (clusterName) {
+        const credential = new DefaultAzureCredential();
+
+        dbClient = new MongoClient(
+            `mongodb+srv://${clusterName}.global.mongocluster.cosmos.azure.com/`, {
+            connectTimeoutMS: 30000,
+            tls: true,
+            retryWrites: true,
+            authMechanism: 'MONGODB-OIDC',
+            authMechanismProperties: {
+                    OIDC_CALLBACK: (params: OIDCCallbackParams) => AzureIdentityTokenCallback(params, credential),
+                    ALLOWED_HOSTS: ['*.azure.com']
+                }
+            }
+        );
+    }
+
+    return { aiClient, dbClient };
+}
+
 export async function readFileReturnJson(filePath: string): Promise<JsonData[]> {
 
     console.log(`Reading JSON file from ${filePath}`);

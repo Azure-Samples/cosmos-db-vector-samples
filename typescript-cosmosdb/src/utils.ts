@@ -1,7 +1,7 @@
 import { CosmosClient } from '@azure/cosmos';
 import { AzureOpenAI } from 'openai/index.js';
 import { promises as fs } from "fs";
-
+import { DefaultAzureCredential, getBearerTokenProvider } from "@azure/identity";
 // Define a type for JSON data
 export type JsonData = Record<string, any>;
 
@@ -32,6 +32,48 @@ export function getClients(): { aiClient: AzureOpenAI | null; dbClient: CosmosCl
 
     if (cosmosEndpoint && cosmosKey) {
         dbClient = new CosmosClient({ endpoint: cosmosEndpoint, key: cosmosKey });
+    }
+
+    return { aiClient, dbClient };
+}
+
+/**
+ * Get Azure OpenAI and Cosmos DB clients using passwordless authentication (managed identity)
+ * This function uses DefaultAzureCredential for authentication instead of API keys
+ * 
+ * @returns Object containing AzureOpenAI and CosmosClient instances or null if configuration is missing
+ */
+export function getClientsPasswordless(): { aiClient: AzureOpenAI | null; dbClient: CosmosClient | null } {
+    let aiClient: AzureOpenAI | null = null;
+    let dbClient: CosmosClient | null = null;
+
+    // For Azure OpenAI with DefaultAzureCredential
+    const apiVersion = process.env.AZURE_OPENAI_EMBEDDING_API_VERSION!;
+    const endpoint = process.env.AZURE_OPENAI_EMBEDDING_ENDPOINT!;
+    const deployment = process.env.AZURE_OPENAI_EMBEDDING_MODEL!;
+
+    if (apiVersion && endpoint && deployment) {
+        const credential = new DefaultAzureCredential();
+        const scope = "https://cognitiveservices.azure.com/.default";
+        const azureADTokenProvider = getBearerTokenProvider(credential, scope);
+        aiClient = new AzureOpenAI({
+            apiVersion,
+            endpoint,
+            deployment,
+            azureADTokenProvider 
+        });
+    }
+
+    // For Cosmos DB with DefaultAzureCredential
+    const cosmosEndpoint = process.env.COSMOS_ENDPOINT!;
+
+    if (cosmosEndpoint) {
+        const credential = new DefaultAzureCredential();
+
+        dbClient = new CosmosClient({ 
+            endpoint: cosmosEndpoint,
+            aadCredentials: credential // Use DefaultAzureCredential instead of key
+        });
     }
 
     return { aiClient, dbClient };

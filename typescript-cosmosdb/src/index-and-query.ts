@@ -22,7 +22,7 @@ const config = {
 
 async function main() {
 
-    const { aiClient, dbClient } = getClients();
+    const { aiClient, dbClient } = getClientsPasswordless();
 
     try {
         

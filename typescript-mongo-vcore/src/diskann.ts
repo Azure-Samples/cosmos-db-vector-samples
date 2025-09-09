@@ -1,5 +1,5 @@
 import path from 'path';
-import { readFileReturnJson, getClients, insertData, printSearchResults } from './utils.js';
+import { readFileReturnJson, getClientsPasswordless, insertData, printSearchResults } from './utils.js';
 
 // ESM specific features - create __dirname equivalent
 import { fileURLToPath } from "node:url";
@@ -9,7 +9,7 @@ const __dirname = dirname(__filename);
 
 const config = {
     query: "find a hotel by a lake with a mountain view",
-    dbName: "Hotels",
+    dbName: "Hotels2",
     collectionName: "hotels_diskann",
     indexName: "vectorIndex_diskann",
     dataFile: process.env.DATA_FILE_WITH_VECTORS!,
@@ -22,9 +22,16 @@ const config = {
 
 async function main() {
 
-    const { aiClient, dbClient } = getClients();
+    const { aiClient, dbClient } = getClientsPasswordless();
 
     try {
+
+        if (!aiClient) {
+            throw new Error('AI client is not configured. Please check your environment variables.');
+        }
+        if (!dbClient) {
+            throw new Error('Database client is not configured. Please check your environment variables.');
+        }
 
         await dbClient.connect();
         const db = dbClient.db(config.dbName);
@@ -82,7 +89,7 @@ async function main() {
         process.exitCode = 1;
     } finally {
         console.log('Closing database connection...');
-        await dbClient.close();
+        if (dbClient) await dbClient.close();
         console.log('Database connection closed');
     }
 }

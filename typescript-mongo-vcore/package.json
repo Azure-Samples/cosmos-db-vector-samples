@@ -12,11 +12,11 @@
     "start:ivf": "node --env-file .env dist/ivf.js",
     "start:hnsw": "node --env-file .env dist/hnsw.js",
     "start:diskann": "node --env-file .env dist/diskann.js"
-
   },
   "dependencies": {
     "@azure/ai-agents": "^1.1.0",
     "@azure/identity": "^4.11.1",
+    "@azure/msal-node-extensions": "^1.5.22",
     "@types/uuid": "^10.0.0",
     "mongodb": "^6.18.0",
     "openai": "^5.16.0",

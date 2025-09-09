@@ -14,7 +14,8 @@
 			"extensions": [
 				"ms-azuretools.vscode-cosmosdb",
 				"buildwithlayer.mongodb-integration-expert-qS6DB",
-				"mongodb.mongodb-vscode"
+				"mongodb.mongodb-vscode",
+				"ms-azuretools.vscode-documentdb"
 			]
 		}
 	}
