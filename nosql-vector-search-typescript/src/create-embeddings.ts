@@ -6,7 +6,7 @@
 import * as path from "node:path";
 import { AzureOpenAI } from "openai";
 import { Embedding } from "openai/resources";
-import { readFileReturnJson, writeFileJson, JsonData } from "./utils.js";
+import { readFileReturnJson, writeFileJson, JsonData, getClientsPasswordless } from "./utils.js";
 
 // ESM specific features - create __dirname equivalent
 import { fileURLToPath } from "node:url";
@@ -14,12 +14,8 @@ import { dirname } from "node:path";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-const apiKey = process.env.AZURE_OPENAI_EMBEDDING_KEY;
-const apiVersion = process.env.AZURE_OPENAI_EMBEDDING_API_VERSION;
-const endpoint = process.env.AZURE_OPENAI_EMBEDDING_ENDPOINT;
-console.log(`Using OpenAI endpoint: ${endpoint}`);
-const deployment = process.env.AZURE_OPENAI_EMBEDDING_MODEL!;
 
+const deployment = process.env.AZURE_OPENAI_EMBEDDING_MODEL!;
 const dataWithVectors = process.env.DATA_FILE_WITH_VECTORS!;
 const dataWithoutVectors = process.env.DATA_FILE_WITHOUT_VECTORS!;
 const fieldToEmbed = process.env.FIELD_TO_EMBED! || "description";
@@ -105,19 +101,18 @@ export async function processEmbeddingBatch<T>(
 
 try {
 
-    const client =  new AzureOpenAI( {
-        apiKey,
-        apiVersion,
-        endpoint,
-        deployment
-    });
+    const { aiClient } = getClientsPasswordless();
+
+    if (!aiClient) {
+        throw new Error('OpenAI client is not configured properly. Please check your environment variables.');
+    }
 
     const data = await readFileReturnJson(path.join(__dirname, "..", dataWithoutVectors!));
     const model = deployment;
     const maxEmbeddings = data.length; 
 
     const embeddings = await processEmbeddingBatch<JsonData>(
-        client,
+        aiClient,
         model,
         fieldToEmbed,
         newEmbeddedField,

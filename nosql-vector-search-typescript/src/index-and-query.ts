@@ -1,5 +1,5 @@
 import path from 'path';
-import { readFileReturnJson, getClients, insertData } from './utils.js';
+import { readFileReturnJson, getClientsPasswordless, insertData } from './utils.js';
 import {  VectorEmbeddingPolicy, VectorEmbeddingDataType, VectorEmbeddingDistanceFunction, IndexingPolicy, VectorIndexType } from '@azure/cosmos';
 // ESM specific features - create __dirname equivalent
 import { fileURLToPath } from "node:url";

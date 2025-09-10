@@ -10,15 +10,14 @@
     "start:insert-at-scale": "node --env-file .env dist/insert-at-scale.js"
   },
   "dependencies": {
-    "@azure/ai-agents": "^1.1.0",
     "@azure/cosmos": "^4.5.1",
     "@azure/identity": "^4.11.1",
-    "@types/uuid": "^10.0.0",
-    "openai": "^5.16.0",
+    "openai": "^5.20.1",
     "uuid": "^11.1.0"
   },
   "devDependencies": {
     "@types/node": "^24.3.0",
+    "@types/uuid": "^10.0.0",
     "typescript": "^5.9.2"
   }
 }

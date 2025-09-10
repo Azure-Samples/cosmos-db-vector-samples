@@ -4,7 +4,7 @@
  */
 import { Container } from '@azure/cosmos';
 import { v4 as uuidv4 } from 'uuid';
-import { JsonData, readFileReturnJson, getClients, calculateRUCost, estimateMonthlyRUCost } from './utils.js';
+import { JsonData, readFileReturnJson, getClientsPasswordless, calculateRUCost, estimateMonthlyRUCost } from './utils.js';
 
 // -------------------------------------------
 // Type Definitions
@@ -814,7 +814,7 @@ async function ensureDatabaseAndContainer(
 async function main() {
 
   // Create Cosmos client
-  const { dbClient: client } = getClients();
+  const { dbClient: client } = getClientsPasswordless();
 
   if (!client) {
     throw new Error('Cosmos DB client is not configured properly. Please check your environment variables.');

@@ -1,5 +1,5 @@
 import { CosmosClient } from '@azure/cosmos';
-import { AzureOpenAI } from 'openai/index.js';
+import { AzureOpenAI } from "openai";
 import { promises as fs } from "fs";
 import { DefaultAzureCredential, getBearerTokenProvider } from "@azure/identity";
 // Define a type for JSON data
