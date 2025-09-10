@@ -14,13 +14,9 @@
     "start:diskann": "node --env-file .env dist/diskann.js"
   },
   "dependencies": {
-    "@azure/ai-agents": "^1.1.0",
     "@azure/identity": "^4.11.1",
-    "@azure/msal-node-extensions": "^1.5.22",
-    "@types/uuid": "^10.0.0",
     "mongodb": "^6.18.0",
-    "openai": "^5.16.0",
-    "uuid": "^11.1.0"
+    "openai": "^5.16.0"
   },
   "devDependencies": {
     "@types/node": "^24.3.0",
