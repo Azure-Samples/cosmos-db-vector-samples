@@ -4,59 +4,6 @@
     // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
-        {
-            "name": "TS: insert 1 doc",
-            "type": "node",
-            "request": "launch",
-            "preLaunchTask": "npm: build",
-            "envFile": "${workspaceFolder}/typescript/.env",
-            "program": "${workspaceFolder}/typescript/dist/insert-one-document.js",
-            "cwd": "${workspaceFolder}/typescript",
-            "outFiles": [
-                "${workspaceFolder}/typescript/dist/**/*.js"
-            ],
-            "skipFiles": [
-                "<node_internals>/**"
-            ],
-            "console": "integratedTerminal"
-        },
-        {
-            "name": "TS: insert 1 doc (npm start)",
-            "type": "node",
-            "request": "launch",
-            "runtimeExecutable": "npm",
-            "runtimeArgs": [
-                "run-script",
-                "start"
-            ],
-            "cwd": "${workspaceFolder}/typescript",
-            "env": {
-                "NODE_OPTIONS": "--inspect-brk"
-            },
-            "preLaunchTask": "npm: build",
-            "console": "integratedTerminal",
-            "skipFiles": [
-                "<node_internals>/**"
-            ]
-        },
-        {
-            "name": "TS: create embed",
-            "type": "node",
-            "request": "launch",
-            "runtimeExecutable": "npm",
-            "runtimeArgs": [
-                "run-script",
-                "start:embed"
-            ],
-            "cwd": "${workspaceFolder}/typescript",
-            "env": {
-                "NODE_OPTIONS": "--inspect-brk"
-            },
-            "preLaunchTask": "npm: build",
-            "console": "integratedTerminal",
-            "skipFiles": [
-                "<node_internals>/**"
-            ]
-        }
+
     ]
 }
