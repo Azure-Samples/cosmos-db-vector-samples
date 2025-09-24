@@ -1,0 +1,11 @@
+# MongoDB driver for connecting to Cosmos DB
+pymongo>=4.6.0
+
+# Azure OpenAI SDK for generating embeddings
+openai>=1.0.0
+
+# Azure authentication library for passwordless connection
+azure-identity>=1.15.0
+
+# Environment variable management from .env files
+python-dotenv>=1.0.0
