@@ -1,10 +1,3 @@
-"""
-Utility functions for Cosmos DB vector search operations.
-
-This module provides shared functionality for connecting to MongoDB/Cosmos DB,
-managing Azure OpenAI clients, handling JSON files, and processing search results.
-"""
-
 import json
 import os
 import time
@@ -30,18 +23,7 @@ class AzureIdentityTokenCallback(OIDCCallback):
         return OIDCCallbackResult(access_token=token)
 
 def get_clients() -> Tuple[MongoClient, AzureOpenAI]:
-    """
-    Create MongoDB and Azure OpenAI clients using connection string authentication.
 
-    This is the simpler authentication method that uses connection strings and API keys.
-    Requires MONGO_CONNECTION_STRING and AZURE_OPENAI_EMBEDDING_KEY in environment.
-
-    Returns:
-        Tuple containing MongoDB client and Azure OpenAI client
-
-    Raises:
-        ValueError: If required environment variables are missing
-    """
     # Get MongoDB connection string - required for Cosmos DB access
     mongo_connection_string = os.getenv("MONGO_CONNECTION_STRING")
     if not mongo_connection_string:
@@ -75,18 +57,7 @@ def get_clients() -> Tuple[MongoClient, AzureOpenAI]:
 
 
 def get_clients_passwordless() -> Tuple[MongoClient, AzureOpenAI]:
-    """
-    Create MongoDB and Azure OpenAI clients using Azure Active Directory authentication.
 
-    This method uses DefaultAzureCredential for passwordless authentication.
-    More secure but requires proper Azure RBAC setup.
-
-    Returns:
-        Tuple containing MongoDB client and Azure OpenAI client
-
-    Raises:
-        ValueError: If required environment variables are missing
-    """
     # Get MongoDB connection string (still needed even with passwordless auth)
     cluster_name = os.getenv("MONGO_CLUSTER_NAME")
     if not cluster_name:
@@ -123,18 +94,7 @@ def get_clients_passwordless() -> Tuple[MongoClient, AzureOpenAI]:
 
 
 def azure_identity_token_callback(credential: DefaultAzureCredential) -> str:
-    """
-    Callback function to retrieve Azure AD token for MongoDB authentication.
 
-    This function is called by the MongoDB driver when it needs an authentication token.
-    The scope is specific to Cosmos DB for MongoDB.
-
-    Args:
-        credential: Azure credential object to use for token retrieval
-
-    Returns:
-        Access token string for MongoDB authentication
-    """
     # Cosmos DB for MongoDB requires this specific scope
     token_scope = "https://cosmos.azure.com/.default"
 
@@ -145,19 +105,7 @@ def azure_identity_token_callback(credential: DefaultAzureCredential) -> str:
 
 
 def read_file_return_json(file_path: str) -> List[Dict[str, Any]]:
-    """
-    Read a JSON file and return its contents as a Python object.
 
-    Args:
-        file_path: Path to the JSON file to read
-
-    Returns:
-        List of dictionaries containing the JSON data
-
-    Raises:
-        FileNotFoundError: If the file doesn't exist
-        json.JSONDecodeError: If the file contains invalid JSON
-    """
     try:
         with open(file_path, 'r', encoding='utf-8') as file:
             return json.load(file)
@@ -170,16 +118,7 @@ def read_file_return_json(file_path: str) -> List[Dict[str, Any]]:
 
 
 def write_file_json(data: List[Dict[str, Any]], file_path: str) -> None:
-    """
-    Write data to a JSON file with pretty formatting.
 
-    Args:
-        data: List of dictionaries to write to file
-        file_path: Path where the JSON file should be saved
-
-    Raises:
-        IOError: If the file cannot be written
-    """
     try:
         with open(file_path, 'w', encoding='utf-8') as file:
             json.dump(data, file, indent=2, ensure_ascii=False)
@@ -191,21 +130,7 @@ def write_file_json(data: List[Dict[str, Any]], file_path: str) -> None:
 
 def insert_data(collection: Collection, data: List[Dict[str, Any]],
                 batch_size: int = 100, index_fields: Optional[List[str]] = None) -> Dict[str, int]:
-    """
-    Insert data into a MongoDB collection in batches with error handling.
 
-    This function handles large datasets by processing them in smaller batches,
-    which prevents memory issues and provides better error recovery.
-
-    Args:
-        collection: MongoDB collection to insert data into
-        data: List of documents to insert
-        batch_size: Number of documents to insert per batch (default: 100)
-        index_fields: Optional list of field names to create indexes on
-
-    Returns:
-        Dictionary with insertion statistics: 'total', 'inserted', 'failed'
-    """
     total_documents = len(data)
     inserted_count = 0
     failed_count = 0
@@ -268,16 +193,7 @@ def insert_data(collection: Collection, data: List[Dict[str, Any]],
 
 
 def drop_vector_indexes(collection, vector_field: str) -> None:
-    """
-    Drop all existing vector indexes on the specified field.
 
-    Since Cosmos DB for MongoDB (vCore) only allows one vector index per field,
-    we need to drop any existing vector indexes before creating a new one.
-
-    Args:
-        collection: MongoDB collection to drop indexes from
-        vector_field: Name of the vector field to drop indexes for
-    """
     try:
         # Get all indexes for the collection
         indexes = list(collection.list_indexes())
@@ -307,14 +223,7 @@ def drop_vector_indexes(collection, vector_field: str) -> None:
 def print_search_resultsx(results: List[Dict[str, Any]],
                         max_results: int = 5,
                         show_score: bool = True) -> None:
-    """
-    Print search results in a formatted, readable way.
 
-    Args:
-        results: List of search result documents from MongoDB aggregation
-        max_results: Maximum number of results to display (default: 5)
-        show_score: Whether to display similarity scores (default: True)
-    """
     if not results:
         print("No search results found.")
         return
@@ -330,14 +239,7 @@ def print_search_resultsx(results: List[Dict[str, Any]],
 def print_search_results(results: List[Dict[str, Any]],
                         max_results: int = 5,
                         show_score: bool = True) -> None:
-    """
-    Print search results in a formatted, readable way.
 
-    Args:
-        results: List of search result documents from MongoDB aggregation
-        max_results: Maximum number of results to display (default: 5)
-        show_score: Whether to display similarity scores (default: True)
-    """
     if not results:
         print("No search results found.")
         return

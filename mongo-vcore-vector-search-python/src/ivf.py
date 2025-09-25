@@ -1,11 +1,3 @@
-"""
-IVF vector search implementation for Cosmos DB.
-
-IVF (Inverted File) creates clusters of similar vectors and uses centroids
-to quickly narrow down search candidates. It's efficient for large datasets
-and provides good performance with configurable accuracy trade-offs.
-"""
-
 import os
 from typing import List, Dict, Any
 from utils import get_clients, get_clients_passwordless,read_file_return_json, insert_data, print_search_results, drop_vector_indexes
@@ -16,17 +8,7 @@ load_dotenv()
 
 
 def create_ivf_vector_index(collection, vector_field: str, dimensions: int) -> None:
-    """
-    Create an IVF vector index on the specified collection.
 
-    IVF partitions the vector space into clusters (Voronoi cells) and creates
-    an inverted index structure for efficient similarity search.
-
-    Args:
-        collection: MongoDB collection to create the index on
-        vector_field: Name of the field containing vector embeddings
-        dimensions: Number of dimensions in the vector embeddings
-    """
     print(f"Creating IVF vector index on field '{vector_field}'...")
 
     # Drop any existing vector indexes on this field first
@@ -77,24 +59,7 @@ def perform_ivf_vector_search(collection,
                              model_name: str,
                              top_k: int = 5,
                              num_probes: int = 1) -> List[Dict[str, Any]]:
-    """
-    Perform vector similarity search using IVF index.
 
-    IVF search first identifies the most relevant clusters based on centroids,
-    then searches within those clusters for the best matches.
-
-    Args:
-        collection: MongoDB collection with IVF vector index
-        azure_openai_client: Azure OpenAI client for generating query embeddings
-        query_text: Text query to search for
-        vector_field: Name of the field containing vector embeddings
-        model_name: Name of the embedding model
-        top_k: Number of top results to return
-        num_probes: Number of clusters to search (affects accuracy vs speed)
-
-    Returns:
-        List of similar documents with similarity scores
-    """
     print(f"Performing IVF vector search for: '{query_text}'")
 
     try:
@@ -144,15 +109,7 @@ def perform_ivf_vector_search(collection,
 
 
 def main():
-    """
-    Main function to demonstrate IVF vector search functionality.
 
-    This function:
-    1. Loads hotel data with vector embeddings
-    2. Inserts data into MongoDB collection
-    3. Creates an IVF vector index with clustering
-    4. Performs sample searches with different probe settings
-    """
     print("Starting IVF vector search demonstration...")
 
     # Load configuration from environment variables
@@ -166,11 +123,6 @@ def main():
         'dimensions': int(os.getenv('EMBEDDING_DIMENSIONS', '1536')),
         'batch_size': int(os.getenv('LOAD_SIZE_BATCH', '100'))
     }
-
-    print(f"Configuration:")
-    print(f"  Database: {config['database_name']}")
-    print(f"  Collection: {config['collection_name']}")
-
 
     try:
         # Initialize database and AI service clients

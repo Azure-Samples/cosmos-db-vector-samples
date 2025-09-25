@@ -1,11 +1,3 @@
-"""
-DiskANN vector search implementation for Cosmos DB.
-
-DiskANN (Disk-based Approximate Nearest Neighbor) is optimized for large-scale
-vector search with efficient disk usage. It provides good performance for
-datasets that don't fit entirely in memory.
-"""
-
 import os
 from typing import List, Dict, Any
 from utils import get_clients, get_clients_passwordless, read_file_return_json, insert_data, print_search_results, drop_vector_indexes
@@ -16,17 +8,7 @@ load_dotenv()
 
 
 def create_diskann_vector_index(collection, vector_field: str, dimensions: int) -> None:
-    """
-    Create a DiskANN vector index on the specified collection.
 
-    DiskANN is designed for large datasets and provides efficient approximate
-    nearest neighbor search with disk-based storage optimization.
-
-    Args:
-        collection: MongoDB collection to create the index on
-        vector_field: Name of the field containing vector embeddings
-        dimensions: Number of dimensions in the vector embeddings
-    """
     print(f"Creating DiskANN vector index on field '{vector_field}'...")
 
     # Drop any existing vector indexes on this field first
@@ -87,23 +69,7 @@ def perform_diskann_vector_search(collection,
                                  vector_field: str,
                                  model_name: str,
                                  top_k: int = 5) -> List[Dict[str, Any]]:
-    """
-    Perform vector similarity search using DiskANN index.
 
-    This function converts the query text to a vector embedding and searches
-    for the most similar documents using the DiskANN index.
-
-    Args:
-        collection: MongoDB collection with DiskANN vector index
-        azure_openai_client: Azure OpenAI client for generating query embeddings
-        query_text: Text query to search for
-        vector_field: Name of the field containing vector embeddings
-        model_name: Name of the embedding model
-        top_k: Number of top results to return
-
-    Returns:
-        List of similar documents with similarity scores
-    """
     print(f"Performing DiskANN vector search for: '{query_text}'")
 
     try:
@@ -154,16 +120,6 @@ def perform_diskann_vector_search(collection,
 
 
 def main():
-    """
-    Main function to demonstrate DiskANN vector search functionality.
-
-    This function:
-    1. Loads hotel data with embeddings
-    2. Inserts the data into MongoDB collection
-    3. Creates a DiskANN vector index
-    4. Performs a sample vector search query
-    """
-    print("Starting DiskANN vector search demonstration...")
 
     # Load configuration from environment variables
     config = {
@@ -176,13 +132,6 @@ def main():
         'dimensions': int(os.getenv('EMBEDDING_DIMENSIONS', '1536')),
         'batch_size': int(os.getenv('LOAD_SIZE_BATCH', '100'))
     }
-
-    print(f"Configuration:")
-    print(f"  Database: {config['database_name']}")
-    print(f"  Collection: {config['collection_name']}")
-    print(f"  Data file: {config['data_file']}")
-    print(f"  Vector field: {config['vector_field']}")
-    print(f"  Vector dimensions: {config['dimensions']}")
 
     try:
         # Initialize clients

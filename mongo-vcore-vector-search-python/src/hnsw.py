@@ -1,11 +1,3 @@
-"""
-HNSW vector search implementation for Cosmos DB.
-
-HNSW (Hierarchical Navigable Small World) builds a multi-layered graph structure
-that provides excellent search performance and high recall. It's particularly
-effective for high-dimensional vectors and real-time search applications.
-"""
-
 import os
 from typing import List, Dict, Any
 from utils import get_clients, get_clients_passwordless, read_file_return_json, insert_data, print_search_results, drop_vector_indexes
@@ -16,17 +8,7 @@ load_dotenv()
 
 
 def create_hnsw_vector_index(collection, vector_field: str, dimensions: int) -> None:
-    """
-    Create an HNSW vector index on the specified collection.
 
-    HNSW creates a hierarchical graph structure that enables fast approximate
-    nearest neighbor search with high recall rates.
-
-    Args:
-        collection: MongoDB collection to create the index on
-        vector_field: Name of the field containing vector embeddings
-        dimensions: Number of dimensions in the vector embeddings
-    """
     print(f"Creating HNSW vector index on field '{vector_field}'...")
 
     # Drop any existing vector indexes on this field first
@@ -80,24 +62,7 @@ def perform_hnsw_vector_search(collection,
                               model_name: str,
                               top_k: int = 5,
                               ef_search: int = 16) -> List[Dict[str, Any]]:
-    """
-    Perform vector similarity search using HNSW index.
 
-    HNSW search traverses the hierarchical graph to find the most similar vectors
-    efficiently while maintaining high accuracy.
-
-    Args:
-        collection: MongoDB collection with HNSW vector index
-        azure_openai_client: Azure OpenAI client for generating query embeddings
-        query_text: Text query to search for
-        vector_field: Name of the field containing vector embeddings
-        model_name: Name of the embedding model
-        top_k: Number of top results to return
-        ef_search: Size of candidate list during search (affects accuracy vs speed)
-
-    Returns:
-        List of similar documents with similarity scores
-    """
     print(f"Performing HNSW vector search for: '{query_text}'")
 
     try:
@@ -147,15 +112,7 @@ def perform_hnsw_vector_search(collection,
 
 
 def main():
-    """
-    Main function to demonstrate HNSW vector search functionality.
 
-    This function:
-    1. Loads hotel data with vector embeddings
-    2. Inserts data into MongoDB collection
-    3. Creates an HNSW vector index
-    4. Performs multiple sample searches with different parameters
-    """
     print("Starting HNSW vector search demonstration...")
 
     # Load configuration from environment variables
@@ -169,11 +126,6 @@ def main():
         'dimensions': int(os.getenv('EMBEDDING_DIMENSIONS', '1536')),
         'batch_size': int(os.getenv('LOAD_SIZE_BATCH', '100'))
     }
-
-    print(f"Configuration:")
-    print(f"  Database: {config['database_name']}")
-    print(f"  Collection: {config['collection_name']}")
-
 
     try:
         # Initialize MongoDB and Azure OpenAI clients
