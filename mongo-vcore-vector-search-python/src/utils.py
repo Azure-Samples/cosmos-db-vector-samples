@@ -13,12 +13,26 @@ from pymongo import MongoClient, InsertOne
 from pymongo.collection import Collection
 from pymongo.errors import BulkWriteError
 from azure.identity import DefaultAzureCredential
+from pymongo.auth_oidc import OIDCCallback, OIDCCallbackContext, OIDCCallbackResult
 from openai import AzureOpenAI
 from dotenv import load_dotenv
 
 # Load environment variables from .env file
 load_dotenv()
 
+# print env variables for debugging as single block of text
+print("Environment Variables:")
+for var in ["MONGO_CONNECTION_STRING", "AZURE_OPENAI_EMBEDDING_ENDPOINT", "AZURE_OPENAI_EMBEDDING_KEY"]:
+    print(f"  {var}: {os.getenv(var)}")
+
+class AzureIdentityTokenCallback(OIDCCallback):
+    def __init__(self, credential):
+        self.credential = credential
+
+    def fetch(self, context: OIDCCallbackContext) -> OIDCCallbackResult:
+        token = self.credential.get_token(
+            "https://ossrdbms-aad.database.windows.net/.default").token
+        return OIDCCallbackResult(access_token=token)
 
 def get_clients() -> Tuple[MongoClient, AzureOpenAI]:
     """
@@ -79,23 +93,23 @@ def get_clients_passwordless() -> Tuple[MongoClient, AzureOpenAI]:
         ValueError: If required environment variables are missing
     """
     # Get MongoDB connection string (still needed even with passwordless auth)
-    mongo_connection_string = os.getenv("MONGO_CONNECTION_STRING")
-    if not mongo_connection_string:
-        raise ValueError("MONGO_CONNECTION_STRING environment variable is required")
+    cluster_name = os.getenv("MONGO_CLUSTER_NAME")
+    if not cluster_name:
+        raise ValueError("MONGO_CLUSTER_NAME environment variable is required")
 
     # Create credential object for Azure authentication
     credential = DefaultAzureCredential()
 
+    authProperties = {"OIDC_CALLBACK": AzureIdentityTokenCallback(credential)}
+
     # Create MongoDB client with Azure AD token callback
     mongo_client = MongoClient(
-        mongo_connection_string,
-        maxPoolSize=50,
-        minPoolSize=5,
-        maxIdleTimeoutMS=30000,
-        serverSelectionTimeoutMS=5000,
-        socketTimeoutMS=20000,
-        authMechanism='MONGODB-OIDC',
-        authMechanismProperties={'REQUEST_TOKEN_CALLBACK': lambda: azure_identity_token_callback(credential)}
+        f"mongodb+srv://{cluster_name}.global.mongocluster.cosmos.azure.com/",
+        connectTimeoutMS=120000,
+        tls=True,
+        retryWrites=True,
+        authMechanism="MONGODB-OIDC",
+        authMechanismProperties=authProperties
     )
 
     # Get Azure OpenAI endpoint

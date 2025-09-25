@@ -343,6 +343,18 @@ paket-files/
 **/__pycache__/
 *.pyc
 
+# Python virtual environments
+venv/
+.venv/
+env/
+.env/
+ENV/
+.ENV/
+env.bak/
+venv.bak/
+.python-version
+.conda/
+
 # Cake - Uncomment if you are using it
 #tools/**
 #!tools/packages.config

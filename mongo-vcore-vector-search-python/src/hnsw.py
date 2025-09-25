@@ -8,7 +8,7 @@ effective for high-dimensional vectors and real-time search applications.
 
 import os
 from typing import List, Dict, Any
-from utils import get_clients, read_file_return_json, insert_data, print_search_results, drop_vector_indexes
+from utils import get_clients, get_clients_passwordless, read_file_return_json, insert_data, print_search_results, drop_vector_indexes
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -199,7 +199,7 @@ def main():
     try:
         # Initialize MongoDB and Azure OpenAI clients
         print("\nInitializing clients...")
-        mongo_client, azure_openai_client = get_clients()
+        mongo_client, azure_openai_client = get_clients_passwordless()
 
         # Access database and collection
         database = mongo_client[config['database_name']]

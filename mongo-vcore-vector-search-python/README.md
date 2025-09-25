@@ -33,7 +33,7 @@ Before running this project, you need:
 ```bash
 # Clone this repository
 git clone <your-repo-url>
-cd cosmos-db-vector-samples
+cd cosmos-db-vector-samples/mongo-vcore-vector-search-python
 
 # Create virtual environment
 python -m venv venv
