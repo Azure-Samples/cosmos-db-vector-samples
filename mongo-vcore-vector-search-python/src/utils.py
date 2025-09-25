@@ -20,11 +20,6 @@ from dotenv import load_dotenv
 # Load environment variables from .env file
 load_dotenv()
 
-# print env variables for debugging as single block of text
-print("Environment Variables:")
-for var in ["MONGO_CONNECTION_STRING", "AZURE_OPENAI_EMBEDDING_ENDPOINT", "AZURE_OPENAI_EMBEDDING_KEY"]:
-    print(f"  {var}: {os.getenv(var)}")
-
 class AzureIdentityTokenCallback(OIDCCallback):
     def __init__(self, credential):
         self.credential = credential
@@ -232,8 +227,6 @@ def insert_data(collection: Collection, data: List[Dict[str, Any]],
         batch_num = (i // batch_size) + 1
         total_batches = (total_documents + batch_size - 1) // batch_size
 
-        print(f"Processing batch {batch_num}/{total_batches} ({len(batch)} documents)...")
-
         try:
             # Prepare bulk insert operations
             operations = [InsertOne(document) for document in batch]
@@ -270,11 +263,6 @@ def insert_data(collection: Collection, data: List[Dict[str, Any]],
         'inserted': inserted_count,
         'failed': failed_count
     }
-
-    print(f"\nInsertion completed:")
-    print(f"  Total documents: {stats['total']}")
-    print(f"  Successfully inserted: {stats['inserted']}")
-    print(f"  Failed: {stats['failed']}")
 
     return stats
 
@@ -316,6 +304,29 @@ def drop_vector_indexes(collection, vector_field: str) -> None:
         # Continue anyway - the error might be that no indexes exist
 
 
+def print_search_resultsx(results: List[Dict[str, Any]],
+                        max_results: int = 5,
+                        show_score: bool = True) -> None:
+    """
+    Print search results in a formatted, readable way.
+
+    Args:
+        results: List of search result documents from MongoDB aggregation
+        max_results: Maximum number of results to display (default: 5)
+        show_score: Whether to display similarity scores (default: True)
+    """
+    if not results:
+        print("No search results found.")
+        return
+
+    print(f"\nSearch Results (showing top {min(len(results), max_results)}):")
+    print("=" * 80)
+
+    for i, result in enumerate(results[:max_results], 1):
+
+        # Display hotel name and ID
+        print(f"HotelName: {result['HotelName']}, Score: {result['score']:.4f}")
+
 def print_search_results(results: List[Dict[str, Any]],
                         max_results: int = 5,
                         show_score: bool = True) -> None:
@@ -335,47 +346,16 @@ def print_search_results(results: List[Dict[str, Any]],
     print("=" * 80)
 
     for i, result in enumerate(results[:max_results], 1):
-        print(f"\nResult {i}:")
-        print("-" * 40)
 
-        # Display similarity score if available and requested
-        if show_score and 'score' in result:
-            print(f"Similarity Score: {result['score']:.4f}")
+        # Check if results are nested under 'document' (when using $$ROOT)
+        if 'document' in result:
+            doc = result['document']
+        else:
+            doc = result
 
         # Display hotel name and ID
-        if 'HotelName' in result:
-            print(f"Hotel: {result['HotelName']}")
-        if 'HotelId' in result:
-            print(f"Hotel ID: {result['HotelId']}")
+        print(f"HotelName: {doc['HotelName']}, Score: {result['score']:.4f}")
 
-        # Display description if available
-        if 'Description' in result:
-            description = result['Description']
-            # Truncate very long descriptions for readability
-            if len(description) > 200:
-                description = description[:200] + "..."
-            print(f"Description: {description}")
-
-        # Display category and rating
-        if 'Category' in result:
-            print(f"Category: {result['Category']}")
-        if 'Rating' in result and result['Rating'] is not None:
-            print(f"Rating: {result['Rating']}")
-
-        # Display address if available
-        if 'Address' in result and result['Address']:
-            address = result['Address']
-            if isinstance(address, dict):
-                address_parts = []
-                if 'StreetAddress' in address:
-                    address_parts.append(address['StreetAddress'])
-                if 'City' in address:
-                    address_parts.append(address['City'])
-                if 'StateProvince' in address:
-                    address_parts.append(address['StateProvince'])
-
-                if address_parts:
-                    print(f"Address: {', '.join(address_parts)}")
 
     if len(results) > max_results:
         print(f"\n... and {len(results) - max_results} more results")

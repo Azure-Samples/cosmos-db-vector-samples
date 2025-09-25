@@ -68,14 +68,6 @@ def create_hnsw_vector_index(collection, vector_field: str, dimensions: int) -> 
         result = collection.database.command(index_command)
         print("HNSW vector index created successfully")
 
-        # Display index configuration for reference
-        print(f"Index configuration:")
-        print(f"  Type: HNSW (Hierarchical Navigable Small World)")
-        print(f"  Similarity metric: Cosine")
-        print(f"  Dimensions: {dimensions}")
-        print(f"  Max connections (m): 16")
-        print(f"  EF construction: 64")
-
     except Exception as e:
         print(f"Error creating HNSW vector index: {e}")
         raise
@@ -87,7 +79,7 @@ def perform_hnsw_vector_search(collection,
                               vector_field: str,
                               model_name: str,
                               top_k: int = 5,
-                              ef_search: int = 100) -> List[Dict[str, Any]]:
+                              ef_search: int = 16) -> List[Dict[str, Any]]:
     """
     Perform vector similarity search using HNSW index.
 
@@ -110,14 +102,12 @@ def perform_hnsw_vector_search(collection,
 
     try:
         # Convert query text to embedding vector
-        print("Generating embedding for query...")
         embedding_response = azure_openai_client.embeddings.create(
             input=[query_text],
             model=model_name
         )
 
         query_embedding = embedding_response.data[0].embedding
-        print(f"Generated embedding with {len(query_embedding)} dimensions")
 
         # Build aggregation pipeline for HNSW vector search
         pipeline = [
@@ -139,25 +129,16 @@ def perform_hnsw_vector_search(collection,
             {
                 # Select only the fields needed for display and add similarity score
                 "$project": {
-                    "HotelId": 1,
-                    "HotelName": 1,
-                    "Description": 1,
-                    "Category": 1,
-                    "Rating": 1,
-                    "Address": 1,
-                    "Tags": 1,
+                    "document": "$$ROOT",
                     # Add search score from metadata
                     "score": {"$meta": "searchScore"}
                 }
             }
         ]
 
-        print(f"Executing HNSW vector search (top {top_k} results, ef_search={ef_search})...")
-
         # Execute the search pipeline
         results = list(collection.aggregate(pipeline))
 
-        print(f"HNSW search completed: found {len(results)} similar results")
         return results
 
     except Exception as e:
@@ -192,9 +173,7 @@ def main():
     print(f"Configuration:")
     print(f"  Database: {config['database_name']}")
     print(f"  Collection: {config['collection_name']}")
-    print(f"  Data file: {config['data_file']}")
-    print(f"  Vector field: {config['vector_field']}")
-    print(f"  Vector dimensions: {config['dimensions']}")
+
 
     try:
         # Initialize MongoDB and Azure OpenAI clients
@@ -215,8 +194,6 @@ def main():
         if not documents_with_embeddings:
             raise ValueError(f"No documents found with embeddings in field '{config['vector_field']}'. "
                            "Please run create_embeddings.py first.")
-
-        print(f"Found {len(documents_with_embeddings)} documents with embeddings")
 
         # Insert data into MongoDB collection
         print(f"\nPreparing collection '{config['collection_name']}'...")
@@ -249,55 +226,21 @@ def main():
         time.sleep(2)
 
         # Demonstrate HNSW search with various queries
-        sample_queries = [
-            {
-                "query": "luxury hotel with excellent amenities",
-                "description": "High-end accommodation search"
-            },
-            {
-                "query": "budget friendly downtown location",
-                "description": "Affordable city center hotel"
-            },
-            {
-                "query": "hotel with kitchen and extended stay",
-                "description": "Long-term accommodation"
-            }
-        ]
+        query = "quintessential lodging near running trails, eateries, retail"
 
-        for query_info in sample_queries:
-            query = query_info["query"]
-            description = query_info["description"]
+        results = perform_hnsw_vector_search(
+            collection,
+            azure_openai_client,
+            query,
+            config['vector_field'],
+            config['model_name'],
+            top_k=5,
+            ef_search=16
+        )
 
-            print(f"\n{'='*80}")
-            print(f"SAMPLE SEARCH: {query}")
-            print(f"Description: {description}")
-            print('='*80)
+        # Display the search results
+        print_search_results(results, max_results=5, show_score=True)
 
-            # Perform HNSW search with different ef_search values to show trade-offs
-            for ef_search in [50, 100]:
-                print(f"\n--- Search with ef_search={ef_search} ---")
-
-                results = perform_hnsw_vector_search(
-                    collection,
-                    azure_openai_client,
-                    query,
-                    config['vector_field'],
-                    config['model_name'],
-                    top_k=3,
-                    ef_search=ef_search
-                )
-
-                # Display the search results
-                print_search_results(results, max_results=3, show_score=True)
-
-        print(f"\n{'='*80}")
-        print("HNSW vector search demonstration completed successfully!")
-        print("Key benefits of HNSW:")
-        print("  • Fast search with hierarchical graph structure")
-        print("  • High recall rates for similarity search")
-        print("  • Tunable parameters for accuracy vs speed trade-offs")
-        print("  • Excellent performance for real-time applications")
-        print('='*80)
 
     except Exception as e:
         print(f"\nError during HNSW demonstration: {e}")

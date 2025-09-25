@@ -50,7 +50,7 @@ async function main() {
                     },
                     cosmosSearchOptions: {
                         kind: 'vector-ivf',
-                        numLists: 1,
+                        numLists: 10,
                         similarity: 'COS',
                         dimensions: config.embeddingDimensions
                     }

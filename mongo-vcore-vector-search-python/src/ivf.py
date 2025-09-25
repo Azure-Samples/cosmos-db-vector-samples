@@ -65,13 +65,6 @@ def create_ivf_vector_index(collection, vector_field: str, dimensions: int) -> N
         result = collection.database.command(index_command)
         print("IVF vector index created successfully")
 
-        # Display configuration details for reference
-        print(f"Index configuration:")
-        print(f"  Type: IVF (Inverted File)")
-        print(f"  Similarity metric: Cosine")
-        print(f"  Dimensions: {dimensions}")
-        print(f"  Number of lists: 10")
-
     except Exception as e:
         print(f"Error creating IVF vector index: {e}")
         raise
@@ -83,7 +76,7 @@ def perform_ivf_vector_search(collection,
                              vector_field: str,
                              model_name: str,
                              top_k: int = 5,
-                             num_probes: int = 10) -> List[Dict[str, Any]]:
+                             num_probes: int = 1) -> List[Dict[str, Any]]:
     """
     Perform vector similarity search using IVF index.
 
@@ -106,14 +99,12 @@ def perform_ivf_vector_search(collection,
 
     try:
         # Generate embedding vector for the search query
-        print("Generating embedding for query...")
         embedding_response = azure_openai_client.embeddings.create(
             input=[query_text],
             model=model_name
         )
 
         query_embedding = embedding_response.data[0].embedding
-        print(f"Generated embedding with {len(query_embedding)} dimensions")
 
         # Construct aggregation pipeline for IVF vector search
         pipeline = [
@@ -135,26 +126,16 @@ def perform_ivf_vector_search(collection,
             {
                 # Project only the fields we want in the output and add similarity score
                 "$project": {
-                    "HotelId": 1,
-                    "HotelName": 1,
-                    "Description": 1,
-                    "Category": 1,
-                    "Rating": 1,
-                    "Address": 1,
-                    "Tags": 1,
-                    "ParkingIncluded": 1,
+                    "document": "$$ROOT",
                     # Add search score from metadata
                     "score": {"$meta": "searchScore"}
                 }
             }
         ]
 
-        print(f"Executing IVF vector search (top {top_k} results, {num_probes} cluster probes)...")
-
         # Run the search aggregation pipeline
         results = list(collection.aggregate(pipeline))
 
-        print(f"IVF search completed: found {len(results)} similar results")
         return results
 
     except Exception as e:
@@ -189,9 +170,7 @@ def main():
     print(f"Configuration:")
     print(f"  Database: {config['database_name']}")
     print(f"  Collection: {config['collection_name']}")
-    print(f"  Data file: {config['data_file']}")
-    print(f"  Vector field: {config['vector_field']}")
-    print(f"  Vector dimensions: {config['dimensions']}")
+
 
     try:
         # Initialize database and AI service clients
@@ -212,8 +191,6 @@ def main():
         if not documents_with_embeddings:
             raise ValueError(f"No documents found with embeddings in field '{config['vector_field']}'. "
                            "Please run create_embeddings.py first.")
-
-        print(f"Found {len(documents_with_embeddings)} documents with embeddings")
 
         # Prepare collection with fresh data
         print(f"\nPreparing collection '{config['collection_name']}'...")
@@ -245,62 +222,20 @@ def main():
         print("Waiting for index clustering to complete...")
         time.sleep(3)  # IVF may need more time for clustering
 
-        # Demonstrate IVF search capabilities with various scenarios
-        search_scenarios = [
-            {
-                "query": "hotel with pool and spa amenities",
-                "description": "Luxury amenities search",
-                "probes": [5, 10, 20]
-            },
-            {
-                "query": "budget accommodation with basic facilities",
-                "description": "Economy hotel search",
-                "probes": [5, 10]
-            },
-            {
-                "query": "extended stay hotel with kitchen facilities",
-                "description": "Long-term accommodation",
-                "probes": [10, 15]
-            }
-        ]
+        # Demonstrate IVF search 
+        query = "quintessential lodging near running trails, eateries, retail"
 
-        for scenario in search_scenarios:
-            query = scenario["query"]
-            description = scenario["description"]
-            probe_values = scenario["probes"]
+        results = perform_ivf_vector_search(
+            collection,
+            azure_openai_client,
+            query,
+            config['vector_field'],
+            config['model_name'],
+            top_k=5
+        )
 
-            print(f"\n{'='*80}")
-            print(f"SEARCH SCENARIO: {query}")
-            print(f"Description: {description}")
-            print('='*80)
-
-            # Test different probe values to show accuracy vs speed trade-off
-            for num_probes in probe_values:
-                print(f"\n--- IVF Search with {num_probes} cluster probes ---")
-                print(f"(Higher probe counts search more clusters for better accuracy)")
-
-                results = perform_ivf_vector_search(
-                    collection,
-                    azure_openai_client,
-                    query,
-                    config['vector_field'],
-                    config['model_name'],
-                    top_k=3,
-                    num_probes=num_probes
-                )
-
-                # Display the search results
-                print_search_results(results, max_results=3, show_score=True)
-
-        print(f"\n{'='*80}")
-        print("IVF vector search demonstration completed successfully!")
-        print("Key features of IVF indexing:")
-        print("  • Clusters vectors by similarity using centroids")
-        print("  • Fast search by examining only relevant clusters")
-        print("  • Configurable accuracy vs speed with probe parameters")
-        print("  • Efficient for large datasets with many vectors")
-        print("  • Good balance between memory usage and search quality")
-        print('='*80)
+        # Display the search results
+        print_search_results(results)
 
     except Exception as e:
         print(f"\nError during IVF demonstration: {e}")

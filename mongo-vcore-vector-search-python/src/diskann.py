@@ -68,14 +68,6 @@ def create_diskann_vector_index(collection, vector_field: str, dimensions: int) 
         result = collection.database.command(index_command)
         print("DiskANN vector index created successfully")
 
-        # Display index configuration for verification
-        print(f"Index configuration:")
-        print(f"  Type: DiskANN")
-        print(f"  Similarity metric: Cosine")
-        print(f"  Dimensions: {dimensions}")
-        print(f"  Max degree: 20")
-        print(f"  Build parameter: 10")
-
     except Exception as e:
         print(f"Error creating DiskANN vector index: {e}")
 
@@ -116,14 +108,12 @@ def perform_diskann_vector_search(collection,
 
     try:
         # Generate embedding for the query text
-        print("Generating embedding for query...")
         embedding_response = azure_openai_client.embeddings.create(
             input=[query_text],
             model=model_name
         )
 
         query_embedding = embedding_response.data[0].embedding
-        print(f"Generated embedding with {len(query_embedding)} dimensions")
 
         # Construct the aggregation pipeline for vector search
         # Cosmos DB for MongoDB vCore uses $search with cosmosSearch
@@ -146,24 +136,16 @@ def perform_diskann_vector_search(collection,
             {
                 # Add similarity score to the results
                 "$project": {
-                    "HotelId": 1,
-                    "HotelName": 1,
-                    "Description": 1,
-                    "Category": 1,
-                    "Rating": 1,
-                    "Address": 1,
+                    "document": "$$ROOT",
                     # Add search score from metadata
                     "score": {"$meta": "searchScore"}
                 }
             }
         ]
 
-        print(f"Executing DiskANN vector search (top {top_k} results)...")
-
         # Execute the aggregation pipeline
         results = list(collection.aggregate(pipeline))
 
-        print(f"Found {len(results)} similar results")
         return results
 
     except Exception as e:
@@ -222,8 +204,6 @@ def main():
             raise ValueError(f"No documents found with embeddings in field '{config['vector_field']}'. "
                            "Please run create_embeddings.py first.")
 
-        print(f"Found {len(documents_with_embeddings)} documents with embeddings")
-
         # Insert data into collection
         print(f"\nInserting data into collection '{config['collection_name']}'...")
 
@@ -242,7 +222,6 @@ def main():
             raise ValueError("No documents were inserted successfully")
 
         # Create DiskANN vector index
-        print("\nCreating DiskANN vector index...")
         create_diskann_vector_index(
             collection,
             config['vector_field'],
@@ -255,33 +234,20 @@ def main():
         time.sleep(2)
 
         # Perform sample vector search
-        sample_queries = [
-            "luxury hotel with pool and spa",
-            "budget accommodation downtown",
-            "hotel near airport with free parking"
-        ]
+        query = "quintessential lodging near running trails, eateries, retail"
 
-        for query in sample_queries:
-            print(f"\n{'='*80}")
-            print(f"SAMPLE SEARCH: {query}")
-            print('='*80)
+        results = perform_diskann_vector_search(
+            collection,
+            azure_openai_client,
+            query,
+            config['vector_field'],
+            config['model_name'],
+            top_k=5
+        )
 
-            results = perform_diskann_vector_search(
-                collection,
-                azure_openai_client,
-                query,
-                config['vector_field'],
-                config['model_name'],
-                top_k=3
-            )
+        # Display results
+        print_search_results(results, max_results=5, show_score=True)
 
-            # Display results
-            print_search_results(results, max_results=3, show_score=True)
-
-        print(f"\n{'='*80}")
-        print("DiskANN vector search demonstration completed successfully!")
-        print("The DiskANN index is now ready for interactive queries.")
-        print('='*80)
 
     except Exception as e:
         print(f"\nError during DiskANN demonstration: {e}")
