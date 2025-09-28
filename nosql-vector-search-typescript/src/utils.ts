@@ -1,83 +1,13 @@
 import { CosmosClient } from '@azure/cosmos';
 import { AzureOpenAI } from "openai";
 import { promises as fs } from "fs";
-import { DefaultAzureCredential, getBearerTokenProvider } from "@azure/identity";
+import { getClients, getClientsPasswordless, insertData } from './cosmos-operations.js';
+
 // Define a type for JSON data
 export type JsonData = Record<string, any>;
 
-export function getClients(): { aiClient: AzureOpenAI | null; dbClient: CosmosClient | null } {
-
-    let aiClient: AzureOpenAI | null = null;
-    let dbClient: CosmosClient | null = null;
-
-    const apiKey = process.env.AZURE_OPENAI_EMBEDDING_KEY!;
-    const apiVersion = process.env.AZURE_OPENAI_EMBEDDING_API_VERSION!;
-    const endpoint = process.env.AZURE_OPENAI_EMBEDDING_ENDPOINT!;
-    const deployment = process.env.AZURE_OPENAI_EMBEDDING_MODEL!;
-
-    if (apiKey && apiVersion && endpoint && deployment) {
-
-        aiClient = new AzureOpenAI({
-            apiKey,
-            apiVersion,
-            endpoint,
-            deployment
-        });
-    }
-
-    // Cosmos DB connection string or endpoint/key
-    // You may need to use endpoint and key separately for CosmosClient
-    const cosmosEndpoint = process.env.COSMOS_ENDPOINT!;
-    const cosmosKey = process.env.COSMOS_KEY!;
-
-    if (cosmosEndpoint && cosmosKey) {
-        dbClient = new CosmosClient({ endpoint: cosmosEndpoint, key: cosmosKey });
-    }
-
-    return { aiClient, dbClient };
-}
-
-/**
- * Get Azure OpenAI and Cosmos DB clients using passwordless authentication (managed identity)
- * This function uses DefaultAzureCredential for authentication instead of API keys
- * 
- * @returns Object containing AzureOpenAI and CosmosClient instances or null if configuration is missing
- */
-export function getClientsPasswordless(): { aiClient: AzureOpenAI | null; dbClient: CosmosClient | null } {
-    let aiClient: AzureOpenAI | null = null;
-    let dbClient: CosmosClient | null = null;
-
-    // For Azure OpenAI with DefaultAzureCredential
-    const apiVersion = process.env.AZURE_OPENAI_EMBEDDING_API_VERSION!;
-    const endpoint = process.env.AZURE_OPENAI_EMBEDDING_ENDPOINT!;
-    const deployment = process.env.AZURE_OPENAI_EMBEDDING_MODEL!;
-
-    if (apiVersion && endpoint && deployment) {
-        const credential = new DefaultAzureCredential();
-        const scope = "https://cognitiveservices.azure.com/.default";
-        const azureADTokenProvider = getBearerTokenProvider(credential, scope);
-        aiClient = new AzureOpenAI({
-            apiVersion,
-            endpoint,
-            deployment,
-            azureADTokenProvider 
-        });
-    }
-
-    // For Cosmos DB with DefaultAzureCredential
-    const cosmosEndpoint = process.env.COSMOS_ENDPOINT!;
-
-    if (cosmosEndpoint) {
-        const credential = new DefaultAzureCredential();
-
-        dbClient = new CosmosClient({ 
-            endpoint: cosmosEndpoint,
-            aadCredentials: credential // Use DefaultAzureCredential instead of key
-        });
-    }
-
-    return { aiClient, dbClient };
-}
+// Re-export client functions for backward compatibility
+export { getClients, getClientsPasswordless, insertData };
 export async function readFileReturnJson(filePath: string): Promise<JsonData[]> {
 
     console.log(`Reading JSON file from ${filePath}`);
@@ -90,38 +20,6 @@ export async function writeFileJson(filePath: string, jsonData: JsonData): Promi
     await fs.writeFile(filePath, jsonString, "utf-8");
 
     console.log(`Wrote JSON file to ${filePath}`);
-}
-export async function insertData(config, container, data) {
-    // Cosmos DB uses containers instead of collections
-    // Insert documents in batches
-    console.log(`Processing in batches of ${config.batchSize}...`);
-    const totalBatches = Math.ceil(data.length / config.batchSize);
-
-    let inserted = 0;
-    let failed = 0;
-    // Cosmos DB does not support bulk insert natively in SDK, but you can use stored procedures or loop
-    // Here we use a simple loop for demonstration
-    for (let i = 0; i < totalBatches; i++) {
-        const start = i * config.batchSize;
-        const end = Math.min(start + config.batchSize, data.length);
-        const batch = data.slice(start, end);
-        for (const doc of batch) {
-            try {
-                await container.items.create(doc);
-                inserted++;
-            } catch (error) {
-                console.error(`Error inserting document:`, error);
-                failed++;
-            }
-        }
-        // Small pause between batches to reduce resource contention
-        if (i < totalBatches - 1) {
-            await new Promise(resolve => setTimeout(resolve, 100));
-        }
-    }
-    // Index creation is handled by indexing policy in Cosmos DB, not programmatically per field
-    //TBD: If custom indexing policy is needed, update container indexing policy via SDK or portal
-    return { total: data.length, inserted, failed };
 }
 
 /**
