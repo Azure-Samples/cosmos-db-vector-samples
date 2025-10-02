@@ -1,5 +1,4 @@
 import { CosmosClient } from '@azure/cosmos';
-import { AzureOpenAI } from "openai";
 import { promises as fs } from "fs";
 import { getClients, getClientsPasswordless, insertData } from './cosmos-operations.js';
 
@@ -14,12 +13,6 @@ export async function readFileReturnJson(filePath: string): Promise<JsonData[]> 
 
     const fileAsString = await fs.readFile(filePath, "utf-8");
     return JSON.parse(fileAsString);
-}
-export async function writeFileJson(filePath: string, jsonData: JsonData): Promise<void> {
-    const jsonString = JSON.stringify(jsonData, null, 2);
-    await fs.writeFile(filePath, jsonString, "utf-8");
-
-    console.log(`Wrote JSON file to ${filePath}`);
 }
 
 /**

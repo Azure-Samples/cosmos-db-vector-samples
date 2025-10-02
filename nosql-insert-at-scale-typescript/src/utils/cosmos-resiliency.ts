@@ -1,17 +1,14 @@
 /**
- * Azure Cosmos DB Operations Module
+ * Azure Cosmos DB Resilience and Retry Logic Module
  * 
- * This module contains all Cosmos DB specific operations including:
- * - Client creation and authentication
- * - Error parsing and handling
- * - Document validation and preparation
- * - Resilient bulk insert operations with retry logic
- * - Database and container management
+ * This module contains all resilience-related functionality for Azure Cosmos DB operations including:
  * - Circuit breaker implementation for educational purposes
+ * - Custom retry logic for errors not handled by Azure SDK
+ * - Error parsing and retryability determination
+ * - Resilient bulk insert operations with comprehensive error handling
+ * - Delay/backoff utilities
  */
 import { Container, CosmosClient } from '@azure/cosmos';
-import { AzureOpenAI } from "openai";
-import { DefaultAzureCredential, getBearerTokenProvider } from "@azure/identity";
 import { v4 as uuidv4 } from 'uuid';
 import { MetricsCollector, Logger } from './metrics.js';
 import {
@@ -20,85 +17,13 @@ import {
   CircuitBreakerOptions,
   FailedDocument,
   ErrorDetails,
-  InsertResult,
-  JsonData
-} from './interfaces.js';
-
-// -------------------------------------------
-// Client Creation Functions
-// -------------------------------------------
-
-export function getClients(): { aiClient: AzureOpenAI | null; dbClient: CosmosClient | null } {
-    let aiClient: AzureOpenAI | null = null;
-    let dbClient: CosmosClient | null = null;
-
-    const apiKey = process.env.AZURE_OPENAI_EMBEDDING_KEY!;
-    const apiVersion = process.env.AZURE_OPENAI_EMBEDDING_API_VERSION!;
-    const endpoint = process.env.AZURE_OPENAI_EMBEDDING_ENDPOINT!;
-    const deployment = process.env.AZURE_OPENAI_EMBEDDING_MODEL!;
-
-    if (apiKey && apiVersion && endpoint && deployment) {
-        aiClient = new AzureOpenAI({
-            apiKey,
-            apiVersion,
-            endpoint,
-            deployment
-        });
-    }
-
-    // Cosmos DB connection string or endpoint/key
-    // You may need to use endpoint and key separately for CosmosClient
-    const cosmosEndpoint = process.env.COSMOS_ENDPOINT!;
-    const cosmosKey = process.env.COSMOS_KEY!;
-
-    if (cosmosEndpoint && cosmosKey) {
-        dbClient = new CosmosClient({ endpoint: cosmosEndpoint, key: cosmosKey });
-    }
-
-    return { aiClient, dbClient };
-}
-
-/**
- * Get Azure OpenAI and Cosmos DB clients using passwordless authentication (managed identity)
- * This function uses DefaultAzureCredential for authentication instead of API keys
- * 
- * @returns Object containing AzureOpenAI and CosmosClient instances or null if configuration is missing
- */
-export function getClientsPasswordless(): { aiClient: AzureOpenAI | null; dbClient: CosmosClient | null } {
-    let aiClient: AzureOpenAI | null = null;
-    let dbClient: CosmosClient | null = null;
-
-    // For Azure OpenAI with DefaultAzureCredential
-    const apiVersion = process.env.AZURE_OPENAI_EMBEDDING_API_VERSION!;
-    const endpoint = process.env.AZURE_OPENAI_EMBEDDING_ENDPOINT!;
-    const deployment = process.env.AZURE_OPENAI_EMBEDDING_MODEL!;
-
-    if (apiVersion && endpoint && deployment) {
-        const credential = new DefaultAzureCredential();
-        const scope = "https://cognitiveservices.azure.com/.default";
-        const azureADTokenProvider = getBearerTokenProvider(credential, scope);
-        aiClient = new AzureOpenAI({
-            apiVersion,
-            endpoint,
-            deployment,
-            azureADTokenProvider 
-        });
-    }
-
-    // For Cosmos DB with DefaultAzureCredential
-    const cosmosEndpoint = process.env.COSMOS_ENDPOINT!;
-
-    if (cosmosEndpoint) {
-        const credential = new DefaultAzureCredential();
-
-        dbClient = new CosmosClient({ 
-            endpoint: cosmosEndpoint,
-            aadCredentials: credential // Use DefaultAzureCredential instead of key
-        });
-    }
-
-    return { aiClient, dbClient };
-}
+  InsertResult
+} from './resilience-interfaces.js';
+import { JsonData } from './interfaces.js';
+import {
+  validateDocument,
+  generateOperationId
+} from './cosmos-operations.js';
 
 /**
  * Retry Resiliency implementation for Azure Cosmos DB operations
@@ -284,26 +209,24 @@ export function parseCosmosError(error: any): ErrorDetails {
 
 /**
  * Check if an error requires custom retry logic based on Azure Cosmos DB NoSQL official guidance
- * Note: SDK automatically retries 408, 410, 429, 449, 503 - only add custom retry where needed
+ * Note: While SDK has some retry for 429, bulk operations often need additional retry logic
  */
 export function isRetryableError(errorCode: number | string): boolean {
   const code = errorCode.toString();
 
-  // Based on Azure Cosmos DB NoSQL official guidance:
-  // Only retry errors where "Should add retry = Yes" AND "SDKs retry = No"
+  // Based on Azure Cosmos DB NoSQL official guidance and bulk operation best practices:
+  // Add custom retry for errors that benefit from application-level retry logic
   
-  // 403 is the main case where we should add custom retry (marked as "Optional")
-  // Only retry for transient auth issues, not for actual authorization failures
+  // Custom retryable codes for bulk operations
   const customRetryableCodes = [
-    '403' // Forbidden - Optional retry only for transient auth issues
+    '403', // Forbidden - Optional retry only for transient auth issues
+    '429'  // Too Many Requests - Additional retry for bulk operations beyond SDK retry
   ];
 
-  // These are handled by SDK automatically (SDKs retry = Yes)
-  // We don't need to add custom retry logic for these
+  // These are handled by SDK automatically but may need additional application retry for bulk ops
   const sdkHandledCodes = [
     '408', // Request Timeout - SDK handles this
     '410', // Gone - SDK handles this  
-    '429', // Too Many Requests - SDK handles this with x-ms-retry-after-ms
     '449', // Retry With - SDK handles this
     '503'  // Service Unavailable - SDK handles this
   ];
@@ -324,63 +247,19 @@ export function isRetryableError(errorCode: number | string): boolean {
     return false;
   }
 
-  // Only add custom retry for codes not handled by SDK
+  // Add custom retry for codes that benefit from application-level retry
   return customRetryableCodes.includes(code);
 }
-
-// -------------------------------------------
-// Document Operations
-// -------------------------------------------
-
-/**
- * Generate a unique operation ID for a document
- */
-export function generateOperationId(doc: JsonData, idField: string = DEFAULT_INSERT_CONFIG.idField): string {
-  const baseId = doc[idField] || uuidv4();
-  return `${baseId}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-}
-
-/**
- * Validate a document before insertion
- */
-export function validateDocument(doc: JsonData, idField: string = DEFAULT_INSERT_CONFIG.idField, schema?: Record<string, any>): boolean {
-  // Basic validation - document must be an object
-  if (!doc || typeof doc !== 'object' || Array.isArray(doc)) {
-    return false;
-  }
-
-  // Ensure document has an ID field or can generate one
-  if (!doc[idField]) {
-    // Allow documents without explicit ID as we can generate one
-    doc[idField] = uuidv4();
-  }
-
-  // Optional schema validation
-  if (schema) {
-    // Basic schema validation - could be enhanced with more sophisticated validation
-    for (const [key, expectedType] of Object.entries(schema)) {
-      if (doc[key] && typeof doc[key] !== expectedType) {
-        return false;
-      }
-    }
-  }
-
-  return true;
-}
-
-// -------------------------------------------
-// Utility Functions
-// -------------------------------------------
 
 /**
  * Delay function for exponential backoff
  */
-async function delay(ms: number): Promise<void> {
+export async function delay(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 // -------------------------------------------
-// Core Insert Operations
+// Core Insert Operations with Resilience
 // -------------------------------------------
 
 /**
@@ -409,6 +288,8 @@ export async function resilientInsert(
     documentCount: data.length,
     batchSize: config.batchSize
   });
+
+  console.log(`🚀 Starting batch processing of ${data.length} documents...`);
 
   // NOTE: Retry resiliency for handling errors not covered by Azure SDK's built-in retry logic.
 
@@ -446,6 +327,10 @@ export async function resilientInsert(
       totalProcessed: start
     });
 
+    if (totalBatches > 1) {
+      console.log(`📦 Processing batch ${i + 1}/${totalBatches} (${batch.length} documents)...`);
+    }
+
     // Validate documents before attempting insertion
     const validDocs = batch.filter(doc => {
       if (!validateDocument(doc, config.idField, config.schema)) {
@@ -463,10 +348,10 @@ export async function resilientInsert(
       return true;
     });
 
-    // Process each document in the batch with simplified retry logic
+    // Process each document in the batch with enhanced retry logic
     const batchPromises = validDocs.map(async (doc) => {
       let customRetries = 0;
-      const MAX_CUSTOM_RETRIES = 2; // Only for 403 Forbidden scenarios
+      const MAX_CUSTOM_RETRIES = 3; // Increased for handling 429 errors
       let lastError: ErrorDetails | null = null;
 
       while (customRetries <= MAX_CUSTOM_RETRIES) {
@@ -482,17 +367,25 @@ export async function resilientInsert(
           // Perform the insert operation with timeout
           // SDK automatically handles retries for: 408, 410, 429, 449, 503
           const insertPromise = container.items.create(docToInsert);
+          
+          let timeoutId: NodeJS.Timeout | undefined;
           const timeoutPromise = new Promise((_, reject) => {
-            setTimeout(() => reject(new Error('Operation timeout')), config.bulkInsertTimeoutMs);
+            timeoutId = setTimeout(() => reject(new Error('Operation timeout')), config.bulkInsertTimeoutMs);
           });
 
           const result = await Promise.race([insertPromise, timeoutPromise]) as any;
+          if (timeoutId) clearTimeout(timeoutId); // Clean up timeout if operation completes first
           const latency = Date.now() - startTime;
 
           // Record successful operation metrics
           metrics.recordRUs(result.requestCharge || 0);
           metrics.recordLatency(latency);
           retryResiliency.recordSuccess();
+
+          // Show success message if this was a retry
+          if (customRetries > 0) {
+            console.log(`✅ Document ${doc[config.idField]} successfully inserted after ${customRetries} ${customRetries === 1 ? 'retry' : 'retries'}`);
+          }
 
           inserted++;
           return { success: true, doc, result };
@@ -504,30 +397,49 @@ export async function resilientInsert(
           metrics.recordError(errorDetails.code);
           retryResiliency.recordFailure();
 
-          logger.warn(`Insert attempt ${customRetries + 1} failed`, {
-            docId: doc[config.idField],
-            error: errorDetails.message,
-            code: errorDetails.code
-          });
+          // Only log detailed warning if this is not going to be retried or is the final attempt
+          if (!isRetryableError(errorDetails.code) || customRetries >= MAX_CUSTOM_RETRIES) {
+            logger.warn(`Insert attempt ${customRetries + 1} failed`, {
+              docId: doc[config.idField],
+              error: errorDetails.message,
+              code: errorDetails.code
+            });
+          }
 
-          // Only retry 403 Forbidden if it might be transient auth issue
-          if (errorDetails.code === '403' && customRetries < MAX_CUSTOM_RETRIES) {
+          // Check if error is retryable
+          if (isRetryableError(errorDetails.code) && customRetries < MAX_CUSTOM_RETRIES) {
             customRetries++;
             retried++;
             
-            // Short delay for auth token refresh scenarios
-            const shortDelay = 500 * customRetries;
-            logger.debug(`Retrying 403 error after ${shortDelay}ms`, {
-              docId: doc[config.idField],
-              attempt: customRetries + 1
-            });
+            let retryDelay: number;
+            
+            if (errorDetails.code === '429') {
+              // For 429 errors, respect the retry-after header if available
+              if (errorDetails.retryAfterMs) {
+                retryDelay = errorDetails.retryAfterMs;
+              } else {
+                // Use exponential backoff starting from 1s for 429 errors
+                retryDelay = Math.min(1000 * Math.pow(2, customRetries - 1), 10000);
+              }
+              
+              console.log(`⏳ Rate limiting detected for document ${doc[config.idField]} - retrying in ${Math.round(retryDelay/1000)}s (attempt ${customRetries + 1}/${MAX_CUSTOM_RETRIES + 1})`);
+            } else if (errorDetails.code === '403') {
+              // Short delay for auth token refresh scenarios
+              retryDelay = 500 * customRetries;
+              
+              console.log(`🔑 Authentication issue for document ${doc[config.idField]} - retrying in ${Math.round(retryDelay/1000)}s (attempt ${customRetries + 1}/${MAX_CUSTOM_RETRIES + 1})`);
+            } else {
+              // Default exponential backoff for other retryable errors
+              retryDelay = Math.min(500 * Math.pow(2, customRetries - 1), 5000);
+              
+              console.log(`⚠️  Error ${errorDetails.code} for document ${doc[config.idField]} - retrying in ${Math.round(retryDelay/1000)}s (attempt ${customRetries + 1}/${MAX_CUSTOM_RETRIES + 1})`);
+            }
 
-            await delay(shortDelay);
+            await delay(retryDelay);
             continue;
           }
           
-          // All other errors: either handled by SDK already, or not retryable
-          // SDK already exhausted retries for 408, 410, 429, 449, 503
+          // All other errors: either not retryable or exhausted retries
           break;
         }
       }
@@ -567,87 +479,17 @@ export async function resilientInsert(
     durationMs: result.metrics.totalDurationMs
   });
 
+  console.log(`🎯 Batch processing completed: ${result.inserted} inserted, ${result.failed} failed, ${result.retried} retries`);
+
   return result;
 }
 
 /**
- * Simple batch insert function for basic Cosmos DB operations
- * This is a basic implementation - for production use resilientInsert() instead
+ * Removed: resilientInsertWithIndexManagement function
+ * 
+ * Index management is now handled by external scripts:
+ * - ./scripts/remove-vector-indexes.sh (run before bulk insert)
+ * - ./scripts/restore-vector-indexes.sh (run after bulk insert)
+ * 
+ * Use the main resilientInsert function for bulk operations.
  */
-export async function insertData(config: any, container: Container, data: JsonData[]): Promise<{ total: number; inserted: number; failed: number }> {
-    // Cosmos DB uses containers instead of collections
-    // Insert documents in batches
-    console.log(`Processing in batches of ${config.batchSize}...`);
-    const totalBatches = Math.ceil(data.length / config.batchSize);
-
-    let inserted = 0;
-    let failed = 0;
-    // Cosmos DB does not support bulk insert natively in SDK, but you can use stored procedures or loop
-    // Here we use a simple loop for demonstration
-    for (let i = 0; i < totalBatches; i++) {
-        const start = i * config.batchSize;
-        const end = Math.min(start + config.batchSize, data.length);
-        const batch = data.slice(start, end);
-        for (const doc of batch) {
-            try {
-                await container.items.create(doc);
-                inserted++;
-            } catch (error) {
-                console.error(`Error inserting document:`, error);
-                failed++;
-            }
-        }
-        // Small pause between batches to reduce resource contention
-        if (i < totalBatches - 1) {
-            await new Promise(resolve => setTimeout(resolve, 100));
-        }
-    }
-    // Index creation is handled by indexing policy in Cosmos DB, not programmatically per field
-    //TBD: If custom indexing policy is needed, update container indexing policy via SDK or portal
-    return { total: data.length, inserted, failed };
-}
-
-/**
- * Ensure Azure Cosmos DB database and container exist with proper partition key configuration
- */
-export async function ensureDatabaseAndContainer(
-  client: any, 
-  databaseName: string, 
-  containerName: string, 
-  partitionKeyPath: string
-): Promise<{ database: any, container: any }> {
-  try {
-    console.log(`Ensuring database ${databaseName} exists...`);
-    const { database } = await client.databases.createIfNotExists({ id: databaseName });
-    console.log(`Database ${databaseName} ensured.`);
-
-    console.log(`Ensuring container ${containerName} exists with partition key ${partitionKeyPath}...`);
-    
-    // IMPORTANT: Partition key cannot be changed after container creation
-    const { container } = await database.containers.createIfNotExists({ 
-      id: containerName,
-      partitionKey: { paths: [partitionKeyPath] }
-    });
-    
-    console.log(`Container ${containerName} ensured.`);
-    console.log(`PARTITION KEY SET TO: ${partitionKeyPath}`);
-    console.log(`Remember: Partition key cannot be changed after container creation!`);
-
-    return { database, container };
-  } catch (error: any) {
-    console.error(`\nERROR: Cannot access database or container. Please ensure they exist.`);
-    console.error(`Error details: ${error.message}\n`);
-    console.error(`IMPORTANT: You need to create the database and container manually before running this script:\n`);
-    console.error(`1. Database name: ${databaseName}`);
-    console.error(`2. Container name: ${containerName} `);
-    console.error(`3. Partition key: ${partitionKeyPath}\n`);
-    console.error(`You can create these resources through:`);
-    console.error(`- Azure Portal: https://portal.azure.com`);
-    console.error(`- Azure CLI: `);
-    console.error(`  az cosmosdb sql database create --account-name <your-account> --name ${databaseName} --resource-group <your-resource-group>`);
-    console.error(`  az cosmosdb sql container create --account-name <your-account> --database-name ${databaseName} --name ${containerName} --partition-key-path ${partitionKeyPath} --resource-group <your-resource-group>\n`);
-    console.error(`The account you're using doesn't have permission to create these resources programmatically.`);
-    
-    throw error;
-  }
-}

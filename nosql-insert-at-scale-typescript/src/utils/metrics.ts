@@ -163,18 +163,31 @@ export class Logger {
    * Log a message with the given level
    */
   private log(level: LogLevel, message: string, data?: any): void {
-    const timestamp = new Date().toISOString();
-    const logData = {
-      timestamp,
-      level,
-      correlationId: this.correlationId,
-      message,
-      ...(data ? { data } : {})
-    };
-
-    // In production, you might want to use a proper logging library
-    // or send logs to a centralized service
-    console.log(JSON.stringify(logData));
+    // Output clean console messages instead of JSON
+    let prefix = '';
+    switch (level) {
+      case LogLevel.DEBUG:
+        prefix = '🔍 ';
+        break;
+      case LogLevel.INFO:
+        prefix = 'ℹ️  ';
+        break;
+      case LogLevel.WARN:
+        prefix = '⚠️  ';
+        break;
+      case LogLevel.ERROR:
+        prefix = '❌ ';
+        break;
+      default:
+        prefix = '';
+    }
+    
+    console.log(`${prefix}${message}`);
+    
+    // If there's additional data and it's at DEBUG level, show it in a readable format
+    if (data && level === LogLevel.DEBUG) {
+      console.log(`   Details: ${JSON.stringify(data, null, 2)}`);
+    }
   }
 
   /**

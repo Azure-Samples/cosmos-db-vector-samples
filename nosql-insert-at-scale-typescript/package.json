@@ -1,23 +1,20 @@
 {
-  "name": "ts-cosmos-nodejs-nosql-vector-samples",
+  "name": "cosmos-vector-insert-at-scale",
   "version": "1.0.0",
   "main": "index.js",
   "type": "module",
   "scripts": {
     "build": "tsc",
-    "start:embed": "node --env-file .env dist/create-embeddings.js",
-    "start:index-and-query": "node --env-file .env dist/index-and-query.js",
     "start:insert-at-scale": "node --env-file .env dist/insert-at-scale.js"
   },
   "dependencies": {
     "@azure/cosmos": "^4.5.1",
     "@azure/identity": "^4.11.1",
-    "openai": "^5.20.1",
-    "uuid": "^11.1.0"
+    "uuid": "^13.0.0"
   },
   "devDependencies": {
-    "@types/node": "^24.3.0",
+    "@types/node": "^24.6.0",
     "@types/uuid": "^10.0.0",
-    "typescript": "^5.9.2"
+    "typescript": "^5.9.3"
   }
 }

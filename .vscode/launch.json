@@ -4,6 +4,20 @@
     // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
+        {
+            "name": "TS:No-sql:Insert-at-scale",
+            "request": "launch",
+            "runtimeArgs": [
+                "run",
+                "start:insert-at-scale"
+            ],
+            "runtimeExecutable": "npm",
+            "cwd": "${workspaceFolder}/nosql-insert-at-scale-typescript",
+            "skipFiles": [
+                "<node_internals>/**"
+            ],
+            "type": "node"
+        }
 
     ]
 }

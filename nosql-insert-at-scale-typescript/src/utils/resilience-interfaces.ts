@@ -1,12 +1,10 @@
 /**
- * Type definitions for Azure Cosmos DB bulk insert operations
- * This file contains all interfaces and type definitions used across the insert-at-scale implementation
+ * Type definitions for Azure Cosmos DB resilience and bulk insert operations
+ * This file contains all interfaces and type definitions used for resilient operations
  */
 
+import type { OperationMetrics } from './interfaces.js';
 import type { MetricsCollector } from './metrics.js';
-
-// Common type aliases
-export type JsonData = Record<string, any>;
 
 /**
  * Configuration options for resilient insert operations
@@ -55,7 +53,7 @@ export interface CircuitBreakerOptions {
  */
 export interface FailedDocument {
   /** The document that failed to insert */
-  document: JsonData;
+  document: Record<string, any>;
   /** Error details */
   error: ErrorDetails;
   /** Number of attempts made before failing */
@@ -96,36 +94,6 @@ export interface InsertResult {
   metrics: OperationMetrics;
   /** The metrics collector instance for advanced performance metrics */
   metricsCollector: MetricsCollector;
-}
-
-/**
- * Performance metrics for the operation
- */
-export interface OperationMetrics {
-  /** Total RU consumption */
-  totalRu: number;
-  /** Average RU per document */
-  avgRuPerDoc: number;
-  /** Maximum RU per operation */
-  maxRu: number;
-  /** Average latency in ms per document */
-  avgLatencyMs: number;
-  /** Maximum latency in ms for any single operation */
-  maxLatencyMs: number;
-  /** Error count by status code */
-  errorCounts: Record<string, number>;
-  /** Total duration of the operation in ms */
-  totalDurationMs: number;
-}
-
-/**
- * Log levels for the logger
- */
-export enum LogLevel {
-  DEBUG = 'DEBUG',
-  INFO = 'INFO',
-  WARN = 'WARN',
-  ERROR = 'ERROR'
 }
 
 /**
