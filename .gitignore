@@ -354,6 +354,7 @@ env.bak/
 venv.bak/
 .python-version
 .conda/
+.env*
 
 # Cake - Uncomment if you are using it
 #tools/**
