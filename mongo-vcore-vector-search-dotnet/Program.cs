@@ -1,13 +1,13 @@
 using Azure.AI.OpenAI;
 using Azure.Identity;
-using DocumentDbVectorSamples.Services;
-using DocumentDbVectorSamples.Services.VectorSearch;
-using DocumentDbVectorSamples.Models;
+using CosmosDbVectorSamples.Services;
+using CosmosDbVectorSamples.Services.VectorSearch;
+using CosmosDbVectorSamples.Models;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
-namespace DocumentDbVectorSamples;
+namespace CosmosDbVectorSamples;
 
 class Program
 {

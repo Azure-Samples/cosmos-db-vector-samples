@@ -1,12 +1,12 @@
 using Azure.Identity;
-using DocumentDbVectorSamples.Models;
+using CosmosDbVectorSamples.Models;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using MongoDB.Bson;
 using MongoDB.Driver;
 using Newtonsoft.Json;
 
-namespace DocumentDbVectorSamples.Services;
+namespace CosmosDbVectorSamples.Services;
 
 /// <summary>
 /// Service for MongoDB operations including data insertion, index management, and vector index creation.
