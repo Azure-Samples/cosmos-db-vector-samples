@@ -1,5 +1,5 @@
 import path from 'path';
-import { getClients, readFileReturnJson, getClientsPasswordless, insertData, printSearchResults } from './utils.js';
+import { readFileReturnJson, getClientsPasswordless, insertData, printSearchResults } from './utils.js';
 
 // ESM specific features - create __dirname equivalent
 import { fileURLToPath } from "node:url";
@@ -9,7 +9,7 @@ const __dirname = dirname(__filename);
 
 const config = {
     query: "quintessential lodging near running trails, eateries, retail",
-    dbName: "Hotels2",
+    dbName: "Hotels",
     collectionName: "hotels_ivf",
     indexName: "vectorIndex_ivf",
     dataFile: process.env.DATA_FILE_WITH_VECTORS!,
@@ -21,7 +21,7 @@ const config = {
 
 async function main() {
 
-    const { aiClient, dbClient } = getClients();
+    const { aiClient, dbClient } = getClientsPasswordless();
 
     try {
 
@@ -35,7 +35,7 @@ async function main() {
         await dbClient.connect();
         const db = dbClient.db(config.dbName);
         const collection = await db.createCollection(config.collectionName);
-        console.log(`in ${config.dbName} Created collection:`, config.collectionName);
+        console.log('Created collection:', config.collectionName);
         const data = await readFileReturnJson(path.join(__dirname, "..", config.dataFile));
         const insertSummary = await insertData(config, collection, data);
 
@@ -90,8 +90,7 @@ async function main() {
         ]).toArray();
 
         // Print the results
-        //printSearchResults(insertSummary, vectorIndexSummary, searchResults);
-        console.log(searchResults);
+        printSearchResults(insertSummary, vectorIndexSummary, searchResults);
 
     } catch (error) {
         console.error('App failed:', error);
