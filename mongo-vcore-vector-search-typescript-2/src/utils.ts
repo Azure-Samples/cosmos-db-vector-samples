@@ -30,7 +30,8 @@ export function getClients(): { aiClient: AzureOpenAI; dbClient: MongoClient } {
         minPoolSize: 1,          // Maintain at least one connection
         maxIdleTimeMS: 30000,    // Close idle connections after 30 seconds
         connectTimeoutMS: 30000, // Connection timeout
-        socketTimeoutMS: 360000, // Socket timeout (for long-running operations)
+        socketTimeoutMS: 120000, // Reduced from 6 minutes to 2 minutes
+        serverSelectionTimeoutMS: 30000, // Add server selection timeout
         writeConcern: {          // Optimize write concern for bulk operations
             w: 1,                // Acknowledge writes after primary has written
             j: false             // Don't wait for journal commit
@@ -234,7 +235,7 @@ export interface AgentConfig {
 export function createAgentConfig(): AgentConfig {
     return {
         // Database configuration
-        databaseName: process.env.MONGO_DB_NAME || 'Hotels2',
+        databaseName: process.env.MONGO_DB_NAME || 'Hotels26',
         
         // Search parameters
         maxResults: parseInt(process.env.MAX_SEARCH_RESULTS || '5'),
@@ -252,7 +253,7 @@ export function createAgentConfig(): AgentConfig {
         // Available collections with different vector index algorithms
         collections: [
             {
-                name: 'Hotels_Search_2',
+                name: 'Hotels_Search_27',
                 indexName: 'vectorIndex_ivf',
                 algorithm: 'vector-ivf',
                 description: 'IVF (Inverted File) - Good for large datasets with batch queries'
@@ -345,17 +346,17 @@ export async function executeHotelSearchWorkflow(
 ): Promise<string> {
     console.log(`🔍 Tool Execution - Hotel Search: "${query}"`);
     
+    // Get database clients
+    const { aiClient, dbClient } = agentConfig.usePasswordless ? 
+        getClientsPasswordless() : getClients();
+    
+    if (!aiClient || !dbClient) {
+        return JSON.stringify({ 
+            error: 'Failed to initialize clients. Check configuration.' 
+        });
+    }
+    
     try {
-        // Get database clients
-        const { aiClient, dbClient } = agentConfig.usePasswordless ? 
-            getClientsPasswordless() : getClients();
-        
-        if (!aiClient || !dbClient) {
-            return JSON.stringify({ 
-                error: 'Failed to initialize clients. Check configuration.' 
-            });
-        }
-        
         await dbClient.connect();
         
         // Get active collection configuration
@@ -384,8 +385,6 @@ export async function executeHotelSearchWorkflow(
             Math.min(maxResults, 10)
         );
         
-        await dbClient.close();
-        
         // Return results in JSON format for the agent
         return JSON.stringify({
             searchQuery: query,
@@ -401,6 +400,12 @@ export async function executeHotelSearchWorkflow(
             error: 'Search failed',
             message: error instanceof Error ? error.message : 'Unknown error'
         });
+    } finally {
+        try {
+            await dbClient.close();
+        } catch (closeError) {
+            console.error('❌ Error closing database connection:', closeError);
+        }
     }
 }
 
@@ -415,14 +420,15 @@ export async function executeSearchAnalysisWorkflow(
 ): Promise<string> {
     console.log(`📊 Tool Execution - Search Analysis: "${query}"`);
     
+    // Get database clients
+    const { aiClient, dbClient } = agentConfig.usePasswordless ? 
+        getClientsPasswordless() : getClients();
+    
+    if (!aiClient || !dbClient) {
+        return JSON.stringify({ error: 'Failed to initialize clients' });
+    }
+    
     try {
-        const { aiClient, dbClient } = agentConfig.usePasswordless ? 
-            getClientsPasswordless() : getClients();
-        
-        if (!aiClient || !dbClient) {
-            return JSON.stringify({ error: 'Failed to initialize clients' });
-        }
-        
         await dbClient.connect();
         
         const activeCollection = agentConfig.collections[agentConfig.activeCollectionIndex];
@@ -446,8 +452,6 @@ export async function executeSearchAnalysisWorkflow(
             searchConfig,
             sampleSize
         );
-        
-        await dbClient.close();
         
         return JSON.stringify({
             query,
@@ -476,6 +480,12 @@ export async function executeSearchAnalysisWorkflow(
             error: 'Analysis failed',
             message: error instanceof Error ? error.message : 'Unknown error'
         });
+    } finally {
+        try {
+            await dbClient.close();
+        } catch (closeError) {
+            console.error('❌ Error closing database connection:', closeError);
+        }
     }
 }
 

@@ -45,23 +45,49 @@ console.log(`  New embedded field: ${newEmbeddedField}`);
 console.log(`  Batch size: ${batchSize}`);
 console.log(`  Use passwordless: ${usePasswordless}`);
 
-try {
-    // Run the complete embedding workflow
-    const result = await createEmbeddingsWorkflow(
-        embeddingConfig,
-        inputFilePath,
-        outputFilePath,
-        usePasswordless
-    );
+async function main() {
+    // Handle process termination signals for graceful shutdown
+    let isShuttingDown = false;
+    const gracefulShutdown = async (signal: string) => {
+        if (isShuttingDown) return;
+        isShuttingDown = true;
+        console.log(`\n🚨 Received ${signal}. Shutting down gracefully...`);
+        console.log('✅ Embedding process terminated');
+        process.exit(0);
+    };
+    
+    process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+    process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 
-    console.log('\n✅ Embedding creation completed successfully!');
-    console.log(`📊 Summary:`);
-    console.log(`  Input items: ${result.inputItems}`);
-    console.log(`  Processed items: ${result.processedItems}`);
-    console.log(`  Model used: ${result.modelUsed}`);
-    console.log(`  Output file: ${result.outputFile}`);
+    try {
+        console.log('🚀 Starting embedding creation workflow...');
+        
+        // Run the complete embedding workflow
+        const result = await createEmbeddingsWorkflow(
+            embeddingConfig,
+            inputFilePath,
+            outputFilePath,
+            usePasswordless
+        );
 
-} catch (error) {
-    console.error(`❌ Failed to create embeddings: ${(error as Error).message}`);
-    process.exit(1);
+        console.log('\n✅ Embedding creation completed successfully!');
+        console.log(`📊 Summary:`);
+        console.log(`  Input items: ${result.inputItems}`);
+        console.log(`  Processed items: ${result.processedItems}`);
+        console.log(`  Model used: ${result.modelUsed}`);
+        console.log(`  Output file: ${result.outputFile}`);
+
+    } catch (error) {
+        console.error(`❌ Failed to create embeddings: ${(error as Error).message}`);
+        process.exitCode = 1;
+    } finally {
+        console.log('🔌 Embedding process completed');
+        process.exit(process.exitCode || 0);
+    }
 }
+
+// Execute main function
+main().catch(error => {
+    console.error('❌ Unhandled error in embedding creation:', error);
+    process.exit(1);
+});

@@ -225,6 +225,19 @@ const EXAMPLE_QUERIES = [
 async function main() {
     console.log('🚀 Starting LangChain Hotel Search Agent\n');
     
+    // Handle process termination signals for graceful shutdown
+    let isShuttingDown = false;
+    const gracefulShutdown = async (signal: string) => {
+        if (isShuttingDown) return;
+        isShuttingDown = true;
+        console.log(`\n🚨 Received ${signal}. Shutting down gracefully...`);
+        console.log('✅ Agent process terminated');
+        process.exit(0);
+    };
+    
+    process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+    process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+    
     try {
         // Create the agent
         const agent = await createHotelSearchAgent();
@@ -243,16 +256,21 @@ async function main() {
                 
                 const startTime = Date.now();
                 
-                // Execute the agent with the query
-                const result = await agent.invoke({ input: query });
-                
-                const duration = Date.now() - startTime;
-                
-                console.log('\n🤖 AGENT RESPONSE:');
-                console.log('-'.repeat(80));
-                console.log(result.output);
-                console.log('-'.repeat(80));
-                console.log(`⏱️  Execution time: ${duration}ms\n`);
+                try {
+                    // Execute the agent with the query
+                    const result = await agent.invoke({ input: query });
+                    
+                    const duration = Date.now() - startTime;
+                    
+                    console.log('\n🤖 AGENT RESPONSE:');
+                    console.log('-'.repeat(80));
+                    console.log(result.output);
+                    console.log('-'.repeat(80));
+                    console.log(`⏱️  Execution time: ${duration}ms\n`);
+                } catch (queryError) {
+                    console.error(`❌ Query ${index + 1} failed:`, queryError);
+                    // Continue with next query instead of failing completely
+                }
                 
                 // Brief pause between queries
                 if (index < EXAMPLE_QUERIES.length - 1) {
@@ -274,10 +292,11 @@ async function main() {
         
     } catch (error) {
         console.error('❌ Agent execution failed:', error);
-        process.exit(1);
+        process.exitCode = 1;
+    } finally {
+        console.log('\n🔌 Agent process completed');
+        process.exit(process.exitCode || 0);
     }
-    
-    console.log('\n✅ Agent execution completed successfully');
 }
 
 // ============================================================================
@@ -299,7 +318,7 @@ export {
 
 if (import.meta.url === `file://${process.argv[1]}`) {
     main().catch(error => {
-        console.error('❌ Application error:', error);
+        console.error('❌ Unhandled application error:', error);
         process.exit(1);
     });
 }

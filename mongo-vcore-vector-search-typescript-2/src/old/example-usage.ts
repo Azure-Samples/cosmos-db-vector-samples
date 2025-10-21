@@ -10,7 +10,7 @@ import {
     performVectorSearch,
     createVectorIndex,
     getClients
-} from './utils.js';
+} from '../utils.js';
 
 // ESM specific features - create __dirname equivalent
 import { fileURLToPath } from "node:url";
