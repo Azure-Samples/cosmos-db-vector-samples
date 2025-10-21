@@ -169,9 +169,9 @@ async function createHotelSearchAgent() {
     
     // Initialize the chat model (LLM that powers the agent)
     const chatClient = new AzureChatOpenAI({
-        azureOpenAIApiKey: process.env.AZURE_OPENAI_EMBEDDING_KEY,
-        azureOpenAIApiVersion: process.env.AZURE_OPENAI_EMBEDDING_API_VERSION,
-        azureOpenAIEndpoint: process.env.AZURE_OPENAI_EMBEDDING_ENDPOINT,
+        azureOpenAIApiKey: process.env.AZURE_OPENAI_API_KEY,
+        azureOpenAIApiVersion: process.env.AZURE_OPENAI_CHAT_API_VERSION,
+        azureOpenAIEndpoint: process.env.AZURE_OPENAI_ENDPOINT,
         azureOpenAIApiDeploymentName: process.env.AZURE_OPENAI_CHAT_MODEL || 'gpt-4o',
         temperature: 0.7, // Balanced creativity vs consistency
     });

@@ -14,9 +14,9 @@ export const AzureIdentityTokenCallback = async (params: OIDCCallbackParams, cre
     };
 };
 export function getClients(): { aiClient: AzureOpenAI; dbClient: MongoClient } {
-    const apiKey = process.env.AZURE_OPENAI_EMBEDDING_KEY!;
+    const apiKey = process.env.AZURE_OPENAI_API_KEY!;
     const apiVersion = process.env.AZURE_OPENAI_EMBEDDING_API_VERSION!;
-    const endpoint = process.env.AZURE_OPENAI_EMBEDDING_ENDPOINT!;
+    const endpoint = process.env.AZURE_OPENAI_ENDPOINT!;
     const deployment = process.env.AZURE_OPENAI_EMBEDDING_MODEL!;
     const aiClient = new AzureOpenAI({
         apiKey,
@@ -47,7 +47,7 @@ export function getClientsPasswordless(): { aiClient: AzureOpenAI | null; dbClie
 
     // For Azure OpenAI with DefaultAzureCredential
     const apiVersion = process.env.AZURE_OPENAI_EMBEDDING_API_VERSION!;
-    const endpoint = process.env.AZURE_OPENAI_EMBEDDING_ENDPOINT!;
+    const endpoint = process.env.AZURE_OPENAI_ENDPOINT!;
     const deployment = process.env.AZURE_OPENAI_EMBEDDING_MODEL!;
 
     if (apiVersion && endpoint && deployment) {
