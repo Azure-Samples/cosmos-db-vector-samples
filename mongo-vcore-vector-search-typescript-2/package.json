@@ -1,0 +1,32 @@
+{
+  "name": "ts-cosmos-nodejs-vector-samples",
+  "version": "1.0.0",
+  "description": "Samples for MongoDB vCore vector search with Cosmos DB",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "start:one-insert": "node --env-file .env dist/insert-one-document.js",
+    "start:embed": "node --env-file .env dist/create-embeddings.js",
+    "start:show-indexes": "node --env-file .env dist/showIndexes.js",
+    "start:ivf": "node --env-file .env dist/ivf.js",
+    "start:hnsw": "node --env-file .env dist/hnsw.js",
+    "start:diskann": "node --env-file .env dist/diskann.js",
+    "start:example": "node --env-file .env dist/example-usage.js",
+    "start:agentic": "node --env-file .env dist/agentic.js",
+    "start:agentic:test": "node --env-file .env dist/agentic.js -- --test"
+  },
+  "dependencies": {
+    "@azure/identity": "^4.11.1",
+    "@langchain/core": "^0.3.78",
+    "@langchain/openai": "^0.6.16",
+    "langchain": "^0.3.36",
+    "mongodb": "^6.18.0",
+    "openai": "^5.16.0",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@types/node": "^24.3.0",
+    "typescript": "^5.9.2"
+  }
+}
