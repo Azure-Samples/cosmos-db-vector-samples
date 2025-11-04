@@ -58,7 +58,7 @@ def get_clients() -> Tuple[MongoClient, AzureOpenAI]:
 
 def get_clients_passwordless() -> Tuple[MongoClient, AzureOpenAI]:
 
-    # Get MongoDB connection string (still needed even with passwordless auth)
+    # Get MongoDB cluster name for passwordless authentication
     cluster_name = os.getenv("MONGO_CLUSTER_NAME")
     if not cluster_name:
         raise ValueError("MONGO_CLUSTER_NAME environment variable is required")
