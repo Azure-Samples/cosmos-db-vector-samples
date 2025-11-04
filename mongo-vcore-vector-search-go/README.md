@@ -271,7 +271,6 @@ For passwordless authentication:
 1. Ensure you're logged in with `az login`
 2. Enable Native DocumentDB and Microsoft Entra ID authentication methods for your Azure Cosmos DB for MongoDB (vCore) resource.
 3. Grant your identity appropriate RBAC permissions on Cosmos DB. You need **Cosmos DB Account Reader Role** and **DocumentDB Account Contributor** roles assigned to your user.
-4. Use the passwordless connection string format in `.env`
 
 ## Project Structure
 
@@ -301,7 +300,7 @@ mongo-vcore-vector-search-go/
 - **IVF**: Clustering-based approach with configurable accuracy
 
 ### Utilities
-- Flexible authentication (connection string or passwordless with Azure Active Directory)
+- Flexible authentication (connection string or passwordless with Azure Entra ID)
 - Batch processing for large datasets with configurable batch sizes
 - Comprehensive error handling and retry logic
 - Progress tracking for long operations
