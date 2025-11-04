@@ -76,15 +76,8 @@ az cognitiveservices account create \
 5. Note the deployment name for configuration
 
 #### Create Cosmos DB for MongoDB (vCore)
-```bash
-# Create Cosmos DB for MongoDB (vCore) account
-az cosmosdb create \
-    --name myCosmosAccount \
-    --resource-group myResourceGroup \
-    --locations regionName=eastus \
-    --kind MongoDB \
-    --capabilities EnableMongo EnableServerless
-```
+
+Learn how to create a Cosmos DB for MongoDB (vCore) account in the [official documentation](https://learn.microsoft.com/en-us/azure/cosmos-db/mongodb/vcore/quickstart-portal).
 
 ### Step 3: Configure Environment Variables
 
