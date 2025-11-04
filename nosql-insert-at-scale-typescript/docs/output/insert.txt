@@ -1,0 +1,159 @@
+> cosmos-vector-insert-at-scale@1.0.0 start:insert
+> node --env-file .env dist/insert.js
+
+🏨 Azure Cosmos DB Insert at Scale Operations
+==============================================
+Environment: development
+Timestamp: 2025-11-04T15:33:35.144Z
+✅ Cosmos DB client initialized successfully
+🔍 Connection Details:
+   Database: Hotels
+   Container: Insert-at-scale-2
+   Partition Key Path: /HotelId
+   Batch Size: 5
+   Max Concurrency: 1
+
+📊 Step 1: Loading Data
+=======================
+Reading JSON file from C:\Users\diberry\repos\samples\cosmos-db-vector-samples\nosql-insert-at-scale-typescript\HotelsData_text_embedding_small_3.json
+✅ Loaded 50 documents from ../HotelsData_text_embedding_small_3.json
+🔍 Validating that documents contain embedding field 'embedding'...
+✅ All documents contain valid embedding field 'embedding' with 1536 dimensions
+
+🚀 Step 2: Enterprise-Grade Bulk Insert
+======================================
+Configuration:
+  - Database: Hotels
+  - Container: Insert-at-scale-2
+  - Batch size: 5
+  - Concurrency: 1
+  - Documents to insert: 50
+Getting database Hotels...
+Getting container Insert-at-scale-2...
+✅ Database: Hotels
+✅ Container: Insert-at-scale-2
+✅ Partition key: /HotelId
+
+Starting resilient insert...
+ℹ️  Starting resilient insert operation
+🚀 Starting batch processing of 50 documents...
+ℹ️  Processing batch 1/10
+📦 Processing document group 1/10 (5 documents)...
+📋 Bulk operation completed for document group with 5 operations
+   Response length: 5
+   Status code summary: { '201': 5 }
+ℹ️  Processing batch 2/10
+📦 Processing document group 2/10 (5 documents)...
+📋 Bulk operation completed for document group with 5 operations
+   Response length: 5
+   Status code summary: { '201': 5 }
+ℹ️  Processing batch 3/10
+📦 Processing document group 3/10 (5 documents)...
+📋 Bulk operation completed for document group with 5 operations
+   Response length: 5
+   Status code summary: { '201': 5 }
+ℹ️  Processing batch 4/10
+📦 Processing document group 4/10 (5 documents)...
+📋 Bulk operation completed for document group with 5 operations
+   Response length: 5
+   Status code summary: { '201': 4, '429': 1 }
+⏳ Rate limiting detected - retrying 1 documents in 1s (attempt 2/4)
+📋 Bulk operation completed for document group with 1 operations
+   Response length: 1
+   Status code summary: { '201': 1 }
+✅ Document 27 successfully inserted after 1 retry
+ℹ️  Processing batch 5/10
+📦 Processing document group 5/10 (5 documents)...
+📋 Bulk operation completed for document group with 5 operations
+   Response length: 5
+   Status code summary: { '201': 5 }
+ℹ️  Processing batch 6/10
+📦 Processing document group 6/10 (5 documents)...
+📋 Bulk operation completed for document group with 5 operations
+   Response length: 5
+   Status code summary: { '201': 5 }
+ℹ️  Processing batch 7/10
+📦 Processing document group 7/10 (5 documents)...
+📋 Bulk operation completed for document group with 5 operations
+   Response length: 5
+   Status code summary: { '201': 3, '429': 2 }
+⏳ Rate limiting detected - retrying 2 documents in 1s (attempt 2/4)
+📋 Bulk operation completed for document group with 2 operations
+   Response length: 2
+   Status code summary: { '201': 2 }
+✅ Document 4 successfully inserted after 1 retry
+✅ Document 40 successfully inserted after 1 retry
+ℹ️  Processing batch 8/10
+📦 Processing document group 8/10 (5 documents)...
+📋 Bulk operation completed for document group with 5 operations
+   Response length: 5
+   Status code summary: { '201': 5 }
+ℹ️  Processing batch 9/10
+📦 Processing document group 9/10 (5 documents)...
+📋 Bulk operation completed for document group with 5 operations
+   Response length: 5
+   Status code summary: { '201': 5 }
+ℹ️  Processing batch 10/10
+📦 Processing document group 10/10 (5 documents)...
+📋 Bulk operation completed for document group with 5 operations
+   Response length: 5
+   Status code summary: { '201': 3, '429': 2 }
+⏳ Rate limiting detected - retrying 2 documents in 1s (attempt 2/4)
+📋 Bulk operation completed for document group with 2 operations
+   Response length: 2
+   Status code summary: { '201': 2 }
+✅ Document 8 successfully inserted after 1 retry
+✅ Document 9 successfully inserted after 1 retry
+ℹ️  Resilient insert operation completed
+🎯 Batch processing completed: 50 inserted, 0 failed, 5 retries
+
+✅ Insert Operation Complete:
+   Inserted: 50/50 documents
+   Failed: 0, Retries: 5
+   Total time: 8.0s
+   RU consumed: 15,559.476
+   Avg RU/doc: 311.19
+   Avg latency: 94ms/doc
+   Peak RU/s observed: 316.4
+   💡 Set SHOW_COST=true to see cost estimation
+
+⚠️  Errors encountered:
+   429: 5 occurrences
+   💡 Autoscale Tips:
+      - Your current max autoscale RU/s may be too low
+      - Autoscale takes 10-30 seconds to scale up
+      - Consider increasing max autoscale RU/s to 1000
+      - Or reduce batch size further (currently 5)
+
+📈 Step 3: Performance Analysis
+==============================
+RU Consumption Analysis:
+  - Total RUs: 15,559.476
+  - Average RU/document: 311.19
+  - Peak RU/operation: 316.43
+
+Performance Metrics:
+  - Total duration: 8.0s
+  - Average latency: 94ms/document
+  - Peak latency: 220ms
+  - Throughput: 6.2 docs/second
+
+Optimization Recommendations:
+  ⚠️  High RU consumption per document (311.19 RU/doc)
+     - Consider document size optimization
+     - Review indexing policies
+  💡 For detailed optimization guidance, see INSERT_AT_SCALE_GUIDE.md
+
+🎉 All Operations Completed Successfully!
+========================================
+✅ 50 documents inserted with resilience
+✅ Performance metrics captured
+
+📚 Next Steps:
+  - Review the performance metrics above
+  - Adjust batch sizes and concurrency based on your RU provisioning
+  - Implement the patterns in your production workloads
+  - Monitor RU consumption and optimize accordingly
+
+📖 For detailed documentation, see INSERT_AT_SCALE_GUIDE.md
+✅ Cosmos DB client disposed successfully

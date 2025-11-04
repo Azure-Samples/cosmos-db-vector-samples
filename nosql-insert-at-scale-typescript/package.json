@@ -1,0 +1,23 @@
+{
+  "name": "cosmos-vector-insert-at-scale",
+  "version": "1.0.0",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "start:create-embeddings": "node --env-file .env dist/create-embeddings.js",
+    "start:insert": "node --env-file .env dist/insert.js",
+    "start:delete": "node --env-file .env dist/delete.js"
+  },
+  "dependencies": {
+    "@azure/cosmos": "^4.5.1",
+    "@azure/identity": "^4.11.1",
+    "openai": "^6.7.0",
+    "uuid": "^13.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.6.0",
+    "@types/uuid": "^10.0.0",
+    "typescript": "^5.9.3"
+  }
+}

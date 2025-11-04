@@ -12,6 +12,7 @@
         "forceConsistentCasingInFileNames": true,
         "sourceMap": true,
         "resolveJsonModule": true,
+        "strictPropertyInitialization": false
     },
     "include": [
         "src/**/*"

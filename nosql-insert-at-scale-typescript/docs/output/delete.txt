@@ -1,0 +1,245 @@
+> cosmos-vector-insert-at-scale@1.0.0 start:delete
+> node --env-file .env dist/delete.js
+
+🗑️  Azure Cosmos DB Delete All Documents Operations
+==================================================
+Environment: development
+Timestamp: 2025-11-04T15:34:35.535Z
+✅ Cosmos DB client initialized successfully
+🔍 Connection Details:
+   Database: Hotels
+   Container: Insert-at-scale-2
+   Partition Key Path: /HotelId
+   Batch Size: 5
+   Max Concurrency: 1
+Getting database Hotels...
+Getting container Insert-at-scale-2...
+✅ Database: Hotels
+✅ Container: Insert-at-scale-2
+✅ Partition key: /HotelId
+
+📊 Step 1: Querying All Documents
+==================================
+🔍 Querying document references from container...
+✅ Found 100 document references
+
+⚠️  WARNING: This will delete ALL 100 documents in the container!
+   Database: Hotels
+   Container: Insert-at-scale-2
+   This action cannot be undone.
+
+   Proceeding with deletion in 3 seconds...
+
+🗑️  Step 2: Enterprise-Grade Bulk Delete
+=======================================
+Configuration:
+  - Database: Hotels
+  - Container: Insert-at-scale-2
+  - Batch size: 5
+  - Concurrency: 1
+  - Documents to delete: 100
+
+Starting resilient delete...
+ℹ️  Starting resilient delete operation
+ℹ️  Starting resilient delete operation
+🚀 Starting batch processing of 100 documents...
+ℹ️  Processing batch 1/20
+📦 Processing document group 1/20 (5 documents)...
+📋 Bulk delete completed for document group with 5 operations
+   Response length: 5
+   Status code summary: { '204': 5 }
+ℹ️  Processing batch 2/20
+📦 Processing document group 2/20 (5 documents)...
+📋 Bulk delete completed for document group with 5 operations
+   Response length: 5
+   Status code summary: { '204': 4, '429': 1 }
+⏳ Rate limiting detected - retrying 1 documents in 1s (attempt 2/4)
+📋 Bulk delete completed for document group with 1 operations
+   Response length: 1
+   Status code summary: { '204': 1 }
+✅ Document 299cf84c-078e-41bc-acc0-3c0fb781db04 successfully deleted after 1 retry
+ℹ️  Processing batch 3/20
+📦 Processing document group 3/20 (5 documents)...
+📋 Bulk delete completed for document group with 5 operations
+   Response length: 5
+   Status code summary: { '204': 5 }
+ℹ️  Processing batch 4/20
+📦 Processing document group 4/20 (5 documents)...
+📋 Bulk delete completed for document group with 5 operations
+   Response length: 5
+   Status code summary: { '204': 4, '429': 1 }
+⏳ Rate limiting detected - retrying 1 documents in 1s (attempt 2/4)
+📋 Bulk delete completed for document group with 1 operations
+   Response length: 1
+   Status code summary: { '204': 1 }
+✅ Document 0ee4eef7-a2ca-4e46-8f09-b3e89340d87c successfully deleted after 1 retry
+ℹ️  Processing batch 5/20
+📦 Processing document group 5/20 (5 documents)...
+📋 Bulk delete completed for document group with 5 operations
+   Response length: 5
+   Status code summary: { '204': 5 }
+ℹ️  Processing batch 6/20
+📦 Processing document group 6/20 (5 documents)...
+📋 Bulk delete completed for document group with 5 operations
+   Response length: 5
+   Status code summary: { '204': 4, '429': 1 }
+⏳ Rate limiting detected - retrying 1 documents in 1s (attempt 2/4)
+📋 Bulk delete completed for document group with 1 operations
+   Response length: 1
+   Status code summary: { '204': 1 }
+✅ Document 71a41b46-b651-48dc-8305-615df91beb32 successfully deleted after 1 retry
+ℹ️  Processing batch 7/20
+📦 Processing document group 7/20 (5 documents)...
+📋 Bulk delete completed for document group with 5 operations
+   Response length: 5
+   Status code summary: { '204': 5 }
+ℹ️  Processing batch 8/20
+📦 Processing document group 8/20 (5 documents)...
+📋 Bulk delete completed for document group with 5 operations
+   Response length: 5
+   Status code summary: { '204': 4, '429': 1 }
+⏳ Rate limiting detected - retrying 1 documents in 1s (attempt 2/4)
+📋 Bulk delete completed for document group with 1 operations
+   Response length: 1
+   Status code summary: { '204': 1 }
+✅ Document bf76bea2-87ab-4ac4-9410-bb722aca083f successfully deleted after 1 retry
+ℹ️  Processing batch 9/20
+📦 Processing document group 9/20 (5 documents)...
+📋 Bulk delete completed for document group with 5 operations
+   Response length: 5
+   Status code summary: { '204': 5 }
+ℹ️  Processing batch 10/20
+📦 Processing document group 10/20 (5 documents)...
+📋 Bulk delete completed for document group with 5 operations
+   Response length: 5
+   Status code summary: { '204': 4, '429': 1 }
+⏳ Rate limiting detected - retrying 1 documents in 1s (attempt 2/4)
+📋 Bulk delete completed for document group with 1 operations
+   Response length: 1
+   Status code summary: { '204': 1 }
+✅ Document de7a105c-ac80-4f66-ab83-6f0f59dcf9a9 successfully deleted after 1 retry
+ℹ️  Processing batch 11/20
+📦 Processing document group 11/20 (5 documents)...
+📋 Bulk delete completed for document group with 5 operations
+   Response length: 5
+   Status code summary: { '204': 5 }
+ℹ️  Processing batch 12/20
+📦 Processing document group 12/20 (5 documents)...
+📋 Bulk delete completed for document group with 5 operations
+   Response length: 5
+   Status code summary: { '204': 4, '429': 1 }
+⏳ Rate limiting detected - retrying 1 documents in 1s (attempt 2/4)
+📋 Bulk delete completed for document group with 1 operations
+   Response length: 1
+   Status code summary: { '204': 1 }
+✅ Document 46e06ff7-7a87-4c01-b42a-c1bbeee10dbc successfully deleted after 1 retry
+ℹ️  Processing batch 13/20
+📦 Processing document group 13/20 (5 documents)...
+📋 Bulk delete completed for document group with 5 operations
+   Response length: 5
+   Status code summary: { '204': 5 }
+ℹ️  Processing batch 14/20
+📦 Processing document group 14/20 (5 documents)...
+📋 Bulk delete completed for document group with 5 operations
+   Response length: 5
+   Status code summary: { '204': 4, '429': 1 }
+⏳ Rate limiting detected - retrying 1 documents in 1s (attempt 2/4)
+📋 Bulk delete completed for document group with 1 operations
+   Response length: 1
+   Status code summary: { '204': 1 }
+✅ Document c8c396f3-5fdf-4983-bbb8-13fbc68ccaee successfully deleted after 1 retry
+ℹ️  Processing batch 15/20
+📦 Processing document group 15/20 (5 documents)...
+📋 Bulk delete completed for document group with 5 operations
+   Response length: 5
+   Status code summary: { '204': 5 }
+ℹ️  Processing batch 16/20
+📦 Processing document group 16/20 (5 documents)...
+📋 Bulk delete completed for document group with 5 operations
+   Response length: 5
+   Status code summary: { '204': 4, '429': 1 }
+⏳ Rate limiting detected - retrying 1 documents in 1s (attempt 2/4)
+📋 Bulk delete completed for document group with 1 operations
+   Response length: 1
+   Status code summary: { '204': 1 }
+✅ Document 13a43873-a6f4-4a55-8508-fcf837d6f500 successfully deleted after 1 retry
+ℹ️  Processing batch 17/20
+📦 Processing document group 17/20 (5 documents)...
+📋 Bulk delete completed for document group with 5 operations
+   Response length: 5
+   Status code summary: { '204': 5 }
+ℹ️  Processing batch 18/20
+📦 Processing document group 18/20 (5 documents)...
+📋 Bulk delete completed for document group with 5 operations
+   Response length: 5
+   Status code summary: { '204': 4, '429': 1 }
+⏳ Rate limiting detected - retrying 1 documents in 1s (attempt 2/4)
+📋 Bulk delete completed for document group with 1 operations
+   Response length: 1
+   Status code summary: { '204': 1 }
+✅ Document ac9c01cd-4306-4650-9e41-91a6a66be884 successfully deleted after 1 retry
+ℹ️  Processing batch 19/20
+📦 Processing document group 19/20 (5 documents)...
+📋 Bulk delete completed for document group with 5 operations
+   Response length: 5
+   Status code summary: { '204': 5 }
+ℹ️  Processing batch 20/20
+📦 Processing document group 20/20 (5 documents)...
+📋 Bulk delete completed for document group with 5 operations
+   Response length: 5
+   Status code summary: { '204': 4, '429': 1 }
+⏳ Rate limiting detected - retrying 1 documents in 1s (attempt 2/4)
+📋 Bulk delete completed for document group with 1 operations
+   Response length: 1
+   Status code summary: { '204': 1 }
+✅ Document bedf98d6-7351-4633-ba02-2f7c2b50ac77 successfully deleted after 1 retry
+ℹ️  Resilient delete operation completed
+🎯 Batch processing completed: 100 deleted, 0 failed, 10 retries
+ℹ️  Resilient delete operation completed
+
+✅ Delete Operation Complete:
+   Deleted: 100/100 documents
+   Failed: 0, Retries: 10
+   Total time: 14.4s
+   RU consumed: 30,791.238
+   Avg RU/doc: 307.91
+   Avg latency: 39ms/doc
+   Peak RU/s observed: 313.1
+   💡 Set SHOW_COST=true to see cost estimation
+
+⚠️  Errors encountered:
+   429: 10 occurrences
+   💡 Autoscale Tips:
+      - Your current max autoscale RU/s may be too low
+      - Consider increasing max autoscale RU/s to 1000
+      - Or reduce batch size further (currently 5)
+
+📈 Step 3: Performance Analysis
+===============================
+RU Consumption Analysis:
+  - Total RUs: 30,791.238
+  - Average RU/document: 307.91
+  - Peak RU/operation: 313.14
+
+Performance Metrics:
+  - Total duration: 14.3s
+  - Average latency: 39ms/document
+  - Peak latency: 114ms
+  - Throughput: 7.0 docs/second
+
+Optimization Recommendations:
+  ⚠️  High RU consumption per document (307.91 RU/doc)
+     - Consider optimizing query patterns
+  ⚠️  Rate limiting detected - consider increasing batch delays
+  💡 For detailed optimization guidance, see documentation
+
+🎉 All Operations Completed Successfully!
+========================================
+✅ 100 documents deleted with resilience
+✅ Performance metrics captured
+
+📚 Summary:
+  - Container has been cleared of all documents
+  - Delete operation completed with retry logic
+  - RU consumption tracked and analyzed
+✅ Cosmos DB client disposed successfully
