@@ -241,9 +241,37 @@ If you encounter "not enabled for this cluster tier" errors:
 
 ## Authentication Options
 
-The project supports two authentication methods:
+The project supports two authentication methods. **Passwordless authentication is strongly recommended** as it follows Azure security best practices.
 
-### Method 1: Connection String Authentication (Simpler)
+### Method 1: Passwordless Authentication (Recommended - Most Secure)
+
+Uses Azure Entra ID with DefaultAzureCredential for enhanced security:
+
+```go
+config := LoadConfig()
+mongoClient, azureOpenAIClient, err := GetClientsPasswordless()
+if err != nil {
+    log.Fatalf("Failed to initialize clients: %v", err)
+}
+defer mongoClient.Disconnect(ctx)
+```
+
+**Benefits of passwordless authentication:**
+- ✅ No credentials stored in connection strings
+- ✅ Uses Azure AD authentication and RBAC
+- ✅ Automatic token rotation and renewal
+- ✅ Centralized identity management
+- ✅ Better audit and compliance capabilities
+
+**Setup for passwordless authentication:**
+
+1. Ensure you're logged in with `az login`
+2. Enable Native DocumentDB and Microsoft Entra ID authentication methods for your Azure Cosmos DB for MongoDB (vCore) resource.
+3. Grant your identity appropriate RBAC permissions on Cosmos DB. You need **Cosmos DB Account Reader Role** and **DocumentDB Account Contributor** roles assigned to your user.
+4. Set `MONGO_CLUSTER_NAME` instead of `MONGO_CONNECTION_STRING` in `.env`
+
+### Method 2: Connection String Authentication
+
 Uses MongoDB connection string with username/password:
 
 ```go
@@ -255,22 +283,7 @@ if err != nil {
 defer mongoClient.Disconnect(ctx)
 ```
 
-### Method 2: Passwordless Authentication (More Secure)
-Uses Azure Active Directory with DefaultAzureCredential:
-
-```go
-config := LoadConfig()
-mongoClient, azureOpenAIClient, err := GetClientsPasswordless()
-if err != nil {
-    log.Fatalf("Failed to initialize clients: %v", err)
-}
-defer mongoClient.Disconnect(ctx)
-```
-
-For passwordless authentication:
-1. Ensure you're logged in with `az login`
-2. Enable Native DocumentDB and Microsoft Entra ID authentication methods for your Azure Cosmos DB for MongoDB (vCore) resource.
-3. Grant your identity appropriate RBAC permissions on Cosmos DB. You need **Cosmos DB Account Reader Role** and **DocumentDB Account Contributor** roles assigned to your user.
+**Note:** While simpler to set up, this method requires storing credentials in your configuration and is less secure than passwordless authentication.
 
 ## Project Structure
 
