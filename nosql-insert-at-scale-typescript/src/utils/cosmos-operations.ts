@@ -5,12 +5,13 @@
  * - Client creation and authentication
  * - Document validation and preparation
  * - Database and container management
- * - Basic CRUD operations
+ * - Basic CRUD operations using executeBulkOperations API
+ * - Generic bulk operation execution with timeout and error handling
  */
-import { Container, CosmosClient } from '@azure/cosmos';
+import { Container, CosmosClient, BulkOperationType, OperationInput } from '@azure/cosmos';
 import { DefaultAzureCredential, getBearerTokenProvider } from "@azure/identity";
 import { v4 as uuidv4 } from 'uuid';
-import { JsonData } from './interfaces.js';
+import { JsonData } from './utils.js';
 
 // -------------------------------------------
 // Client Creation Functions
@@ -104,40 +105,32 @@ export function validateDocument(doc: JsonData, idField: string = 'id', schema?:
 // -------------------------------------------
 
 /**
- * Simple batch insert function for basic Cosmos DB operations
- * This is a basic implementation without resilience features
+ * Query all documents in a container for deletion
+ * Returns only id and partition key for efficient bulk delete operations
  */
-export async function insertData(config: any, container: Container, data: JsonData[]): Promise<{ total: number; inserted: number; failed: number }> {
-    // Cosmos DB uses containers instead of collections
-    // Insert documents in batches
-    console.log(`Processing in batches of ${config.batchSize}...`);
-    const totalBatches = Math.ceil(data.length / config.batchSize);
+export async function queryAllDocumentRefs(container: Container, partitionKeyPath: string): Promise<{ id: string; partitionKey: any }[]> {
+    try {
+        // Extract partition key field name from path (remove leading /)
+        const partitionKeyField = partitionKeyPath.slice(1);
+        
+        // Query all documents but only fetch id and partition key for efficient deletion
+        const querySpec = {
+            query: `SELECT c.id, c["${partitionKeyField}"] as partitionKey FROM c`
+        };
 
-    let inserted = 0;
-    let failed = 0;
-    // Cosmos DB does not support bulk insert natively in SDK, but you can use stored procedures or loop
-    // Here we use a simple loop for demonstration
-    for (let i = 0; i < totalBatches; i++) {
-        const start = i * config.batchSize;
-        const end = Math.min(start + config.batchSize, data.length);
-        const batch = data.slice(start, end);
-        for (const doc of batch) {
-            try {
-                await container.items.create(doc);
-                inserted++;
-            } catch (error) {
-                console.error(`Error inserting document:`, error);
-                failed++;
-            }
-        }
-        // Small pause between batches to reduce resource contention
-        if (i < totalBatches - 1) {
-            await new Promise(resolve => setTimeout(resolve, 100));
-        }
+        console.log(`🔍 Querying document references from container...`);
+        const { resources: documents } = await container.items.query(querySpec).fetchAll();
+        
+        console.log(`✅ Found ${documents.length} document references`);
+        
+        return documents.map(doc => ({
+            id: doc.id,
+            partitionKey: doc.partitionKey
+        }));
+    } catch (error) {
+        console.error(`❌ Failed to query document references:`, error);
+        throw error;
     }
-    // Index creation is handled by indexing policy in Cosmos DB, not programmatically per field
-    //TBD: If custom indexing policy is needed, update container indexing policy via SDK or portal
-    return { total: data.length, inserted, failed };
 }
 
 /**
@@ -183,6 +176,97 @@ export async function ensureDatabaseAndContainer(
     console.error(`  az cosmosdb sql container create --account-name <your-account> --database-name ${databaseName} --name ${containerName} --partition-key-path ${partitionKeyPath} --resource-group <your-resource-group>\n`);
     
     throw error;
+  }
+}
+
+// -------------------------------------------
+// Generic Bulk Operations
+// -------------------------------------------
+
+/**
+ * Configuration for bulk operation execution
+ */
+export interface BulkExecutionConfig {
+  /** Timeout for bulk operations in milliseconds */
+  timeoutMs: number;
+  /** Enable debug logging */
+  enableDebugLogging?: boolean;
+}
+
+/**
+ * Result of a bulk operation execution
+ */
+export interface BulkExecutionResult {
+  /** The response from executeBulkOperations */
+  bulkResponse: any[];
+  /** Latency of the operation in milliseconds */
+  latency: number;
+  /** Any error that occurred during execution */
+  error?: Error;
+}
+
+/**
+ * Generic function to execute bulk operations with timeout and error handling
+ * 
+ * This function handles the common pattern of:
+ * 1. Executing bulk operations with a timeout
+ * 2. Logging operation summary
+ * 3. Returning standardized results
+ * 
+ * @param container - Cosmos DB container instance
+ * @param bulkOperations - Array of bulk operations to execute
+ * @param config - Configuration for the bulk execution
+ * @returns Promise<BulkExecutionResult> with response, latency, and any errors
+ */
+export async function executeBulkOperationsWithTimeout(
+  container: Container,
+  bulkOperations: OperationInput[],
+  config: BulkExecutionConfig
+): Promise<BulkExecutionResult> {
+  const startTime = Date.now();
+  
+  try {
+    // Execute bulk operations with timeout
+    // SDK automatically handles retries for: 408, 410, 429, 449, 503
+    const bulkPromise = container.items.executeBulkOperations(bulkOperations);
+    
+    let timeoutId: NodeJS.Timeout | undefined;
+    const timeoutPromise = new Promise((_, reject) => {
+      timeoutId = setTimeout(() => reject(new Error('Bulk operation timeout')), config.timeoutMs);
+    });
+
+    const bulkResponse = await Promise.race([bulkPromise, timeoutPromise]) as any;
+    if (timeoutId) clearTimeout(timeoutId); // Clean up timeout if operation completes first
+    const latency = Date.now() - startTime;
+
+    // Debug logging if enabled
+    if (config.enableDebugLogging) {
+      console.log(`📋 Bulk operation completed for document group with ${bulkOperations.length} operations`);
+      console.log(`   Response length: ${bulkResponse.length}`);
+      
+      // Count status codes for quick overview
+      const statusCounts: { [key: string]: number } = {};
+      bulkResponse.forEach((result: any) => {
+        // BulkOperationResult has response property containing the statusCode
+        const status = result.response?.statusCode || (result.error ? 'error' : 'unknown');
+        statusCounts[status] = (statusCounts[status] || 0) + 1;
+      });
+      console.log(`   Status code summary:`, statusCounts);
+    }
+
+    return {
+      bulkResponse,
+      latency
+    };
+
+  } catch (error: any) {
+    const latency = Date.now() - startTime;
+    
+    return {
+      bulkResponse: [],
+      latency,
+      error
+    };
   }
 }
 

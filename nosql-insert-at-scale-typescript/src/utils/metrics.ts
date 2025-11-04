@@ -5,7 +5,36 @@
  * and operational metrics for Azure Cosmos DB bulk insert operations.
  */
 import { v4 as uuidv4 } from 'uuid';
-import { OperationMetrics, LogLevel } from './interfaces.js';
+
+/**
+ * Performance metrics for operations
+ */
+export interface OperationMetrics {
+  /** Total RU consumption */
+  totalRu: number;
+  /** Average RU per document */
+  avgRuPerDoc: number;
+  /** Maximum RU per operation */
+  maxRu: number;
+  /** Average latency in ms per document */
+  avgLatencyMs: number;
+  /** Maximum latency in ms for any single operation */
+  maxLatencyMs: number;
+  /** Error count by status code */
+  errorCounts: Record<string, number>;
+  /** Total duration of the operation in ms */
+  totalDurationMs: number;
+}
+
+/**
+ * Log levels for the logger
+ */
+export enum LogLevel {
+  DEBUG = 'DEBUG',
+  INFO = 'INFO',
+  WARN = 'WARN',
+  ERROR = 'ERROR'
+}
 
 /**
  * Comprehensive metrics collector for Azure Cosmos DB performance tracking

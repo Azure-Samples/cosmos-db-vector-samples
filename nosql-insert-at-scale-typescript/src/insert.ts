@@ -16,12 +16,11 @@ import { fileURLToPath } from "node:url";
 import { dirname } from "node:path";
 
 // Utils imports
-import { JsonData, readFileReturnJson, getClientsPasswordless, calculateRUCost } from './utils/utils.js';
+import { JsonData, readFileReturnJson, getClientsPasswordless, calculateServerlessRUCost, calculateAutoscaleRUCost, compareAllPricingModels, shouldShowCost } from './utils/utils.js';
 import { 
   ensureDatabaseAndContainer
 } from './utils/cosmos-operations.js';
-import { resilientInsert } from './utils/cosmos-resiliency.js';
-import { DEFAULT_INSERT_CONFIG, InsertConfig, InsertResult } from './utils/resilience-interfaces.js';
+import { resilientInsert, DEFAULT_INSERT_CONFIG, InsertConfig, InsertResult } from './utils/cosmos-resiliency.js';
 
 // ESM support
 const __filename = fileURLToPath(import.meta.url);
@@ -148,15 +147,36 @@ async function performResilientInsert(client: any, data: JsonData[]): Promise<In
   console.log(`   Avg RU/doc: ${result.metrics.avgRuPerDoc.toFixed(2)}`);
   console.log(`   Avg latency: ${result.metrics.avgLatencyMs.toFixed(0)}ms/doc`);
 
-  // Show cost estimation
-  const costEstimate = calculateRUCost({
-    totalRUs: result.metrics.totalRu,
-    isServerless: true // Assume serverless for this demo
-  });
-  
-  console.log(`\n💰 Cost Estimation:`);
-  console.log(`   Serverless cost: $${costEstimate.estimatedCost.toFixed(6)}`);
-  console.log(`   ${costEstimate.description}`);
+  // Show cost estimation for autoscale (only if SHOW_COST=true)
+  if (shouldShowCost()) {
+    const peakRUsPerSecond = Math.ceil(result.metrics.maxRu); // Use the peak RU observed
+    
+    console.log(`\n💰 Cost Estimation (Autoscale):`);
+    
+    // Calculate autoscale cost based on observed usage
+    const autoscaleCost = calculateAutoscaleRUCost({
+      maxAutoscaleRUs: Math.max(peakRUsPerSecond * 2, 1000), // Estimate needed max RU/s (2x peak + minimum 1000)
+      totalRUsConsumed: result.metrics.totalRu,
+      days: 30,
+      regionCount: 1,
+      averageUtilizationPercent: 60 // Conservative estimate
+    });
+    
+    console.log(`   Estimated autoscale cost: $${autoscaleCost.estimatedCost.toFixed(2)}/month`);
+    console.log(`   Recommended max autoscale RU/s: ${Math.max(peakRUsPerSecond * 2, 1000)}`);
+    console.log(`   Peak RU/s observed: ${result.metrics.maxRu.toFixed(1)}`);
+    
+    // Also show serverless comparison
+    const serverlessCost = calculateServerlessRUCost({
+      totalRUs: result.metrics.totalRu,
+      regionCount: 1
+    });
+    
+    console.log(`   Serverless comparison: $${serverlessCost.estimatedCost.toFixed(6)} (this operation only)`);
+  } else {
+    console.log(`   Peak RU/s observed: ${result.metrics.maxRu.toFixed(1)}`);
+    console.log(`   💡 Set SHOW_COST=true to see cost estimation`);
+  }
 
   // Show errors if any occurred
   if (Object.keys(result.metrics.errorCounts).length > 0) {
@@ -165,7 +185,12 @@ async function performResilientInsert(client: any, data: JsonData[]): Promise<In
       console.log(`   ${errorCode}: ${count} occurrences`);
     }
     if (result.metrics.errorCounts['429']) {
-      console.log(`   💡 Tip: Consider increasing RU/s or enabling autoscale for high throughput`);
+      const peakRUsPerSecond = Math.ceil(result.metrics.maxRu);
+      console.log(`   💡 Autoscale Tips:`);
+      console.log(`      - Your current max autoscale RU/s may be too low`);
+      console.log(`      - Autoscale takes 10-30 seconds to scale up`);
+      console.log(`      - Consider increasing max autoscale RU/s to ${Math.max(peakRUsPerSecond * 3, 1000)}`);
+      console.log(`      - Or reduce batch size further (currently ${config.batchSize})`);
     }
   }
 
@@ -228,12 +253,21 @@ async function main() {
   try {
     // Initialize Cosmos DB client only
     const { dbClient } = getClientsPasswordless();
+    //const { dbClient } = getClients();
 
     if (!dbClient) {
       throw new Error('❌ Cosmos DB client is not configured properly. Please check your Cosmos DB environment variables.');
     }
 
     console.log('✅ Cosmos DB client initialized successfully');
+    
+    // Debug: Show connection details (without sensitive info)
+    console.log(`🔍 Connection Details:`);
+    console.log(`   Database: ${config.databaseName}`);
+    console.log(`   Container: ${config.containerName}`);
+    console.log(`   Partition Key Path: ${config.partitionKeyPath}`);
+    console.log(`   Batch Size: ${config.batchSize}`);
+    console.log(`   Max Concurrency: ${config.maxConcurrency === -1 ? 'SDK Optimized' : config.maxConcurrency}`);
 
     // Step 1: Load data
     const data = await loadData();
