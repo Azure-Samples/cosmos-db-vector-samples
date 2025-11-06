@@ -132,10 +132,10 @@ az cosmosdb keys list \
 ```
 
 ### Step 5: Configure passwordless authentication (optional)
-To use passwordless authentication with Azure Entra ID, follow these steps:
+To use passwordless authentication with Microsoft Entra ID, follow these steps:
 
 1. In your Azure Cosmos DB for MongoDB (vCore) resource, enable **Native DocumentDB** and **Microsoft Entra ID** authentication methods.
-2. Assign your Azure Entra ID user the following roles on the Cosmos DB resource:
+2. Assign your Microsoft Entra ID user the following roles on the Cosmos DB resource:
    - **Cosmos DB Account Reader Role**
    - **DocumentDB Account Contributor**
 
@@ -245,7 +245,7 @@ The project supports two authentication methods. **Passwordless authentication i
 
 ### Method 1: Passwordless Authentication (Recommended - Most Secure)
 
-Uses Azure Entra ID with DefaultAzureCredential for enhanced security:
+Uses Microsoft Entra ID with DefaultAzureCredential for enhanced security:
 
 ```go
 config := LoadConfig()
@@ -313,7 +313,7 @@ mongo-vcore-vector-search-go/
 - **IVF**: Clustering-based approach with configurable accuracy
 
 ### Utilities
-- Flexible authentication (connection string or passwordless with Azure Entra ID)
+- Flexible authentication (connection string or passwordless with Microsoft Entra ID)
 - Batch processing for large datasets with configurable batch sizes
 - Comprehensive error handling and retry logic
 - Progress tracking for long operations
