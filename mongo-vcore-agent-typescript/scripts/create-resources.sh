@@ -154,7 +154,9 @@ az cognitiveservices account create \
   --resource-group "$RESOURCE_GROUP_NAME" \
   --kind OpenAI \
   --sku "$OPENAI_SKU" \
-  --location "$LOCATION"
+  --location "$LOCATION" \
+  --custom-domain "${OPENAI_RESOURCE_NAME}" \
+  --yes
 
 # Get the current user's object ID for RBAC assignments
 USER_OBJECT_ID=$(az ad signed-in-user show --query "id" -o tsv)
@@ -299,6 +301,18 @@ az resource create \
   --properties "{\"identityProvider\":{\"type\":\"MicrosoftEntraID\",\"properties\":{\"principalType\":\"User\"}},\"roles\":[{\"db\":\"admin\",\"role\":\"root\"}]}" \
   --latest-include-preview
 
+# Add firewall rule for current IP address
+echo "Adding firewall rule for current IP address..."
+CURRENT_IP=$(curl -s https://ifconfig.me)
+echo "Current IP address: $CURRENT_IP"
+az cosmosdb mongocluster firewall rule create \
+  --cluster-name "$COSMOS_MONGO_CLUSTER_NAME" \
+  --resource-group "$RESOURCE_GROUP_NAME" \
+  --rule-name "AllowCurrentIP" \
+  --start-ip-address "$CURRENT_IP" \
+  --end-ip-address "$CURRENT_IP" \
+  2>/dev/null || echo "⚠️  Note: Firewall rule may already exist or command not available"
+
 # Get Cosmos DB MongoDB connection string
 echo "Retrieving Cosmos DB MongoDB connection details..."
 COSMOS_MONGO_CONNECTION_STRING=$(az cosmosdb mongocluster show \
@@ -306,18 +320,39 @@ COSMOS_MONGO_CONNECTION_STRING=$(az cosmosdb mongocluster show \
   --resource-group "$RESOURCE_GROUP_NAME" \
   --query "connectionString" -o tsv)
 
+# Get Azure OpenAI endpoint
+echo "Retrieving Azure OpenAI endpoint..."
+# Try to get custom subdomain first (needed for token-based auth)
+CUSTOM_SUBDOMAIN=$(az cognitiveservices account show \
+  --name "$OPENAI_RESOURCE_NAME" \
+  --resource-group "$RESOURCE_GROUP_NAME" \
+  --query "properties.customSubDomainName" -o tsv 2>/dev/null)
+
+if [ -n "$CUSTOM_SUBDOMAIN" ] && [ "$CUSTOM_SUBDOMAIN" != "null" ]; then
+  # Custom subdomain exists, use resource-specific endpoint (supports token auth)
+  OPENAI_ENDPOINT="https://${CUSTOM_SUBDOMAIN}.openai.azure.com/"
+  echo "✅ Using custom subdomain endpoint: $OPENAI_ENDPOINT (supports passwordless auth)"
+else
+  # No custom subdomain, construct one from resource name (newer deployment model)
+  OPENAI_ENDPOINT="https://${OPENAI_RESOURCE_NAME}.openai.azure.com/"
+  echo "✅ Using resource name endpoint: $OPENAI_ENDPOINT (supports passwordless auth)"
+fi
+
+echo "OpenAI Endpoint: $OPENAI_ENDPOINT"
+
 # Create the .env file
 ENV_FILE=".env"
 echo "Creating .env file..."
 cat <<EOL > $ENV_FILE
 DEBUG=true
-USE_PASSWORDLESS="true"
+USE_PASSWORDLESS=true
 
 # ========================================
 # Azure OpenAI Shared Settings
 # ========================================
-AZURE_OPENAI_API_KEY="$OPENAI_KEY"
-AZURE_OPENAI_ENDPOINT="https://$OPENAI_RESOURCE_NAME.openai.azure.com/"
+#AZURE_OPENAI_API_KEY="$OPENAI_KEY"
+AZURE_OPENAI_ENDPOINT="$OPENAI_ENDPOINT"
+AZURE_OPENAI_API_INSTANCE_NAME="$OPENAI_RESOURCE_NAME"
 
 # ========================================
 # Azure OpenAI Embedding Model Settings
@@ -357,7 +392,7 @@ LOAD_SIZE_BATCH="100"
 # ========================================
 # MongoDB/Cosmos DB Connection Settings
 # ========================================
-MONGO_CONNECTION_STRING="$COSMOS_MONGO_CONNECTION_STRING"
+#MONGO_CONNECTION_STRING="$COSMOS_MONGO_CONNECTION_STRING"
 MONGO_CLUSTER_NAME="$COSMOS_MONGO_CLUSTER_NAME"
 MONGO_DB_NAME="Hotels26"
 

@@ -2,9 +2,186 @@ import { MongoClient, OIDCResponse, OIDCCallbackParams } from 'mongodb';
 import { AzureOpenAI } from 'openai/index.js';
 import { promises as fs } from "fs";
 import { AccessToken, DefaultAzureCredential, TokenCredential, getBearerTokenProvider } from '@azure/identity';
+import { Document } from '@langchain/core/documents';
+import { AzureChatOpenAI } from '@langchain/openai';
 
 // Define a type for JSON data
 export type JsonData = Record<string, any>;
+
+// ============================================================================
+// RETRY AND QUOTA HANDLING UTILITIES
+// ============================================================================
+
+/**
+ * Configuration for retry behavior
+ */
+export interface RetryConfig {
+    maxRetries: number;
+    initialDelayMs: number;
+    maxDelayMs: number;
+    backoffMultiplier: number;
+    retryableStatusCodes: number[];
+    respectRetryAfter?: boolean;  // Whether to respect server's Retry-After header
+}
+
+/**
+ * Default retry configuration for Azure OpenAI operations
+ */
+export const DEFAULT_RETRY_CONFIG: RetryConfig = {
+    maxRetries: 5,
+    initialDelayMs: 1000,      // Start with 1 second
+    maxDelayMs: 60000,         // Cap at 60 seconds (even if server says longer)
+    backoffMultiplier: 2,      // Exponential backoff
+    retryableStatusCodes: [429, 503, 500, 502, 504], // Rate limit, service unavailable, server errors
+    respectRetryAfter: true    // Honor server's Retry-After header
+};
+
+/**
+ * Sleep utility for retry delays
+ */
+export async function sleep(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+/**
+ * Calculate exponential backoff delay with jitter
+ */
+export function calculateBackoffDelay(
+    attemptNumber: number,
+    config: RetryConfig = DEFAULT_RETRY_CONFIG
+): number {
+    const exponentialDelay = config.initialDelayMs * Math.pow(config.backoffMultiplier, attemptNumber);
+    const cappedDelay = Math.min(exponentialDelay, config.maxDelayMs);
+    // Add jitter (±25%) to prevent thundering herd
+    const jitter = cappedDelay * (0.75 + Math.random() * 0.5);
+    return Math.floor(jitter);
+}
+
+/**
+ * Check if an error is retriable based on status code or error type
+ */
+export function isRetriableError(error: any, config: RetryConfig = DEFAULT_RETRY_CONFIG): boolean {
+    // Check HTTP status codes
+    if (error.status && config.retryableStatusCodes.includes(error.status)) {
+        return true;
+    }
+    
+    // Check error codes
+    if (error.code === 'ECONNRESET' || error.code === 'ETIMEDOUT' || error.code === 'ENOTFOUND') {
+        return true;
+    }
+    
+    // Check for rate limit messages
+    if (error.message && (
+        error.message.includes('rate limit') ||
+        error.message.includes('quota') ||
+        error.message.includes('too many requests')
+    )) {
+        return true;
+    }
+    
+    return false;
+}
+
+/**
+ * Extract Retry-After header from error response (for 429 errors)
+ */
+export function getRetryAfterMs(error: any): number | null {
+    if (!error.headers) return null;
+    
+    // Check for Retry-After header
+    const retryAfter = error.headers.get?.('retry-after') || error.headers['retry-after'];
+    if (!retryAfter) return null;
+    
+    // Parse as seconds or HTTP date
+    const retryAfterNum = parseInt(retryAfter, 10);
+    if (!isNaN(retryAfterNum)) {
+        return retryAfterNum * 1000; // Convert seconds to milliseconds
+    }
+    
+    // Try parsing as HTTP date
+    const retryDate = new Date(retryAfter);
+    if (!isNaN(retryDate.getTime())) {
+        return Math.max(0, retryDate.getTime() - Date.now());
+    }
+    
+    return null;
+}
+
+/**
+ * Generic retry wrapper with exponential backoff and quota handling
+ * 
+ * @example
+ * const result = await withRetry(
+ *   () => chatClient.invoke({ input: "Hello" }),
+ *   { maxRetries: 3, onRetry: (attempt, delay) => console.log(`Retry ${attempt} after ${delay}ms`) }
+ * );
+ */
+export async function withRetry<T>(
+    operation: () => Promise<T>,
+    options: {
+        config?: Partial<RetryConfig>;
+        operationName?: string;
+        onRetry?: (attempt: number, delay: number, error: any) => void;
+    } = {}
+): Promise<T> {
+    const config: RetryConfig = { ...DEFAULT_RETRY_CONFIG, ...options.config };
+    const operationName = options.operationName || 'Operation';
+    
+    let lastError: any;
+    
+    for (let attempt = 0; attempt <= config.maxRetries; attempt++) {
+        try {
+            return await operation();
+        } catch (error: any) {
+            lastError = error;
+            
+            // Don't retry on last attempt
+            if (attempt === config.maxRetries) {
+                console.error(`❌ ${operationName} failed after ${config.maxRetries} retries`);
+                throw error;
+            }
+            
+            // Check if error is retriable
+            if (!isRetriableError(error, config)) {
+                console.error(`❌ ${operationName} failed with non-retriable error:`, error.message);
+                throw error;
+            }
+            
+            // Calculate delay - respect Retry-After header if present and enabled
+            let delay: number;
+            const retryAfterMs = getRetryAfterMs(error);
+            
+            if (retryAfterMs !== null && config.respectRetryAfter) {
+                // Server told us how long to wait
+                delay = Math.min(retryAfterMs, config.maxDelayMs);
+                if (retryAfterMs > config.maxDelayMs) {
+                    console.warn(
+                        `⚠️  Server requested ${(retryAfterMs / 1000).toFixed(0)}s wait, ` +
+                        `but capping at ${(config.maxDelayMs / 1000).toFixed(0)}s`
+                    );
+                }
+            } else {
+                // Use exponential backoff
+                delay = calculateBackoffDelay(attempt, config);
+            }
+            
+            // Call onRetry callback if provided (for custom logging)
+            if (options.onRetry) {
+                options.onRetry(attempt + 1, delay, error);
+            } else {
+                // Default minimal logging only if no callback provided
+                console.log(`⏳ Retry ${attempt + 1}: ${(delay / 1000).toFixed(0)}s`);
+            }
+            
+            // Wait before retrying
+            await sleep(delay);
+        }
+    }
+    
+    // Should never reach here, but TypeScript doesn't know that
+    throw lastError;
+}
 
 export const AzureIdentityTokenCallback = async (params: OIDCCallbackParams, credential: TokenCredential): Promise<OIDCResponse> => {
     const tokenResponse: AccessToken | null = await credential.getToken(['https://ossrdbms-aad.database.windows.net/.default']);
@@ -69,7 +246,7 @@ export function getClientsPasswordless(): { aiClient: AzureOpenAI | null; dbClie
         const credential = new DefaultAzureCredential();
 
         dbClient = new MongoClient(
-            `mongodb+srv://${clusterName}.global.mongocluster.cosmos.azure.com/`, {
+            `mongodb+srv://${clusterName}.mongocluster.cosmos.azure.com/`, {
             connectTimeoutMS: 30000,
             tls: true,
             retryWrites: true,
@@ -83,6 +260,74 @@ export function getClientsPasswordless(): { aiClient: AzureOpenAI | null; dbClie
     }
 
     return { aiClient, dbClient };
+}
+
+/**
+ * Get chat client for LangChain agents with API key authentication
+ * Includes retry configuration for quota/rate limit handling
+ */
+export function getChatClient(maxRetries: number = 5): AzureChatOpenAI {
+    const apiKey = process.env.AZURE_OPENAI_API_KEY!;
+    const apiVersion = process.env.AZURE_OPENAI_CHAT_API_VERSION!;
+    const instanceName = process.env.AZURE_OPENAI_API_INSTANCE_NAME!;
+    const deployment = process.env.AZURE_OPENAI_CHAT_MODEL!;
+    
+    // Construct custom subdomain endpoint (required for LangChain)
+    const endpoint = `https://${instanceName}.openai.azure.com/`;
+
+    return new AzureChatOpenAI({
+        azureOpenAIApiKey: apiKey,
+        azureOpenAIApiVersion: apiVersion,
+        azureOpenAIEndpoint: endpoint,
+        azureOpenAIApiInstanceName: instanceName,
+        azureOpenAIApiDeploymentName: deployment,
+        maxRetries,              // Configure retry behavior with exponential backoff
+        timeout: 60000,          // 60 second timeout per request
+        maxConcurrency: 1,       // Limit to 1 concurrent request to prevent quota exhaustion
+    });
+}
+
+/**
+ * Get chat client for LangChain agents with passwordless authentication
+ * Includes retry configuration for quota/rate limit handling
+ * 
+ * IMPORTANT: Passwordless authentication requires the Azure OpenAI resource to have
+ * a custom subdomain enabled. If your resource uses the regional endpoint format
+ * (e.g., swedencentral.api.cognitive.microsoft.com), passwordless auth will NOT work.
+ * 
+ * To enable custom subdomain:
+ * 1. The resource must be created with --custom-domain flag, OR
+ * 2. You must use API key authentication instead (set USE_PASSWORDLESS=false)
+ */
+export function getChatClientPasswordless(maxRetries: number = 5): AzureChatOpenAI | null {
+    const apiVersion = process.env.AZURE_OPENAI_CHAT_API_VERSION!;
+    const instanceName = process.env.AZURE_OPENAI_API_INSTANCE_NAME!;
+    const deployment = process.env.AZURE_OPENAI_CHAT_MODEL!;
+
+    if (!apiVersion || !instanceName || !deployment) {
+        console.warn('⚠️  Missing required environment variables for passwordless chat client');
+        return null;
+    }
+
+    const credential = new DefaultAzureCredential();
+    const scope = "https://cognitiveservices.azure.com/.default";
+    const azureADTokenProvider = getBearerTokenProvider(credential, scope);
+
+    // For token auth, MUST provide BOTH the custom subdomain endpoint AND instance name
+    const endpoint = `https://${instanceName}.openai.azure.com/`;
+    
+    console.log(`🔐 Attempting passwordless auth to: ${endpoint}`);
+    
+    return new AzureChatOpenAI({
+        azureOpenAIApiVersion: apiVersion,
+        azureOpenAIApiInstanceName: instanceName,
+        azureOpenAIEndpoint: endpoint,
+        azureOpenAIApiDeploymentName: deployment,
+        azureADTokenProvider,
+        maxRetries,              // Configure retry behavior with exponential backoff
+        timeout: 60000,          // 60 second timeout per request
+        maxConcurrency: 1,       // Limit to 1 concurrent request to prevent quota exhaustion
+    });
 }
 
 export async function readFileReturnJson(filePath: string): Promise<JsonData[]> {
@@ -276,12 +521,12 @@ export async function performAgentVectorSearch(
     config: SearchConfig,
     maxResults: number = 5
 ): Promise<{
-    searchResults: any[];
-    formattedResults: any[];
+    searchResults: [Document, number][];
+    formattedResults: string;
     metadata: any;
 }> {
     // Perform the basic vector search
-    const searchResults = await performVectorSearch(
+    const rawSearchResults = await performVectorSearch(
         aiClient,
         collection,
         query,
@@ -289,40 +534,23 @@ export async function performAgentVectorSearch(
         maxResults
     );
 
-    // Format results specifically for agent consumption
-    const formattedResults = searchResults.map((result: any, idx: number) => {
-        const hotel = result.document;
-        return {
-            rank: idx + 1,
-            hotelId: hotel.HotelId,
-            name: hotel.HotelName,
-            description: hotel.Description?.substring(0, 300) + '...',
-            category: hotel.Category,
-            rating: hotel.Rating,
-            tags: hotel.Tags?.slice(0, 6) || [],
-            parkingIncluded: hotel.ParkingIncluded,
-            lastRenovated: hotel.LastRenovationDate,
-            location: {
-                address: hotel.Address?.StreetAddress,
-                city: hotel.Address?.City,
-                state: hotel.Address?.StateProvince,
-                country: hotel.Address?.Country
-            },
-            amenities: hotel.Rooms?.[0] ? {
-                hasWifi: hotel.Rooms[0].SmokingAllowed !== undefined ? !hotel.Rooms[0].SmokingAllowed : null,
-                roomType: hotel.Rooms[0].Type,
-                baseRate: hotel.Rooms[0].BaseRate
-            } : null,
-            relevanceScore: parseFloat(result.score?.toFixed(4) || '0')
-        };
-    });
+    // Convert MongoDB results to LangChain Document format
+    const searchResults = convertToDocumentFormat(rawSearchResults);
+    
+    // Log result count
+    console.log(`✅ Found ${searchResults.length} result${searchResults.length !== 1 ? 's' : ''}`);
 
+    // Format results for display using shared utility
+    const formattedResults = formatSearchResults(searchResults);
+
+    // Calculate metadata from the converted results
+    const scores = searchResults.map(([_, score]) => score);
     const metadata = {
         totalResults: searchResults.length,
-        maxScore: formattedResults.length > 0 ? Math.max(...formattedResults.map(r => r.relevanceScore)) : 0,
-        minScore: formattedResults.length > 0 ? Math.min(...formattedResults.map(r => r.relevanceScore)) : 0,
-        averageScore: formattedResults.length > 0 ? 
-            formattedResults.reduce((sum, r) => sum + r.relevanceScore, 0) / formattedResults.length : 0,
+        maxScore: scores.length > 0 ? Math.max(...scores) : 0,
+        minScore: scores.length > 0 ? Math.min(...scores) : 0,
+        averageScore: scores.length > 0 ? 
+            scores.reduce((sum, score) => sum + score, 0) / scores.length : 0,
         embeddingField: config.embeddedField,
         dimensions: config.embeddingDimensions
     };
@@ -344,23 +572,31 @@ export async function executeHotelSearchWorkflow(
     query: string,
     maxResults: number = 5
 ): Promise<string> {
-    console.log(`🔍 Tool Execution - Hotel Search: "${query}"`);
+    console.log(`   🔍 Tool: search_hotels - Starting workflow`);
+    console.log(`      Query: "${query}"`);
+    console.log(`      Max results: ${maxResults}`);
     
     // Get database clients
+    console.log(`      Step 1: Getting database clients...`);
     const { aiClient, dbClient } = agentConfig.usePasswordless ? 
         getClientsPasswordless() : getClients();
     
     if (!aiClient || !dbClient) {
+        console.log(`      ❌ Failed to initialize clients`);
         return JSON.stringify({ 
             error: 'Failed to initialize clients. Check configuration.' 
         });
     }
+    console.log(`      ✅ Clients initialized`);
     
     try {
+        console.log(`      Step 2: Connecting to MongoDB...`);
         await dbClient.connect();
+        console.log(`      ✅ Connected to MongoDB`);
         
         // Get active collection configuration
         const activeCollection = agentConfig.collections[agentConfig.activeCollectionIndex];
+        console.log(`      Step 3: Using collection "${activeCollection.name}"`);
         
         // Create search configuration
         const searchConfig: SearchConfig = {
@@ -375,36 +611,60 @@ export async function executeHotelSearchWorkflow(
         // Get database collection
         const db = dbClient.db(agentConfig.databaseName);
         const collection = db.collection(activeCollection.name);
+        console.log(`      ✅ Collection ready`);
         
         // Perform enhanced vector search
-        const { formattedResults, metadata } = await performAgentVectorSearch(
+        console.log(`      Step 4: Performing vector search...`);
+        const { searchResults, formattedResults, metadata } = await performAgentVectorSearch(
             aiClient,
             collection,
             query,
             searchConfig,
             Math.min(maxResults, 10)
         );
+        console.log(`      ✅ Vector search completed: ${searchResults.length} results found`);
+        console.log(`      📊 Score range: ${metadata.minScore.toFixed(3)} - ${metadata.maxScore.toFixed(3)}`);
         
         // Return results in JSON format for the agent
-        return JSON.stringify({
+        const response = JSON.stringify({
             searchQuery: query,
             algorithm: activeCollection.algorithm,
-            totalResults: formattedResults.length,
-            hotels: formattedResults,
+            totalResults: searchResults.length,
+            results: formattedResults,
             searchMetrics: metadata
         }, null, 2);
         
+        console.log(`      ✅ Returning ${response.length} bytes to agent\n`);
+        return response;
+        
     } catch (error) {
-        console.error('❌ Tool execution error:', error);
+        console.error('\n      ' + '='.repeat(70));
+        console.error('      ❌ TOOL EXECUTION FAILED: search_hotels');
+        console.error('      ' + '='.repeat(70));
+        console.error(`      🔧 Tool: search_hotels`);
+        console.error(`      📍 Query: "${query}"`);
+        console.error(`      💥 Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        console.error(`      🔍 Type: ${(error as any)?.constructor?.name || 'Unknown'}`);
+        
+        if ((error as Error)?.stack) {
+            console.error('      📚 Stack:');
+            (error as Error).stack?.split('\n').slice(0, 5).forEach(line => {
+                console.error(`         ${line}`);
+            });
+        }
+        console.error('      ' + '='.repeat(70) + '\n');
+        
         return JSON.stringify({
             error: 'Search failed',
-            message: error instanceof Error ? error.message : 'Unknown error'
+            message: error instanceof Error ? error.message : 'Unknown error',
+            type: (error as any)?.constructor?.name || 'Unknown'
         });
     } finally {
         try {
             await dbClient.close();
+            console.log(`      ✅ MongoDB connection closed\n`);
         } catch (closeError) {
-            console.error('❌ Error closing database connection:', closeError);
+            console.error('      ❌ Error closing database connection:', closeError);
         }
     }
 }
@@ -418,7 +678,10 @@ export async function executeSearchAnalysisWorkflow(
     query: string,
     sampleSize: number = 5
 ): Promise<string> {
-    console.log(`📊 Tool Execution - Search Analysis: "${query}"`);
+    // Minimal logging - only log if DEBUG env var is set
+    if (process.env.DEBUG === 'true') {
+        console.log(`📊 Search Analysis: "${query}"`);
+    }
     
     // Get database clients
     const { aiClient, dbClient } = agentConfig.usePasswordless ? 
@@ -445,7 +708,7 @@ export async function executeSearchAnalysisWorkflow(
         const db = dbClient.db(agentConfig.databaseName);
         const collection = db.collection(activeCollection.name);
         
-        const { formattedResults, metadata } = await performAgentVectorSearch(
+        const { searchResults, formattedResults, metadata } = await performAgentVectorSearch(
             aiClient,
             collection,
             query,
@@ -458,7 +721,7 @@ export async function executeSearchAnalysisWorkflow(
             algorithmUsed: activeCollection.algorithm,
             algorithmDescription: activeCollection.description,
             performance: {
-                resultCount: formattedResults.length,
+                resultCount: searchResults.length,
                 scoreDistribution: {
                     highest: metadata.maxScore,
                     lowest: metadata.minScore,
@@ -836,4 +1099,62 @@ export async function createEmbeddingsWorkflow(
         console.error(`❌ Failed to create embeddings: ${(error as Error).message}`);
         throw error;
     }
+}
+
+// ============================================================================
+// LangChain Document Conversion Utilities
+// ============================================================================
+
+/**
+ * Converts raw MongoDB vector search results to LangChain Document format.
+ * This utility enables compatibility between MongoDB-based vector search and LangChain's
+ * Document type, allowing both implementations to share the same formatting logic.
+ * 
+ * @param rawResults - Array of MongoDB search results with document and score properties
+ * @returns Array of [Document, score] tuples compatible with LangChain
+ * 
+ * @example
+ * const rawResults = await performVectorSearch(aiClient, collection, query, config, 5);
+ * const documents = convertToDocumentFormat(rawResults);
+ * // documents is now [Document, number][] format
+ */
+export function convertToDocumentFormat(
+    rawResults: any[]
+): [Document, number][] {
+    return rawResults.map(result => [
+        new Document({
+            pageContent: result.document.Description || '',
+            metadata: result.document  // All hotel fields stored in metadata
+        }),
+        result.score
+    ]);
+}
+
+/**
+ * Formats search results into a human-readable string output.
+ * Works with both MongoDB raw results and LangChain Document format.
+ * 
+ * @param results - Array of [Document, number] tuples from vector search
+ * @returns Formatted string with numbered results showing hotel details and similarity scores
+ * 
+ * @example
+ * ```typescript
+ * const results = await vectorSearch(query, embeddings);
+ * const formatted = formatSearchResults(results);
+ * console.log(formatted);
+ * // Output:
+ * // 1. Fancy Stay (Score: 0.857)
+ * //    Description: A luxurious hotel...
+ * //    Tags: pool, restaurant, concierge
+ * ```
+ */
+export function formatSearchResults(results: [Document, number][]): string {
+    return results.map((result, index) => {
+        const [doc, score] = result;
+        const metadata = doc.metadata;
+        
+        return `${index + 1}. ${metadata.HotelName} (Score: ${score.toFixed(3)})
+   Description: ${doc.pageContent}
+   Tags: ${metadata.Tags?.join(', ') || 'N/A'}`;
+    }).join('\n\n');
 }

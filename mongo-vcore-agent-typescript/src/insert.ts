@@ -47,7 +47,16 @@ const config: SearchConfig = {
 
 
 async function main() {
-    const { aiClient, dbClient } = getClients();
+    // Use passwordless authentication (RBAC)
+    const { aiClient, dbClient } = getClientsPasswordless();
+    
+    // Validate clients are configured
+    if (!aiClient) {
+        throw new Error('❌ AI client is not configured. Please check your environment variables.');
+    }
+    if (!dbClient) {
+        throw new Error('❌ Database client is not configured. Please check your environment variables.');
+    }
     
     // Handle process termination signals
     let isShuttingDown = false;
@@ -56,8 +65,10 @@ async function main() {
         isShuttingDown = true;
         console.log(`\n🚨 Received ${signal}. Shutting down gracefully...`);
         try {
-            await dbClient.close();
-            console.log('✅ Database connection closed');
+            if (dbClient) {
+                await dbClient.close();
+                console.log('✅ Database connection closed');
+            }
         } catch (error) {
             console.error('❌ Error during shutdown:', error);
         }
@@ -103,8 +114,10 @@ async function main() {
         process.exitCode = 1;
     } finally {
         console.log('🔌 Closing database connection...');
-        await dbClient.close();
-        console.log('✅ Database connection closed');
+        if (dbClient) {
+            await dbClient.close();
+            console.log('✅ Database connection closed');
+        }
         process.exit(process.exitCode || 0);
     }
 }
