@@ -672,6 +672,12 @@ export async function executeHotelSearchWorkflow(
 /**
  * Search performance analysis workflow for LangChain tools
  * Analyzes search quality and provides insights about the results
+ * 
+ * @deprecated This function is no longer needed. The search_hotels tool already
+ * returns searchMetrics with all analysis data (scores, averages, counts).
+ * Let the LLM analyze these metrics directly instead of performing a duplicate search.
+ * 
+ * Use executeHotelSearchWorkflow() instead - it returns both results and metrics.
  */
 export async function executeSearchAnalysisWorkflow(
     agentConfig: AgentConfig,
@@ -811,10 +817,26 @@ export async function performVectorSearch(
                 score: {
                     $meta: "searchScore"
                 },
-                document: "$$ROOT"
+                // Only include essential fields - exclude vector embeddings and unnecessary data
+                // This dramatically reduces payload size sent to LLM (~12KB per doc reduced to ~1KB)
+                document: {
+                    HotelId: "$HotelId",
+                    HotelName: "$HotelName",
+                    Description: "$Description",
+                    Category: "$Category",
+                    Tags: "$Tags",
+                    ParkingIncluded: "$ParkingIncluded",
+                    LastRenovationDate: "$LastRenovationDate",
+                    Rating: "$Rating",
+                    Address: "$Address"
+                }
             }
         }
     ]).toArray();
+
+    // Calculate approximate size of results (for debugging/optimization)
+    const resultSize = JSON.stringify(searchResults).length;
+    console.log(`📦 Result payload size: ${(resultSize / 1024).toFixed(2)} KB (${searchResults.length} documents)`);
 
     return searchResults;
 }

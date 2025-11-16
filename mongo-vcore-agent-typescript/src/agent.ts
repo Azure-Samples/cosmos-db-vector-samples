@@ -21,7 +21,6 @@ import {
     getChatClientPasswordless,
     performAgentVectorSearch,
     executeHotelSearchWorkflow,
-    executeSearchAnalysisWorkflow,
     createAgentConfig,
     AgentConfig,
     SearchConfig,
@@ -81,33 +80,6 @@ function createHotelSearchTool() {
     });
 }
 
-/**
- * Creates a tool for analyzing search performance
- * 
- * LEARNING CONCEPT: Multiple tools can work together in an agent
- */
-function createSearchAnalysisTool() {
-    return new DynamicStructuredTool({
-        name: 'analyze_search_performance',
-        description: `Analyze the quality and performance of vector search results.
-        
-        Use this when users want to:
-        - Understand search result quality
-        - Get insights about relevance scores
-        - Learn about the search algorithm performance`,
-        
-        schema: z.object({
-            query: z.string().describe('Query to analyze'),
-            sampleSize: z.number().optional().default(5).describe('Number of results to analyze')
-        }),
-        
-        func: async ({ query, sampleSize = 5 }) => {
-            console.log(`🔧 Tool Called: analyze_search_performance("${query}", samples=${sampleSize})`);
-            return await executeSearchAnalysisWorkflow(config, query, sampleSize);
-        }
-    });
-}
-
 // ============================================================================
 // AGENT PROMPT DESIGN - Core Learning Concept #2
 // ============================================================================
@@ -127,30 +99,58 @@ function createAgentPrompt() {
             `You are an expert hotel recommendation assistant using vector search technology.
 
 **Your Role:**
-🏨 Help users find hotels that match their specific needs and preferences
-📊 Analyze search results and explain your recommendations
-🎯 Make data-driven decisions based on relevance scores and hotel features
+🏨 Help users find hotels from the Hotels collection in Azure Cosmos DB
+📊 Analyze search quality using the metrics returned by search_hotels
+🎯 Make data-driven recommendations based on relevance scores and hotel features
 
-**Available Tools:**
-- search_hotels: Find hotels using semantic similarity search
-- analyze_search_performance: Get insights about search quality and performance
+**Available Tool:**
+- search_hotels: Searches the Hotels collection and returns results with quality metrics
+
+**Understanding Tool Results:**
+The search_hotels tool returns:
+- Hotel results (HotelName, Description, Tags, etc.)
+- searchMetrics object with:
+  * totalResults: Number of hotels found
+  * maxScore, minScore, averageScore: Relevance score distribution
+  * embeddingField: Vector field used for search
+  * dimensions: Embedding dimensionality
+
+**Analyzing Search Quality:**
+When users ask about search quality, analyze the searchMetrics:
+1. **Score Interpretation:**
+   - > 0.8 = Excellent semantic match
+   - 0.7-0.8 = Good match
+   - 0.6-0.7 = Fair match  
+   - < 0.6 = Poor match (suggest query refinement)
+
+2. **Score Distribution:**
+   - Look at range between maxScore and minScore
+   - Narrow range (< 0.1) = consistent quality
+   - Wide range (> 0.2) = mixed relevance
+
+3. **Result Count:**
+   - < 3 results = query might be too specific
+   - 5-10 results = good balance
+   - Consider suggesting broader/narrower queries
 
 **Decision-Making Process:**
 1. **Understand** user requirements (location, budget, amenities, purpose)
-2. **Search** using the hotel search tool with well-crafted queries  
-3. **Analyze** results considering relevance scores (>0.8 = excellent match)
-4. **Recommend** best options with clear explanations
-5. **Use analysis tool** when users want performance insights
+2. **Search** using the search_hotels tool with semantic queries
+3. **Interpret** searchMetrics to assess result quality
+4. **Recommend** best hotels with confidence based on scores
+5. **Explain** why certain hotels match better (use scores as evidence)
 
 **Communication Style:**
 - Be conversational and helpful
-- Explain why you recommend specific hotels
-- Mention relevance scores to show confidence
-- Suggest alternatives if results aren't ideal
-- Use the analysis tool to explain search performance when asked
+- Reference specific scores to show confidence
+- Explain what scores mean in plain language
+- Suggest query refinements if scores are low
+- Mention the IVF algorithm when users ask about the technology
 
-The system uses IVF (Inverted File) vector search algorithm, which provides 
-excellent performance for large hotel datasets with semantic similarity matching.`
+**About the Technology:**
+The Hotels collection uses IVF (Inverted File) vector search algorithm for fast 
+semantic similarity matching. The system searches across hotel descriptions and 
+features using 1536-dimensional embeddings from Azure OpenAI (text-embedding-ada-002).`
         ],
         ['placeholder', '{chat_history}'],
         ['human', '{input}'],
@@ -195,13 +195,12 @@ async function createHotelSearchAgent() {
         console.log(`   ✅ Chat client configured with ${maxRetries} retries for quota/rate limit handling`);
         
         console.log('   Step 3: Creating tools...');
-        // Create the tools the agent can use
+        // Create the tool the agent can use
         const tools = [
-            createHotelSearchTool(),
-            createSearchAnalysisTool()
+            createHotelSearchTool()
         ];
         
-        console.log(`   ✅ Created ${tools.length} tools: ${tools.map(t => t.name).join(', ')}`);
+        console.log(`   ✅ Created ${tools.length} tool: ${tools.map(t => t.name).join(', ')}`);
         
         console.log('   Step 4: Creating agent prompt...');
         const prompt = createAgentPrompt();
@@ -219,18 +218,34 @@ async function createHotelSearchAgent() {
         
         console.log('   Step 6: Creating agent executor...');
         // Create the executor that manages the agent's execution
+        // Control LangChain internal logging with DEBUG environment variable
+        const showLangChainLogs = process.env.DEBUG === 'true';
+        
+        let llmCallCount = 0;
+        
         const agentExecutor = new AgentExecutor({
             agent,
             tools,
             maxIterations: 5, // Prevent infinite loops
-            verbose: true, // Enable to see LangChain's internal logs
+            verbose: showLangChainLogs, // LangChain's internal logs (controlled by DEBUG env var)
             callbacks: [
                 {
-                    handleLLMStart: async () => {
-                        console.log('   🤖 LLM Call: Agent making decision with Azure OpenAI...');
+                    handleLLMStart: async (_llm: any, prompts: string[]) => {
+                        llmCallCount++;
+                        console.log(`   🤖 LLM Call #${llmCallCount}: Agent making decision with Azure OpenAI...`);
+                        if (prompts && prompts.length > 0) {
+                            const firstPrompt = prompts[0];
+                            const preview = firstPrompt.substring(0, 100).replace(/\n/g, ' ');
+                            console.log(`   📝 Prompt preview: "${preview}..."`);
+                        }
                     },
-                    handleLLMEnd: async () => {
-                        console.log('   ✅ LLM Response: Received decision from Azure OpenAI');
+                    handleLLMEnd: async (output: any) => {
+                        console.log(`   ✅ LLM Response #${llmCallCount}: Received`);
+                        // Show what the LLM decided to do
+                        if (output?.generations?.[0]?.[0]?.text) {
+                            const responsePreview = output.generations[0][0].text.substring(0, 100).replace(/\n/g, ' ');
+                            console.log(`   📝 Response preview: "${responsePreview}..."`);
+                        }
                     },
                     handleToolStart: async (tool: any) => {
                         console.log(`   🔧 Tool Start: ${tool.name}`);
@@ -463,7 +478,6 @@ async function main() {
 export {
     createHotelSearchAgent,
     createHotelSearchTool,
-    createSearchAnalysisTool,
     createAgentPrompt,
     config as agentConfig
 };

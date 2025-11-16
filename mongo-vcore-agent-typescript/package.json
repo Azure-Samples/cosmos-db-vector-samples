@@ -8,7 +8,8 @@
     "build": "tsc",
     "start:insert": "node --env-file .env dist/insert.js",
     "start:embed": "node --env-file .env dist/create-embeddings.js",
-    "start:agent": "node --env-file .env dist/agent.js"
+    "start:agent": "node --env-file .env dist/agent.js",
+    "start:two-agents": "node --env-file .env dist/two-agents.js"
   },
   "dependencies": {
     "@azure/identity": "^4.11.1",
