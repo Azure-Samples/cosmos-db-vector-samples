@@ -20,9 +20,7 @@
         "noImplicitAny": false,
         "forceConsistentCasingInFileNames": true,
         "sourceMap": true,
-        "resolveJsonModule": true,
-        "incremental": true,
-        "tsBuildInfoFile": "./.tsbuildinfo"
+        "resolveJsonModule": true
     },
     "include": [
         "src/**/*"

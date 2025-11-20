@@ -1,18 +1,12 @@
 import {
-  AzureCosmosDBMongoDBVectorStore,
-  AzureCosmosDBMongoDBSimilarityType,
-} from "@langchain/azure-cosmosdb";
-import { AzureOpenAIEmbeddings, AzureChatOpenAI } from "@langchain/openai";
-import { readFileSync } from 'fs';
-import { Document } from '@langchain/core/documents';
-import { HotelsData } from './utils/types.js';
+  AzureCosmosDBMongoDBVectorStore } from "@langchain/azure-cosmosdb";
+import { AzureOpenAIEmbeddings } from "@langchain/openai";
 import { PLANNER_SYSTEM_PROMPT, SYNTHESIZER_SYSTEM_PROMPT, createSynthesizerUserPrompt } from './utils/prompts.js';
 import { z } from 'zod';
-import { createAgent, tool, createMiddleware, ToolMessage } from "langchain";
+import { createAgent, tool } from "langchain";
 import { embeddingClient, plannerClient, synthClient } from './utils/clients.js';
 // Helper functions to get vector index options based on algorithm
 import { insertDocs } from './utils/documentdb.js';
-import { VectorStore } from "@langchain/core/vectorstores";
 
 const query = process.env.QUERY! || "quintessential lodging near running trails, eateries, retail";
 
