@@ -23,6 +23,26 @@ interface Hotel {
   Rooms: Room[];
 }
 
+export interface HotelSearchResult {
+    HotelId: string;
+  HotelName: string;
+  Description: string;
+  Category: string;
+  Tags: string[];
+  ParkingIncluded: boolean;
+  IsDeleted: boolean;
+  LastRenovationDate: string;
+  Rating: number;
+  Address: {
+    StreetAddress: string;
+    City: string;
+    StateProvince?: string;
+    PostalCode: string;
+    Country: string;
+  },
+  Score: number;
+}
+
 interface Room {
   Description: string;
   Description_fr: string;

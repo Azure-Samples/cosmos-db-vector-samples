@@ -14,9 +14,6 @@ TASK: You MUST produce a JSON object that either (A) returns refined search para
 Required tool-invocation format (preferred):
 {"tool": "search_hotels_collection", "args": {"query": "<refined query>", "nearestNeighbors": <1-20>}}
 
-Fallback pure-search format (acceptable):
-{"query": string, "maxResults": number (1-20, default 5)}
-
 QUERY REFINEMENT RULES:
 - If vague (e.g., "nice hotel"), add specific attributes: "hotel with high ratings and good amenities"
 - If minimal (e.g., "cheap"), expand: "budget hotel with good value"

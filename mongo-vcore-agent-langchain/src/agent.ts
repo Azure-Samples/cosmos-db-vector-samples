@@ -4,14 +4,18 @@ import { AzureOpenAIEmbeddings } from "@langchain/openai";
 import { PLANNER_SYSTEM_PROMPT, SYNTHESIZER_SYSTEM_PROMPT, createSynthesizerUserPrompt } from './utils/prompts.js';
 import { z } from 'zod';
 import { createAgent, tool } from "langchain";
+import { Hotel, HotelSearchResult } from './utils/types.js';
 import { embeddingClient, plannerClient, synthClient } from './utils/clients.js';
 // Helper functions to get vector index options based on algorithm
 import { insertDocs } from './utils/documentdb.js';
 import { callbacks } from './utils/handlers.js';
+import { extractPlannerToolOutput } from './utils/extract.js';
+
+
 const query = process.env.QUERY! || "quintessential lodging near running trails, eateries, retail";
 
 const getHotelsToMatchSearchQuery = tool(
-  async ({ query, nearestNeighbors }, config) => {
+  async ({ query, nearestNeighbors }, config):Promise<HotelSearchResult[]> => {
 
     const store = config.context.store as AzureCosmosDBMongoDBVectorStore;
     const embeddingClient = config.context.embeddingClient as AzureOpenAIEmbeddings;
@@ -41,7 +45,11 @@ const getHotelsToMatchSearchQuery = tool(
       };
     });
 
-    return JSON.stringify(hotels);
+    hotels.map(hotel => {
+      console.log(`Hotel: ${hotel.HotelName}, Score: ${hotel.Score}`);
+    });
+
+    return hotels;
   },
   {
     name: "search_hotels_collection",
@@ -61,7 +69,7 @@ async function runPlannerAgent(
   store: AzureCosmosDBMongoDBVectorStore,
   nearestNeighbors = 5
 ): Promise<string> {
-  console.log('\n--- PLANNER (direct vector search) ---');
+  console.log('\n--- PLANNER ---');
 
   const userMessage = `Call the "search_hotels_collection" tool with the desired number of neighbors: nearestNeighbors="${nearestNeighbors}" and the query: query="${userQuery}". Respond ONLY with a tool response JSON output`;
 
@@ -82,16 +90,16 @@ async function runPlannerAgent(
     { context: { store, embeddingClient }, callbacks }
   );
 
-  const plannerMessages = agentResult.messages;
-  console.log(plannerMessages);
+  const plannerMessages = agentResult.messages || [];
 
-  const lastMessage = plannerMessages[plannerMessages.length - 1];
-  const content = typeof lastMessage.content === 'string' 
-    ? lastMessage.content 
-    : lastMessage.content.map((block: any) => block.text || '').join('');
-  const hotels: any = JSON.parse(content);
+  const { toolContent, parsed } = extractPlannerToolOutput(plannerMessages, nearestNeighbors);
 
-  return JSON.stringify(hotels);
+  if (parsed === null) {
+    throw new Error('Planner tool output not found or not valid JSON');
+  }
+
+  // return the tool JSON string (same as before)
+  return toolContent;
 }
 
 // Synthesizer agent function - generates final user-friendly response
@@ -125,10 +133,10 @@ const store = await insertDocs(
 
 
 const hotelContext = await runPlannerAgent(query, store, 5);
-//const finalAnswer = await runSynthesizerAgent(query, hotelContext);
+const finalAnswer = await runSynthesizerAgent(query, hotelContext);
 
 console.log('\n--- FINAL ANSWER ---');
-//console.log(finalAnswer);
+console.log(finalAnswer);
 
 await store.delete();
 await store.close();
