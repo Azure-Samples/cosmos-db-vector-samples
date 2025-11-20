@@ -4,14 +4,20 @@ import { AzureOpenAIEmbeddings } from "@langchain/openai";
 import { DEFAULT_QUERY, PLANNER_SYSTEM_PROMPT, SYNTHESIZER_SYSTEM_PROMPT, createSynthesizerUserPrompt } from './utils/prompts.js';
 import { z } from 'zod';
 import { createAgent, tool } from "langchain";
-import { embeddingClient, plannerClient, synthClient } from './utils/clients.js';
+import { createClientsPasswordless, createClients } from './utils/clients.js';
 import { getStore } from './utils/documentdb.js';
 import { callbacks } from './utils/handlers.js';
 import { extractPlannerToolOutput } from './utils/extract.js';
 import { deleteCosmosMongoDatabase } from './utils/cleanup.js';
 
+// Search query
 const query = DEFAULT_QUERY;
 
+// Authentication
+const clients = process.env.USE_PASSWORDLESS === 'true' || process.env.USE_PASSWORDLESS === '1' ? createClientsPasswordless() : createClients();
+const { embeddingClient, plannerClient, synthClient } = clients;
+
+// Vector Search Tool
 const getHotelsToMatchSearchQuery = tool(
   async ({ query, nearestNeighbors }, config): Promise<string> => {
 
@@ -84,9 +90,7 @@ const getHotelsToMatchSearchQuery = tool(
   }
 );
 
-
-
-// Planner agent function - directly performs a vector search and returns documents
+// Planner agent uses Vector Search Tool
 async function runPlannerAgent(
   userQuery: string,
   store: AzureCosmosDBMongoDBVectorStore,
@@ -119,7 +123,7 @@ async function runPlannerAgent(
   return searchResultsAsText;
 }
 
-// Synthesizer agent function - generates final user-friendly response
+// Synthesizer agent function generates final user-friendly response
 async function runSynthesizerAgent(userQuery: string, hotelContext: string): Promise<string> {
   console.log('\n--- SYNTHESIZER ---');
 
@@ -142,14 +146,21 @@ async function runSynthesizerAgent(userQuery: string, hotelContext: string): Pro
   return finalAnswer as string;
 }
 
+// Get vector store (get docs, create embeddings, insert docs)
 const store = await getStore(
   process.env.DATA_FILE_WITHOUT_VECTORS!,
   embeddingClient);
 
+// Run planner agent
 const hotelContext = await runPlannerAgent(query, store, 5);
+
+// Run synth agent
 const finalAnswer = await runSynthesizerAgent(query, hotelContext);
 
+// Get final recommendation (data + AI)
 console.log('\n--- FINAL ANSWER ---');
 console.log(finalAnswer);
 
+// Clean up (delete datbase)
+await store.close();
 await deleteCosmosMongoDatabase();

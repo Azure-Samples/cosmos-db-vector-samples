@@ -1,0 +1,21 @@
+```mermaid
+flowchart TD
+  A[User] -->|asks question| Planner(Planner Agent) 
+  Planner -->|calls tool| Tool[getHotelsToMatchSearchQuery Tool]
+  Tool -->|returns plain text / JSON string| Extractor(Extractor)
+  Planner -->|may return AI message instead of tool call| Fallback{Planner didn't call tool}
+  Fallback -->|run programmatic vector search| Extractor
+  Extractor -->|hotelContext string| Synth(Synthesizer Agent)
+  Synth -->|final answer| A
+
+  subgraph Clients
+    E[Embedding Client]
+    C[Cosmos DB (Mongo API) Vector Store]
+    Chat[Chat Client]
+  end
+
+  Tool --> C
+  Tool --> E
+  Planner --> Chat
+  Synth --> Chat
+```
