@@ -2,15 +2,13 @@ import {
   AzureCosmosDBMongoDBVectorStore,
   AzureCosmosDBMongoDBSimilarityType,
 } from "@langchain/azure-cosmosdb";
-import { AzureOpenAIEmbeddings, AzureChatOpenAI  } from "@langchain/openai";
+import { AzureOpenAIEmbeddings, AzureChatOpenAI } from "@langchain/openai";
 import { readFileSync } from 'fs';
 import { Document } from '@langchain/core/documents';
 import { HotelsData } from './utils/types.js';
 import { PLANNER_SYSTEM_PROMPT, SYNTHESIZER_SYSTEM_PROMPT, createSynthesizerUserPrompt } from './utils/prompts.js';
-import { tool } from '@langchain/core/tools';
 import { z } from 'zod';
-import { AgentExecutor, createToolCallingAgent } from 'langchain/agents';
-import { ChatPromptTemplate } from '@langchain/core/prompts';
+import { createAgent, tool, createMiddleware, ToolMessage } from "langchain";
 
 // Helper functions to get vector index options based on algorithm
 function getSimilarityType(similarity: string) {
@@ -54,7 +52,7 @@ function getDiskANNIndexOptions() {
 
 function getVectorIndexOptions() {
   const algorithm = process.env.VECTOR_INDEX_ALGORITHM || 'vector-ivf';
-  
+
   switch (algorithm) {
     case 'vector-hnsw':
       return getHNSWIndexOptions();
@@ -66,8 +64,8 @@ function getVectorIndexOptions() {
   }
 }
 
-const hotelsData: HotelsData = JSON.parse(readFileSync('./data/Hotels.json', 'utf-8'));
-const query = "quintessential lodging near running trails, eateries, retail";
+const hotelsData: HotelsData = JSON.parse(readFileSync(process.env.DATA_FILE_WITHOUT_VECTORS!, 'utf-8'));
+const query = process.env.QUERY! || "quintessential lodging near running trails, eateries, retail";
 
 const documents = hotelsData.map(hotel => new Document({
   pageContent: `Hotel: ${hotel.HotelName}\n\n${hotel.Description}`,
@@ -89,12 +87,6 @@ const documents = hotelsData.map(hotel => new Document({
   id: hotel.HotelId.toString()
 }));
 
-/*
-AZURE_OPENAI_API_INSTANCE_NAME=<YOUR_INSTANCE_NAME>
-AZURE_OPENAI_API_EMBEDDINGS_DEPLOYMENT_NAME=<YOUR_EMBEDDINGS_DEPLOYMENT_NAME>
-AZURE_OPENAI_API_KEY=<YOUR_KEY>
-AZURE_OPENAI_API_VERSION="2024-02-01"
-*/
 const embeddingClient = new AzureOpenAIEmbeddings({
   azureOpenAIApiKey: process.env.AZURE_OPENAI_API_KEY!,
   azureOpenAIApiInstanceName: process.env.AZURE_OPENAI_API_INSTANCE_NAME!,
@@ -137,30 +129,38 @@ const store = await AzureCosmosDBMongoDBVectorStore.fromDocuments(
 
 // Create hotel search tool
 const hotelSearchTool = tool(
-  async ({ query, maxResults }: { query: string; maxResults: number }) => {
+  ({ query, maxResults }: { query: string; maxResults: number }) => {
     console.log(`\n--- VECTOR SEARCH ---`);
     console.log(`Query: "${query}"`);
     console.log(`Max results: ${maxResults}`);
-    
+
     const results = await store.similaritySearchVectorWithScore(
       await embeddingClient.embedQuery(query),
       maxResults
     );
     console.log(`Found ${results.length} hotels`);
     results.forEach(([doc, score], i) => console.log(`${i + 1}. ${doc.metadata.HotelName} (score: ${score.toFixed(4)})`));
+
+    const hotelResults = results.map(([doc, score]) => ({
+      hotelName: doc.metadata.HotelName,
+      vectorScore: score
+    }));
     
-    const context = results.map(([doc, score]) => 
+    console.log('\n--- TOOL RETURNING ---');
+    console.log(JSON.stringify(hotelResults, null, 2));
+
+    const context = results.map(([doc, score]) =>
       `Hotel: ${doc.metadata.HotelName}
-Score: ${score.toFixed(4)}
-${doc.pageContent}
-Rating: ${doc.metadata.Rating}
-Category: ${doc.metadata.Category}
-Tags: ${doc.metadata.Tags.join(', ')}
-Parking Included: ${doc.metadata.ParkingIncluded ? 'Yes' : 'No'}
-Address: ${doc.metadata.Address.StreetAddress}, ${doc.metadata.Address.City}, ${doc.metadata.Address.StateProvince} ${doc.metadata.Address.PostalCode}
-Rooms Available: ${doc.metadata.Rooms.length} room type(s)`
+      Score: ${score.toFixed(4)}
+      ${doc.pageContent}
+      Rating: ${doc.metadata.Rating}
+      Category: ${doc.metadata.Category}
+      Tags: ${doc.metadata.Tags.join(', ')}
+      Parking Included: ${doc.metadata.ParkingIncluded ? 'Yes' : 'No'}
+      Address: ${doc.metadata.Address.StreetAddress}, ${doc.metadata.Address.City}, ${doc.metadata.Address.StateProvince} ${doc.metadata.Address.PostalCode}
+      Rooms Available: ${doc.metadata.Rooms.length} room type(s)`
     ).join('\n\n---\n\n');
-    
+
     return context;
   },
   {
@@ -173,55 +173,71 @@ Rooms Available: ${doc.metadata.Rooms.length} room type(s)`
   }
 );
 
+const handleToolErrors = createMiddleware({
+  name: "HandleToolErrors",
+  wrapToolCall: async (request, handler) => {
+    try {
+      return await handler(request);
+    } catch (error) {
+      // Return a custom error message to the model
+      return new ToolMessage({
+        content: `Tool error: Please check your input and try again. (${error})`,
+        tool_call_id: request.toolCall.id!,
+      });
+    }
+  },
+});
+
 // Planner agent function - decides what to search and executes the search
 async function runPlannerAgent(userQuery: string): Promise<string> {
   console.log('\n--- PLANNER AGENT (with search tool) ---');
   console.log(`Input: "${userQuery}"`);
-  
-  const agentSystemPrompt = `You are a hotel search planner. Use the search_hotels tool to find hotels matching the user's needs.
 
-When using the tool, provide:
-- query: A clear, detailed search query for semantic search (expand vague requests like "nice hotel" to "hotel with high ratings and good amenities")
-- maxResults: Number of results to return (1-20, default 5)
-
-Transform vague requests into specific, searchable queries while preserving user's specific requirements (location, amenities, etc.).`;
-
-  const prompt = ChatPromptTemplate.fromMessages([
-    ["system", agentSystemPrompt],
-    ["human", "{input}"],
-    ["placeholder", "{agent_scratchpad}"]
-  ]);
-
-  const agent = await createToolCallingAgent({
-    llm: plannerClient,
+  const agent = createAgent({
+    model: plannerClient,
     tools: [hotelSearchTool],
-    prompt,
+    systemPrompt: PLANNER_SYSTEM_PROMPT,
+    middleware: [handleToolErrors],
   });
 
-  const agentExecutor = new AgentExecutor({
-    agent,
-    tools: [hotelSearchTool],
+  const agentResult = await agent.invoke({
+    messages: [{ role: "user", content: userQuery }],
+  })
+
+  // Log all messages to see tool calls and results
+  console.log('\n--- AGENT MESSAGES ---');
+  agentResult.messages.forEach((msg, i) => {
+    console.log(`\nMessage ${i + 1}:`);
+    console.log(`  Role: ${msg._getType()}`);
+    if ('tool_calls' in msg && msg.tool_calls && Array.isArray(msg.tool_calls) && msg.tool_calls.length > 0) {
+      console.log(`  Tool Calls: ${JSON.stringify(msg.tool_calls, null, 2)}`);
+    }
+    if (msg._getType() === 'tool') {
+      console.log(`  Tool Result: ${msg.content}`);
+    }
   });
 
-  const agentResult = await agentExecutor.invoke({ input: userQuery });
-  console.log(`Output: Hotel context with ${agentResult.output.length} characters`);
-  return agentResult.output;
+  console.log(`\nOutput: Hotel context with ${agentResult.messages[agentResult.messages.length - 1].content.length} characters`);
+  return agentResult.messages[agentResult.messages.length - 1].content as string;
 }
 
 // Synthesizer agent function - generates final user-friendly response
 async function runSynthesizerAgent(userQuery: string, hotelContext: string): Promise<string> {
   console.log('\n--- SYNTHESIZER ---');
   console.log(`Input: User query + ${hotelContext.length} chars of hotel context`);
-  
-  const synthMessages = [
-    { role: 'system', content: SYNTHESIZER_SYSTEM_PROMPT },
-    { role: 'user', content: createSynthesizerUserPrompt(userQuery, hotelContext) }
-  ];
-  
-  const synthResp = await synthClient.invoke(synthMessages.map(m => [m.role, m.content]));
-  const finalAnswer = synthResp.content as string;
+
+  const agent = createAgent({
+    model: synthClient,
+    systemPrompt: SYNTHESIZER_SYSTEM_PROMPT,
+  });
+
+  const agentResult = await agent.invoke({
+    messages: [{ role: "user", content: createSynthesizerUserPrompt(userQuery, hotelContext) }],
+  })
+  const synthMessages = agentResult.messages;
+  const finalAnswer = synthMessages[synthMessages.length - 1].content;
   console.log(`Output: ${finalAnswer.length} characters of final recommendation`);
-  return finalAnswer;
+  return finalAnswer as string;
 }
 
 // Execute two-agent workflow
