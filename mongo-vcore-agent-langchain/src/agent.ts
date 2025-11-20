@@ -68,7 +68,10 @@ async function runPlannerAgent(
   nearestNeighbors = 5
 ): Promise<void> {
   console.log('\n--- PLANNER (direct vector search) ---');
-  console.log(`Input: "${userQuery}"`);
+
+  const userMessage = `Call the "search_hotels_collection" tool with the desired number of neighbors: nearestNeighbors="${nearestNeighbors}" and the query: query="${userQuery}". Respond ONLY with a tool response JSON output`;
+
+  console.log(`Agent input: "${userQuery}"`);
 
   const contextSchema = z.object({
     store: z.any(),
@@ -116,7 +119,7 @@ async function runPlannerAgent(
   ];
 
   const agentResult = await agent.invoke(
-    { messages: [{ role: 'user', content: userQuery }] },
+    { messages: [{ role: 'user', content: userMessage }] },
     { context: { store, embeddingClient }, callbacks: plannerCallbacks }
   );
 
