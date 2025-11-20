@@ -7,7 +7,7 @@ import { createAgent, tool } from "langchain";
 import { embeddingClient, plannerClient, synthClient } from './utils/clients.js';
 // Helper functions to get vector index options based on algorithm
 import { insertDocs } from './utils/documentdb.js';
-
+import { callbacks } from './utils/handlers.js';
 const query = process.env.QUERY! || "quintessential lodging near running trails, eateries, retail";
 
 const getHotelsToMatchSearchQuery = tool(
@@ -60,12 +60,10 @@ async function runPlannerAgent(
   userQuery: string,
   store: AzureCosmosDBMongoDBVectorStore,
   nearestNeighbors = 5
-): Promise<void> {
+): Promise<string> {
   console.log('\n--- PLANNER (direct vector search) ---');
 
   const userMessage = `Call the "search_hotels_collection" tool with the desired number of neighbors: nearestNeighbors="${nearestNeighbors}" and the query: query="${userQuery}". Respond ONLY with a tool response JSON output`;
-
-  console.log(`Agent input: "${userQuery}"`);
 
   const contextSchema = z.object({
     store: z.any(),
@@ -79,49 +77,21 @@ async function runPlannerAgent(
     contextSchema,
   });
 
-  // Diagnostic callbacks array to log agent decisions and tool usage
-  const plannerCallbacks = [
-    {
-      handleLLMStart: async (_llm, prompts) => {
-        console.log('[planner][LLM start] prompts=', Array.isArray(prompts) ? prompts.length : 1);
-      },
-      handleLLMEnd: async (_output) => {
-        console.log('[planner][LLM end]');
-      },
-      handleLLMError: async (err) => {
-        console.error('[planner][LLM error]', err);
-      },
-      handleAgentAction: async (action) => {
-        try {
-          const toolName = action?.tool?.name ?? action?.tool ?? 'unknown';
-          const input = action?.input ? (typeof action.input === 'string' ? action.input : JSON.stringify(action.input)) : '';
-          console.log(`[planner][Agent Decision] tool=${toolName} input=${input}`);
-        }
-        catch (e) { /* ignore */ }
-      },
-      handleToolStart: async (tool) => {
-        console.log('[planner][Tool Start]', typeof tool === 'string' ? tool : (tool?.name ?? JSON.stringify(tool)));
-      },
-      handleToolEnd: async (output) => {
-        try {
-          const summary = typeof output === 'string' ? output.slice(0, 200) : JSON.stringify(output).slice(0, 200);
-          console.log('[planner][Tool End] output summary=', summary);
-        }
-        catch (e) { /* ignore */ }
-      }
-    }
-  ];
-
   const agentResult = await agent.invoke(
     { messages: [{ role: 'user', content: userMessage }] },
-    { context: { store, embeddingClient }, callbacks: plannerCallbacks }
+    { context: { store, embeddingClient }, callbacks }
   );
 
   const plannerMessages = agentResult.messages;
   console.log(plannerMessages);
 
-  // Return the hotels array (JSON) to the synthesizer — vectors are not included
-  // return JSON.stringify(hotels);
+  const lastMessage = plannerMessages[plannerMessages.length - 1];
+  const content = typeof lastMessage.content === 'string' 
+    ? lastMessage.content 
+    : lastMessage.content.map((block: any) => block.text || '').join('');
+  const hotels: any = JSON.parse(content);
+
+  return JSON.stringify(hotels);
 }
 
 // Synthesizer agent function - generates final user-friendly response
@@ -136,26 +106,10 @@ async function runSynthesizerAgent(userQuery: string, hotelContext: string): Pro
     systemPrompt: SYNTHESIZER_SYSTEM_PROMPT,
   });
 
-  // const cbManager = CallbackManager.fromHandlers({
-  //   handleLLMStart: async (llm, prompts) => {
-  //     try {
-  //       console.log('[LLM start] model=', llm?.name ?? llm?.model ?? llm?.modelName, 'prompts=', Array.isArray(prompts) ? prompts.length : 1);
-  //     } catch (e) { /* ignore */ }
-  //   },
-  //   handleLLMNewToken: async (token) => {
-  //     try { process.stdout.write(token); } catch (e) { /* ignore */ }
-  //   },
-  //   handleLLMEnd: async (output) => {
-  //     try { console.log('\n[LLM end] output keys=', Object.keys(output || {})); } catch (e) { /* ignore */ }
-  //   },
-  //   handleLLMError: async (err) => {
-  //     try { console.error('[LLM error]', err); } catch (e) { /* ignore */ }
-  //   }
-  // });
-
   const agentResult = await agent.invoke({
-    messages: [{ role: 'user', content: createSynthesizerUserPrompt(userQuery, conciseContext) }],
-    //callbacks: cbManager,
+    messages: [{ 
+      role: 'user', 
+      content: createSynthesizerUserPrompt(userQuery, conciseContext) }]
   });
   const synthMessages = agentResult.messages;
   const finalAnswer = synthMessages[synthMessages.length - 1].content;
