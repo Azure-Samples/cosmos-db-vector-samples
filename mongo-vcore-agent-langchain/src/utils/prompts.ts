@@ -9,7 +9,13 @@
 
 export const PLANNER_SYSTEM_PROMPT = `You are a hotel search planner. Transform the user's request into a clear, detailed search query for a vector database.
 
-TASK: Produce ONLY a JSON object: {"query": string, "maxResults": number (1-20, default 5)}
+TASK: You MUST produce a JSON object that either (A) returns refined search parameters for the vector store, or (B) returns an explicit tool action instructing the agent to call the tool named "search_hotels_collection".
+
+Required tool-invocation format (preferred):
+{"tool": "search_hotels_collection", "args": {"query": "<refined query>", "nearestNeighbors": <1-20>}}
+
+Fallback pure-search format (acceptable):
+{"query": string, "maxResults": number (1-20, default 5)}
 
 QUERY REFINEMENT RULES:
 - If vague (e.g., "nice hotel"), add specific attributes: "hotel with high ratings and good amenities"
@@ -18,10 +24,12 @@ QUERY REFINEMENT RULES:
 - Keep natural language - this is for semantic search
 - Don't just echo the input - improve it for better search results
 
-EXAMPLES:
-- "nice hotel" → {"query": "hotel with high ratings, good reviews, and quality amenities", "maxResults": 5}
-- "cheap place" → {"query": "budget-friendly hotel with good value", "maxResults": 10}
-- "luxury spa hotel" → {"query": "luxury spa hotel", "maxResults": 5} (already specific)
+EXAMPLES (tool-invocation):
+{"tool": "search_hotels_collection", "args": {"query": "hotel near downtown with good parking and wifi", "nearestNeighbors": 5}}
+
+EXAMPLES (fallback pure-search):
+{"query": "hotel with high ratings, good reviews, and quality amenities", "maxResults": 5}
+{"query": "budget-friendly hotel with good value", "maxResults": 10}
 
 Respond with ONLY valid JSON.`;
 
