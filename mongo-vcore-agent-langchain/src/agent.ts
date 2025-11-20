@@ -7,7 +7,7 @@ import { createAgent, tool } from "langchain";
 import { Hotel, HotelSearchResult } from './utils/types.js';
 import { embeddingClient, plannerClient, synthClient } from './utils/clients.js';
 // Helper functions to get vector index options based on algorithm
-import { insertDocs } from './utils/documentdb.js';
+import { getStore } from './utils/documentdb.js';
 import { callbacks } from './utils/handlers.js';
 import { extractPlannerToolOutput } from './utils/extract.js';
 
@@ -15,7 +15,7 @@ import { extractPlannerToolOutput } from './utils/extract.js';
 const query = process.env.QUERY! || "quintessential lodging near running trails, eateries, retail";
 
 const getHotelsToMatchSearchQuery = tool(
-  async ({ query, nearestNeighbors }, config):Promise<HotelSearchResult[]> => {
+  async ({ query, nearestNeighbors }, config): Promise<string> => {
 
     const store = config.context.store as AzureCosmosDBMongoDBVectorStore;
     const embeddingClient = config.context.embeddingClient as AzureOpenAIEmbeddings;
@@ -49,7 +49,32 @@ const getHotelsToMatchSearchQuery = tool(
       console.log(`Hotel: ${hotel.HotelName}, Score: ${hotel.Score}`);
     });
 
-    return hotels;
+    // Build a well-named, human-readable text block for each hotel with clear markers
+    const formatted = hotels.map(h => {
+      const addr = h.Address || {} as Record<string, any>;
+      const tags = Array.isArray(h.Tags) ? h.Tags.join(', ') : String(h.Tags || '');
+      return [
+        '--- HOTEL START ---',
+        `HotelId: ${h.HotelId ?? 'N/A'}`,
+        `HotelName: ${h.HotelName ?? 'N/A'}`,
+        `Description: ${h.Description ?? ''}`,
+        `Category: ${h.Category ?? ''}`,
+        `Tags: ${tags}`,
+        `ParkingIncluded: ${h.ParkingIncluded === true}`,
+        `IsDeleted: ${h.IsDeleted === true}`,
+        `LastRenovationDate: ${h.LastRenovationDate ?? ''}`,
+        `Rating: ${h.Rating ?? ''}`,
+        `Address.StreetAddress: ${addr?.StreetAddress ?? ''}`,
+        `Address.City: ${addr?.City ?? ''}`,
+        `Address.StateProvince: ${addr?.StateProvince ?? ''}`,
+        `Address.PostalCode: ${addr?.PostalCode ?? ''}`,
+        `Address.Country: ${addr?.Country ?? ''}`,
+        `Score: ${Number(h.Score ?? 0).toFixed(6)}`,
+        '--- HOTEL END ---'
+      ].join('\n');
+    }).join('\n\n');
+
+    return formatted;
   },
   {
     name: "search_hotels_collection",
@@ -92,14 +117,10 @@ async function runPlannerAgent(
 
   const plannerMessages = agentResult.messages || [];
 
-  const { toolContent, parsed } = extractPlannerToolOutput(plannerMessages, nearestNeighbors);
-
-  if (parsed === null) {
-    throw new Error('Planner tool output not found or not valid JSON');
-  }
+  const searchResultsAsText = extractPlannerToolOutput(plannerMessages, nearestNeighbors);
 
   // return the tool JSON string (same as before)
-  return toolContent;
+  return searchResultsAsText;
 }
 
 // Synthesizer agent function - generates final user-friendly response
@@ -125,12 +146,9 @@ async function runSynthesizerAgent(userQuery: string, hotelContext: string): Pro
   return finalAnswer as string;
 }
 
-// Execute two-agent workflow
-const store = await insertDocs(
+const store = await getStore(
   process.env.DATA_FILE_WITHOUT_VECTORS!,
   embeddingClient);
-
-
 
 const hotelContext = await runPlannerAgent(query, store, 5);
 const finalAnswer = await runSynthesizerAgent(query, hotelContext);

@@ -95,6 +95,26 @@ export const synthClient = new AzureChatOpenAI({
   azureOpenAIApiVersion: process.env.AZURE_OPENAI_SYNTH_API_VERSION,
 });
 
+export async function getStore(dataFilePath: string, embeddingClient: AzureOpenAIEmbeddings): Promise<AzureCosmosDBMongoDBVectorStore> {
+
+  const dbExists = process.env.DB_EXISTS === 'true' || process.env.DB_EXISTS === '1';
+
+  return dbExists ? getExistingDbStore() : insertDocs(dataFilePath, embeddingClient);
+}
+
+async function getExistingDbStore(){
+  const store = new AzureCosmosDBMongoDBVectorStore(
+    embeddingClient,
+    {
+      connectionString: process.env.MONGO_CONNECTION_STRING,
+      databaseName: process.env.MONGO_DB_NAME!,
+      collectionName: process.env.MONGO_DB_COLLECTION!,
+      indexOptions: getVectorIndexOptions(),
+    }
+  );
+  return store;
+}
+
 export async function insertDocs(
   dataFilePath: string,
   embeddingClient: AzureOpenAIEmbeddings
