@@ -41,7 +41,7 @@ const getHotelsToMatchSearchQuery = tool(
       };
     });
 
-    return hotels;
+    return JSON.stringify(hotels);
   },
   {
     name: "search_hotels_collection",
