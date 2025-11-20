@@ -20,7 +20,7 @@ const query = process.env.QUERY! || "quintessential lodging near running trails,
 async function runPlannerAgent(
   userQuery: string,
   store: AzureCosmosDBMongoDBVectorStore,
-  maxResults = 5
+  nearestNeighbors = 5
 ): Promise<string> {
   console.log('\n--- PLANNER (direct vector search) ---');
   console.log(`Input: "${userQuery}"`);
@@ -29,7 +29,7 @@ async function runPlannerAgent(
   const queryVector = await embeddingClient.embedQuery(userQuery);
 
   // Perform similarity search on the vector store
-  const results = await store.similaritySearchVectorWithScore(queryVector, maxResults);
+  const results = await store.similaritySearchVectorWithScore(queryVector, nearestNeighbors);
   console.log(`Found ${results.length} documents from vector store`);
 
   // Map results to the Hotel type (HotelsData) by extracting metadata fields
@@ -45,13 +45,14 @@ async function runPlannerAgent(
       IsDeleted: md.IsDeleted,
       LastRenovationDate: md.LastRenovationDate,
       Rating: md.Rating,
-      Address: md.Address
+      Address: md.Address,
+      Score: score
       };
   });
 
   // For transparency, log top hits
   hotels.forEach((h, i) => {
-    console.log(`${i + 1}. ${h.HotelName || 'unknown'} (id: ${h.HotelId})`);
+    console.log(`${i + 1}. ${h.HotelName || 'unknown'} (id: ${h.HotelId}, score: ${h.Score}) `);
   });
 
   // Return the hotels array (JSON) to the synthesizer — vectors are not included
@@ -63,6 +64,7 @@ async function runSynthesizerAgent(userQuery: string, hotelContext: string): Pro
   console.log('\n--- SYNTHESIZER ---');
 
   let conciseContext = hotelContext;
+  console.log(`Context size is ${conciseContext.length} characters`);
 
   const agent = createAgent({
     model: synthClient,
@@ -80,7 +82,7 @@ async function runSynthesizerAgent(userQuery: string, hotelContext: string): Pro
 
 // Execute two-agent workflow
 const store = await insertDocs(
-  process.env.DATA_FILE_WITH_VECTORS!,
+  process.env.DATA_FILE_WITHOUT_VECTORS!,
   embeddingClient);
 
 
