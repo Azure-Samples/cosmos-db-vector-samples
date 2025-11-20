@@ -17,6 +17,7 @@
     "@langchain/core": "^1.0.6",
     "@langchain/openai": "^1.1.2",
     "langchain": "^1.0.6",
+    "mongo": "^0.1.0",
     "zod": "^4.1.12"
   }
 }

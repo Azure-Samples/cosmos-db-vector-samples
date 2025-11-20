@@ -1,18 +1,16 @@
 import {
   AzureCosmosDBMongoDBVectorStore } from "@langchain/azure-cosmosdb";
 import { AzureOpenAIEmbeddings } from "@langchain/openai";
-import { PLANNER_SYSTEM_PROMPT, SYNTHESIZER_SYSTEM_PROMPT, createSynthesizerUserPrompt } from './utils/prompts.js';
+import { DEFAULT_QUERY, PLANNER_SYSTEM_PROMPT, SYNTHESIZER_SYSTEM_PROMPT, createSynthesizerUserPrompt } from './utils/prompts.js';
 import { z } from 'zod';
 import { createAgent, tool } from "langchain";
-import { Hotel, HotelSearchResult } from './utils/types.js';
 import { embeddingClient, plannerClient, synthClient } from './utils/clients.js';
-// Helper functions to get vector index options based on algorithm
 import { getStore } from './utils/documentdb.js';
 import { callbacks } from './utils/handlers.js';
 import { extractPlannerToolOutput } from './utils/extract.js';
+import { deleteCosmosMongoDatabase } from './utils/cleanup.js';
 
-
-const query = process.env.QUERY! || "quintessential lodging near running trails, eateries, retail";
+const query = DEFAULT_QUERY;
 
 const getHotelsToMatchSearchQuery = tool(
   async ({ query, nearestNeighbors }, config): Promise<string> => {
@@ -116,10 +114,8 @@ async function runPlannerAgent(
   );
 
   const plannerMessages = agentResult.messages || [];
-
   const searchResultsAsText = extractPlannerToolOutput(plannerMessages, nearestNeighbors);
 
-  // return the tool JSON string (same as before)
   return searchResultsAsText;
 }
 
@@ -156,5 +152,4 @@ const finalAnswer = await runSynthesizerAgent(query, hotelContext);
 console.log('\n--- FINAL ANSWER ---');
 console.log(finalAnswer);
 
-await store.delete();
-await store.close();
+await deleteCosmosMongoDatabase();

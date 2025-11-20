@@ -97,9 +97,11 @@ export const synthClient = new AzureChatOpenAI({
 
 export async function getStore(dataFilePath: string, embeddingClient: AzureOpenAIEmbeddings): Promise<AzureCosmosDBMongoDBVectorStore> {
 
-  const dbExists = process.env.DB_EXISTS === 'true' || process.env.DB_EXISTS === '1';
+  //const dbExists = process.env.DB_EXISTS === 'true' || process.env.DB_EXISTS === '1';
 
-  return dbExists ? getExistingDbStore() : insertDocs(dataFilePath, embeddingClient);
+  //return dbExists ? getExistingDbStore() : insertDocs(dataFilePath, embeddingClient);
+
+  return insertDocs(dataFilePath, embeddingClient);
 }
 
 async function getExistingDbStore(){
@@ -149,6 +151,8 @@ export async function insertDocs(
       indexOptions: getVectorIndexOptions(),
     }
   );
+
+  console.log(`Inserted ${documents.length} documents into Cosmos DB (Mongo API) vector store.`);
 
   return store;
 }

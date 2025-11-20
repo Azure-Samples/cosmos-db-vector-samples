@@ -7,6 +7,8 @@
 // Planner Prompts
 // ============================================================================
 
+export const DEFAULT_QUERY = process.env.QUERY! || "quintessential lodging near running trails, eateries, retail";
+
 export const PLANNER_SYSTEM_PROMPT = `You are a hotel search planner. Transform the user's request into a clear, detailed search query for a vector database.
 
 TASK: You MUST produce a JSON object that either (A) returns refined search parameters for the vector store, or (B) returns an explicit tool action instructing the agent to call the tool named "search_hotels_collection".
