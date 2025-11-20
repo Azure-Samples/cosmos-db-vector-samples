@@ -433,3 +433,4 @@ FodyWeavers.xsd
 dist/
 build/
 node_modules/
+.tsbuildinfo*
