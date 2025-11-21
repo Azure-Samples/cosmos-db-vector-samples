@@ -6,10 +6,7 @@ import { z } from 'zod';
 import { createAgent } from "langchain";
 import { createClientsPasswordless, createClients } from './utils/clients.js';
 import { DEBUG_CALLBACKS } from './utils/debug-handlers.js';
-import { extractPlannerToolOutput } from './utils/tool-results-extraction.js';
-import { deleteCosmosMongoDatabase } from './utils/mongodb-cleanup.js';
-import { getStore } from './utils/azure-documentdb.js';
-import { getHotelsToMatchSearchQuery } from './utils/azure-documentdb.js';
+import { extractPlannerToolOutput, getStore, getHotelsToMatchSearchQuery, deleteCosmosMongoDatabase } from './vector-store.js';
 
 // Authentication
 const clients = process.env.USE_PASSWORDLESS === 'true' || process.env.USE_PASSWORDLESS === '1' ? createClientsPasswordless() : createClients();

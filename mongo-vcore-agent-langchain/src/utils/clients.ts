@@ -1,20 +1,40 @@
 import { AzureOpenAIEmbeddings, AzureChatOpenAI } from "@langchain/openai";
 import { MongoClient, OIDCCallbackParams } from 'mongodb';
+import { AccessToken, DefaultAzureCredential, TokenCredential, getBearerTokenProvider } from '@azure/identity';
 
-import { AzureIdentityTokenCallback, CREDENTIAL, AZURE_OPENAI_AD_TOKEN_PROVIDER } from './azure-identity.js';
 /*
-
 This file contains utility functions to create Azure OpenAI clients for embeddings, planning, and synthesis.
 
 It supports two modes of authentication:
 1. API Key based authentication using AZURE_OPENAI_API_KEY and AZURE_OPENAI_API_INSTANCE_NAME environment variables.
 2. Passwordless authentication using DefaultAzureCredential from Azure Identity library.
-
 */
 
+// Azure Identity configuration
+const OPENAI_SCOPE = 'https://cognitiveservices.azure.com/.default';
+const DOCUMENT_DB_SCOPE = 'https://ossrdbms-aad.database.windows.net/.default';
+
+// Azure identity credential (used for passwordless auth)
+const CREDENTIAL = new DefaultAzureCredential();
+
+// Token callback for MongoDB OIDC authentication
+async function azureIdentityTokenCallback(
+  params: OIDCCallbackParams, 
+  credential: TokenCredential
+): Promise<{ accessToken: string; expiresInSeconds: number }> {
+  const tokenResponse: AccessToken | null = await credential.getToken([DOCUMENT_DB_SCOPE]);
+  return {
+    accessToken: tokenResponse?.token || '',
+    expiresInSeconds: (tokenResponse?.expiresOnTimestamp || 0) - Math.floor(Date.now() / 1000)
+  };
+}
+
+// Token provider for Azure OpenAI
+const AZURE_OPENAI_AD_TOKEN_PROVIDER = getBearerTokenProvider(CREDENTIAL, OPENAI_SCOPE);
+
+// Debug logging
 const DEBUG = process.env.DEBUG === 'true' || process.env.DEBUG === '1';
 if (DEBUG) {
-
   const usePasswordless = process.env.USE_PASSWORDLESS === 'true' || process.env.USE_PASSWORDLESS === '1';
   if (usePasswordless) {
     console.log('[clients] Passwordless mode enabled. Passwordless env presence:', {
@@ -38,9 +58,9 @@ if (DEBUG) {
   }
 }
 
+// Create clients with API key authentication
 export function createClients() {
   try {
-
     const key = process.env.AZURE_OPENAI_API_KEY;
     const instance = process.env.AZURE_OPENAI_API_INSTANCE_NAME;
     if (!key || !instance) {
@@ -79,8 +99,7 @@ export function createClients() {
       connectionString: process.env.AZURE_COSMOSDB_MONGODB_CONNECTION_STRING!,
       databaseName: process.env.MONGO_DB_NAME!,
       collectionName: process.env.MONGO_DB_COLLECTION!
-    }
-
+    };
 
     return { embeddingClient, plannerClient, synthClient, dbConfig };
   } catch (err: any) {
@@ -90,22 +109,25 @@ export function createClients() {
   }
 }
 
+// Create MongoDB client with passwordless authentication
 function getMongoPasswordless() {
   const clusterName = process.env.MONGO_CLUSTER_NAME!;
-  const dbClient = new MongoClient(
-    `mongodb+srv://${clusterName}.global.mongocluster.cosmos.azure.com/`, {
-    connectTimeoutMS: 30000,
-    tls: true,
-    retryWrites: true,
-    authMechanism: 'MONGODB-OIDC',
-    authMechanismProperties: {
-      OIDC_CALLBACK: (params: OIDCCallbackParams) => AzureIdentityTokenCallback(params, CREDENTIAL),
-      ALLOWED_HOSTS: ['*.azure.com']
+  return new MongoClient(
+    `mongodb+srv://${clusterName}.global.mongocluster.cosmos.azure.com/`, 
+    {
+      connectTimeoutMS: 30000,
+      tls: true,
+      retryWrites: true,
+      authMechanism: 'MONGODB-OIDC',
+      authMechanismProperties: {
+        OIDC_CALLBACK: (params: OIDCCallbackParams) => azureIdentityTokenCallback(params, CREDENTIAL),
+        ALLOWED_HOSTS: ['*.azure.com']
+      }
     }
-  });
-  return dbClient;
+  );
 }
 
+// Create clients with passwordless authentication
 export function createClientsPasswordless() {
   try {
     const instance = process.env.AZURE_OPENAI_API_INSTANCE_NAME;
@@ -142,8 +164,7 @@ export function createClientsPasswordless() {
       client: mongoClient,
       databaseName: process.env.MONGO_DB_NAME!,
       collectionName: process.env.MONGO_DB_COLLECTION!,
-
-    }
+    };
 
     return { embeddingClient, plannerClient, synthClient, dbConfig };
   } catch (err: any) {
@@ -151,4 +172,3 @@ export function createClientsPasswordless() {
     throw err;
   }
 }
-
