@@ -27,7 +27,47 @@ Find the [complete source code](https://github.com/Azure-Samples/cosmos-db-vecto
 
 ## Prerequisites
 
-[!INCLUDE[Prerequisites - Vector Search Quickstart](includes/prerequisite-quickstart-vector-search.md)]
+### Azure resources
+
+- **Azure OpenAI resource** with the following model deployments in Microsoft Azure AI Foundry:
+  - `gpt-4o` deployment (Synthesizer Agent)
+    - Recommended: **50,000 tokens per minute (TPM)** capacity
+    - Pricing: ~$2.50 per 1M input tokens, ~$10.00 per 1M output tokens
+  - `gpt-4o-mini` deployment (Planner Agent)
+    - Recommended: **30,000 tokens per minute (TPM)** capacity
+    - Pricing: ~$0.15 per 1M input tokens, ~$0.60 per 1M output tokens
+  - `text-embedding-3-small` deployment (Embeddings)
+    - Recommended: **10,000 tokens per minute (TPM)** capacity
+    - Pricing: ~$0.02 per 1M tokens
+  - **Token quotas**: Configure sufficient TPM for each deployment to avoid rate limiting
+    - See [Manage Azure OpenAI quotas](https://learn.microsoft.com/azure/ai-services/openai/how-to/quota) for quota management
+    - If you encounter 429 errors, increase your TPM quota or reduce request frequency
+  <!-- TODO: Add tabbed conceptual for passwordless authentication -->
+  <!-- Tab 1: API Key (default) - current content above -->
+  <!-- Tab 2: Passwordless (Microsoft Entra ID) -->
+  <!-- - RBAC role required: Cognitive Services OpenAI User or Cognitive Services OpenAI Contributor -->
+  <!-- - Assign role in Azure Portal: Azure OpenAI resource → Access control (IAM) → Add role assignment -->
+  <!-- - See [Azure OpenAI RBAC roles](https://learn.microsoft.com/azure/ai-services/openai/how-to/role-based-access-control) -->
+
+- **Azure Cosmos DB for MongoDB vCore cluster** with vector search support:
+  - **Cluster tier requirements** based on vector index algorithm:
+    - **IVF (Inverted File Index)**: M10 or higher (default algorithm)
+    - **HNSW (Hierarchical Navigable Small World)**: M30 or higher (graph-based)
+    - **DiskANN**: M40 or higher (optimized for large-scale)
+  - **Firewall configuration**: REQUIRED - Add your client IP address to the cluster's firewall rules
+    - Find your IP: `curl -4 ifconfig.me`
+    - Configure in Azure Portal: Cosmos DB cluster → Networking → Firewall
+    - See [Configure firewall rules](https://learn.microsoft.com/azure/cosmos-db/mongodb/vcore/how-to-configure-firewall) for detailed instructions
+    - Without proper firewall configuration, connection attempts will fail
+  <!-- TODO: Add tabbed conceptual for passwordless authentication -->
+  <!-- Tab 1: Connection String (default) - current content above -->
+  <!-- Tab 2: Passwordless (Microsoft Entra ID) -->
+  <!-- - RBAC role required: DocumentDB Account Contributor or custom role with read/write permissions -->
+  <!-- - Assign role in Azure Portal: Cosmos DB account → Access control (IAM) → Add role assignment -->
+  <!-- - Configure Microsoft Entra authentication on cluster -->
+  <!-- - See [Cosmos DB RBAC](https://learn.microsoft.com/azure/cosmos-db/mongodb/vcore/security) -->
+
+### Development tools
 
 - [Node.js LTS](https://nodejs.org/download/)
 - [TypeScript](https://www.typescriptlang.org/download): Install TypeScript globally:
@@ -35,6 +75,11 @@ Find the [complete source code](https://github.com/Azure-Samples/cosmos-db-vecto
     ```bash
     npm install -g typescript
     ```
+
+- [Azure CLI](https://learn.microsoft.com/cli/azure/install-azure-cli) for authentication
+  <!-- TODO: Add tabbed conceptual for authentication methods -->
+  <!-- Tab 1: API Key / Connection String (default) - Azure CLI used for resource management only -->
+  <!-- Tab 2: Passwordless (Microsoft Entra ID) - Azure CLI required for identity-based authentication, must be signed in with `az login` -->
 
 ## Create a Node.js project
 
@@ -78,11 +123,27 @@ Find the [complete source code](https://github.com/Azure-Samples/cosmos-db-vecto
     curl -o .env https://raw.githubusercontent.com/Azure-Samples/cosmos-db-vector-samples/main/mongo-vcore-agent-langchain/.env.sample
     ```
 
-    Then edit and replace these placeholder values:
+    **Important**: This quickstart uses a two-agent architecture (Planner + Synthesizer) with three model deployments (two chat models + embeddings). The standard LangChain environment variable pattern supports a single model, so this sample uses custom environment variables for each model deployment:
+    
+    - **Planner Agent**: `AZURE_OPENAI_PLANNER_DEPLOYMENT` and `AZURE_OPENAI_PLANNER_API_VERSION`
+    - **Synthesizer Agent**: `AZURE_OPENAI_SYNTH_DEPLOYMENT` and `AZURE_OPENAI_SYNTH_API_VERSION`
+    - **Embeddings**: `AZURE_OPENAI_EMBEDDING_DEPLOYMENT` and `AZURE_OPENAI_EMBEDDING_API_VERSION`
+
+    <!-- TODO: Add tabbed conceptual for passwordless authentication -->
+    <!-- Tab 1: API Key / Connection String (default) -->
+    Edit the `.env` file and replace these placeholder values:
     - `AZURE_OPENAI_API_KEY`: Your Azure OpenAI API key
     - `AZURE_OPENAI_API_INSTANCE_NAME`: Your Azure OpenAI resource name
+    - `AZURE_OPENAI_PLANNER_DEPLOYMENT`: Your gpt-4o-mini deployment name
+    - `AZURE_OPENAI_SYNTH_DEPLOYMENT`: Your gpt-4o deployment name
+    - `AZURE_OPENAI_EMBEDDING_DEPLOYMENT`: Your text-embedding-3-small deployment name
     - `AZURE_COSMOSDB_MONGODB_CONNECTION_STRING`: Your Azure Cosmos DB connection string
     - `MONGO_CLUSTER_NAME`: Your Cosmos DB cluster name
+    <!-- Tab 2: Passwordless (Microsoft Entra ID) -->
+    <!-- Set `USE_PASSWORDLESS=true` in .env -->
+    <!-- Remove or comment out: AZURE_OPENAI_API_KEY and AZURE_COSMOSDB_MONGODB_CONNECTION_STRING -->
+    <!-- Ensure you're signed in with Azure CLI: `az login` -->
+    <!-- Your Azure identity must have appropriate RBAC roles assigned (see Prerequisites) -->
 
 1. Add a `tsconfig.json` file to configure TypeScript:
 
@@ -154,7 +215,7 @@ The `src/vector-store.ts` file consolidates all vector database operations. This
 
 ### Initialize the vector store
 
-The `getStore()` function loads hotel data, creates LangChain documents, and initializes the vector store with automatic embedding generation:
+The `getStore()` function performs the complete vector store setup: reads hotel documents from JSON, generates vector embeddings, creates the database and collection if they don't exist, inserts documents into Cosmos DB, and creates the vector index for the selected algorithm:
 
 ```typescript
 export async function getStore(
@@ -191,10 +252,13 @@ export async function getStore(
 ```
 
 This code demonstrates:
+- **Read documents**: Loads hotel data from JSON file using `readFileSync()` and parses into HotelsData array
 - **Data transformation**: Uses TypeScript destructuring to exclude unnecessary fields (Description_fr, Location, Rooms)
 - **Document creation**: Combines hotel name and description in pageContent for semantic search
-- **Automatic embeddings**: `fromDocuments()` generates embeddings using the embedding client and inserts them into Cosmos DB
-- **Vector index**: Applies algorithm-specific configuration via `getVectorIndexOptions()`
+- **Generate vectors**: `fromDocuments()` calls the embedding client to create vector embeddings for each document
+- **Create database and collection**: Automatically creates the Cosmos DB database and collection if they don't already exist
+- **Insert documents**: Stores documents with their embeddings into Cosmos DB collection
+- **Create vector index**: Automatically creates the vector index based on the selected algorithm (IVF, HNSW, or DiskANN) via `getVectorIndexOptions()`
 
 ### Configure vector index algorithms
 
@@ -283,6 +347,9 @@ This tool implementation demonstrates:
 - **Context injection**: Accesses the vector store and embedding client passed from the agent
 - **Query embedding**: Converts natural language query to vector using the same embedding model
 - **Vector similarity search**: Uses `similaritySearchVectorWithScore()` to find nearest neighbors with relevance scores
+  - Similarity scores range from 0 to 1 (0% to 100% similarity)
+  - A threshold of 0.7 means results with 70% or higher similarity are returned
+  - Higher scores indicate closer semantic matches to the query
 - **Result formatting**: Structures hotel data and scores for the synthesizer agent to analyze
 
 ## Create the Azure client connection code
@@ -349,10 +416,19 @@ export function createClients(): ClientConfig {
   };
 }
 
+<!-- TODO: Add tabbed conceptual for passwordless authentication -->
+<!-- Tab 1: API Key / Connection String (default) - createClients() shown above -->
+<!-- Tab 2: Passwordless (Microsoft Entra ID) - show createClientsPasswordless() implementation -->
 export function createClientsPasswordless(): ClientConfig {
   // Passwordless authentication using Azure Identity
   // Note: Requires RBAC roles configured on both Azure OpenAI and Cosmos DB
   throw new Error("Passwordless authentication not yet implemented");
+  /* Implementation would use:
+  - new DefaultAzureCredential() for Azure Identity
+  - azureADTokenProvider for Azure OpenAI clients
+  - MongoDB connection string with Azure AD authentication
+  - See complete implementation at: https://github.com/Azure-Samples/cosmos-db-vector-samples/blob/main/mongo-vcore-agent-langchain/src/utils/clients.ts
+  */
 }
 ```
 
@@ -619,6 +695,41 @@ Deleted database: Hotels
 ## Clean up resources
 
 The application automatically deletes the test database after execution. Delete the resource group, DocumentDB account, and Azure OpenAI resource when you don't need them to avoid extra costs.
+
+## Common issues
+
+### Connection failures to Cosmos DB
+
+If you receive connection timeout or authentication errors:
+
+1. **Verify firewall configuration**: Ensure your client IP is added to the Cosmos DB cluster firewall rules
+   - Run `curl -4 ifconfig.me` to get your current IP address
+   - Add the IP in Azure Portal: Cosmos DB cluster → Networking → Firewall
+   - See [Configure firewall rules](https://learn.microsoft.com/azure/cosmos-db/mongodb/vcore/how-to-configure-firewall)
+
+2. **Check connection string**: Verify your `AZURE_COSMOSDB_MONGODB_CONNECTION_STRING` is correct and includes authentication credentials
+
+### Rate limiting (429 errors)
+
+If you encounter "Rate limit exceeded" errors:
+
+1. **Increase token quotas**: Your deployment TPM may be insufficient
+   - Review [Manage Azure OpenAI quotas](https://learn.microsoft.com/azure/ai-services/openai/how-to/quota)
+   - Request quota increases in Azure Portal: Azure OpenAI resource → Quotas
+
+2. **Verify deployment capacity**: Ensure each model deployment has the recommended TPM:
+   - gpt-4o: 50,000 TPM
+   - gpt-4o-mini: 30,000 TPM
+   - text-embedding-3-small: 10,000 TPM
+
+### Vector index errors
+
+If vector index creation fails:
+
+1. **Verify cluster tier**: Ensure your Cosmos DB cluster meets the minimum tier requirement for your chosen algorithm:
+   - IVF: M10+
+   - HNSW: M30+
+   - DiskANN: M40+
 
 ## Related content
 
