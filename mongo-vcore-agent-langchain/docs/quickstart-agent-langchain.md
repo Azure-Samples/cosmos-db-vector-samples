@@ -18,8 +18,8 @@ ms.custom:
 Build an intelligent AI agent using LangChain with the Azure DocumentDB Node.js client library. This agent uses vector search to find relevant hotels and provides personalized recommendations.
 
 This quickstart demonstrates a two-agent architecture:
-- **Planner Agent**: Transforms user queries and executes vector search using a custom tool
-- **Synthesizer Agent**: Analyzes search results and provides comparative recommendations
+- **Planner Agent** (`gpt-4o-mini`, 30K tokens/min recommended): Transforms user queries and executes vector search using a custom tool
+- **Synthesizer Agent** (`gpt-4o`, 50K tokens/min recommended): Analyzes search results and provides comparative recommendations
 
 The sample uses a hotel dataset in JSON format. The planner agent creates embeddings on-the-fly using the `text-embedding-3-small` model, performs vector similarity search, and the synthesizer agent generates natural language recommendations.
 
