@@ -32,10 +32,6 @@ EXAMPLES (fallback pure-search):
 
 Respond with ONLY valid JSON.`;
 
-export function createPlannerUserPrompt(userQuery: string): string {
-    return userQuery;
-}
-
 // ============================================================================
 // Synthesizer Prompts
 // ============================================================================

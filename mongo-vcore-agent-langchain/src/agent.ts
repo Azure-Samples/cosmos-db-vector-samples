@@ -1,21 +1,19 @@
 import {
-  AzureCosmosDBMongoDBVectorStore } from "@langchain/azure-cosmosdb";
+  AzureCosmosDBMongoDBVectorStore
+} from "@langchain/azure-cosmosdb";
 import { AzureOpenAIEmbeddings } from "@langchain/openai";
-import { DEFAULT_QUERY, PLANNER_SYSTEM_PROMPT, SYNTHESIZER_SYSTEM_PROMPT, createSynthesizerUserPrompt } from './utils/prompts.js';
+import { PLANNER_SYSTEM_PROMPT, SYNTHESIZER_SYSTEM_PROMPT, createSynthesizerUserPrompt } from './utils/prompts.js';
 import { z } from 'zod';
 import { createAgent, tool } from "langchain";
 import { createClientsPasswordless, createClients } from './utils/clients.js';
-import { getStore } from './utils/documentdb.js';
-import { callbacks } from './utils/handlers.js';
-import { extractPlannerToolOutput } from './utils/extract.js';
-import { deleteCosmosMongoDatabase } from './utils/cleanup.js';
-
-// Search query
-const query = DEFAULT_QUERY;
+import { DEBUG_CALLBACKS } from './utils/debug-handlers.js';
+import { extractPlannerToolOutput } from './utils/tool-results-extraction.js';
+import { deleteCosmosMongoDatabase } from './utils/mongodb-cleanup.js';
+import { getStore } from './utils/azure-documentdb.js';
 
 // Authentication
 const clients = process.env.USE_PASSWORDLESS === 'true' || process.env.USE_PASSWORDLESS === '1' ? createClientsPasswordless() : createClients();
-const { embeddingClient, plannerClient, synthClient } = clients;
+const { embeddingClient, plannerClient, synthClient, dbConfig } = clients;
 
 // Vector Search Tool
 const getHotelsToMatchSearchQuery = tool(
@@ -114,7 +112,8 @@ async function runPlannerAgent(
 
   const agentResult = await agent.invoke(
     { messages: [{ role: 'user', content: userMessage }] },
-    { context: { store, embeddingClient }, callbacks }
+    // @ts-ignore
+    { context: { store, embeddingClient }, DEBUG_CALLBACKS }
   );
 
   const plannerMessages = agentResult.messages || [];
@@ -136,9 +135,10 @@ async function runSynthesizerAgent(userQuery: string, hotelContext: string): Pro
   });
 
   const agentResult = await agent.invoke({
-    messages: [{ 
-      role: 'user', 
-      content: createSynthesizerUserPrompt(userQuery, conciseContext) }]
+    messages: [{
+      role: 'user',
+      content: createSynthesizerUserPrompt(userQuery, conciseContext)
+    }]
   });
   const synthMessages = agentResult.messages;
   const finalAnswer = synthMessages[synthMessages.length - 1].content;
@@ -149,17 +149,20 @@ async function runSynthesizerAgent(userQuery: string, hotelContext: string): Pro
 // Get vector store (get docs, create embeddings, insert docs)
 const store = await getStore(
   process.env.DATA_FILE_WITHOUT_VECTORS!,
-  embeddingClient);
+  embeddingClient,
+  dbConfig);
+
+const query = process.env.QUERY || "quintessential lodging near running trails, eateries, retail";
 
 // Run planner agent
-const hotelContext = await runPlannerAgent(query, store, 5);
+//const hotelContext = await runPlannerAgent(query, store, 5);
 
 // Run synth agent
-const finalAnswer = await runSynthesizerAgent(query, hotelContext);
+//const finalAnswer = await runSynthesizerAgent(query, hotelContext);
 
 // Get final recommendation (data + AI)
-console.log('\n--- FINAL ANSWER ---');
-console.log(finalAnswer);
+//console.log('\n--- FINAL ANSWER ---');
+//console.log(finalAnswer);
 
 // Clean up (delete datbase)
 await store.close();

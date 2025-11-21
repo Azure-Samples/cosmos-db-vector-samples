@@ -1,6 +1,7 @@
 import { AzureOpenAIEmbeddings, AzureChatOpenAI } from "@langchain/openai";
-import { DefaultAzureCredential, getBearerTokenProvider } from '@azure/identity';
+import { MongoClient, OIDCCallbackParams } from 'mongodb';
 
+import { AzureIdentityTokenCallback, CREDENTIAL, AZURE_OPENAI_AD_TOKEN_PROVIDER } from './azure-identity.js';
 /*
 
 This file contains utility functions to create Azure OpenAI clients for embeddings, planning, and synthesis.
@@ -23,8 +24,7 @@ if (DEBUG) {
       HAS_AZURE_OPENAI_INSTANCE: !!process.env.AZURE_OPENAI_API_INSTANCE_NAME,
       HAS_EMBEDDING_DEPLOYMENT: !!process.env.AZURE_OPENAI_EMBEDDING_DEPLOYMENT,
       HAS_PLANNER_DEPLOYMENT: !!process.env.AZURE_OPENAI_PLANNER_DEPLOYMENT,
-      HAS_SYNTH_DEPLOYMENT: !!process.env.AZURE_OPENAI_SYNTH_DEPLOYMENT,
-      DEFAULT_CREDENTIAL_WILL_TRY: 'VisualStudioCode/AzureCli/ManagedIdentity/Environment',
+      HAS_SYNTH_DEPLOYMENT: !!process.env.AZURE_OPENAI_SYNTH_DEPLOYMENT
     });
   } else {
     console.log('[clients] Env present:', {
@@ -33,6 +33,7 @@ if (DEBUG) {
       HAS_EMBEDDING_DEPLOYMENT: !!process.env.AZURE_OPENAI_EMBEDDING_DEPLOYMENT,
       HAS_PLANNER_DEPLOYMENT: !!process.env.AZURE_OPENAI_PLANNER_DEPLOYMENT,
       HAS_SYNTH_DEPLOYMENT: !!process.env.AZURE_OPENAI_SYNTH_DEPLOYMENT,
+      HAS_CONNECTION_STRING: !!process.env.AZURE_COSMOSDB_MONGODB_CONNECTION_STRING,
     });
   }
 }
@@ -74,12 +75,35 @@ export function createClients() {
       azureOpenAIApiVersion: process.env.AZURE_OPENAI_SYNTH_API_VERSION,
     });
 
-    return { embeddingClient, plannerClient, synthClient };
+    const dbConfig = {
+      connectionString: process.env.AZURE_COSMOSDB_MONGODB_CONNECTION_STRING!,
+      databaseName: process.env.MONGO_DB_NAME!,
+      collectionName: process.env.MONGO_DB_COLLECTION!
+    }
+
+
+    return { embeddingClient, plannerClient, synthClient, dbConfig };
   } catch (err: any) {
     console.error('[clients] Failed to construct OpenAI clients:', err?.message ?? err);
     console.error('[clients] Confirm AZURE_OPENAI_* env vars are set correctly (or configure passwordless token provider).');
     throw err;
   }
+}
+
+function getMongoPasswordless() {
+  const clusterName = process.env.MONGO_CLUSTER_NAME!;
+  const dbClient = new MongoClient(
+    `mongodb+srv://${clusterName}.global.mongocluster.cosmos.azure.com/`, {
+    connectTimeoutMS: 30000,
+    tls: true,
+    retryWrites: true,
+    authMechanism: 'MONGODB-OIDC',
+    authMechanismProperties: {
+      OIDC_CALLBACK: (params: OIDCCallbackParams) => AzureIdentityTokenCallback(params, CREDENTIAL),
+      ALLOWED_HOSTS: ['*.azure.com']
+    }
+  });
+  return dbClient;
 }
 
 export function createClientsPasswordless() {
@@ -89,19 +113,15 @@ export function createClientsPasswordless() {
       throw new Error('Missing passwordless: AZURE_OPENAI_API_INSTANCE_NAME for passwordless client');
     }
 
-    const credential = new DefaultAzureCredential();
-    const scope = 'https://cognitiveservices.azure.com/.default';
-    const azureADTokenProvider = getBearerTokenProvider(credential, scope);
-
     const embeddingClient = new AzureOpenAIEmbeddings({
-      azureADTokenProvider,
+      azureADTokenProvider: AZURE_OPENAI_AD_TOKEN_PROVIDER,
       azureOpenAIApiEmbeddingsDeploymentName: process.env.AZURE_OPENAI_EMBEDDING_DEPLOYMENT,
       azureOpenAIApiVersion: process.env.AZURE_OPENAI_EMBEDDING_API_VERSION,
       maxRetries: 1,
     });
 
     const plannerClient = new AzureChatOpenAI({
-      azureADTokenProvider,
+      azureADTokenProvider: AZURE_OPENAI_AD_TOKEN_PROVIDER,
       model: process.env.AZURE_OPENAI_PLANNER_DEPLOYMENT!,
       temperature: 0,
       azureOpenAIApiDeploymentName: process.env.AZURE_OPENAI_PLANNER_DEPLOYMENT,
@@ -109,14 +129,23 @@ export function createClientsPasswordless() {
     });
 
     const synthClient = new AzureChatOpenAI({
-      azureADTokenProvider,
+      azureADTokenProvider: AZURE_OPENAI_AD_TOKEN_PROVIDER,
       model: process.env.AZURE_OPENAI_SYNTH_DEPLOYMENT!,
       temperature: 0.3,
       azureOpenAIApiDeploymentName: process.env.AZURE_OPENAI_SYNTH_DEPLOYMENT,
       azureOpenAIApiVersion: process.env.AZURE_OPENAI_SYNTH_API_VERSION,
     });
 
-    return { embeddingClient, plannerClient, synthClient };
+    const mongoClient = getMongoPasswordless();
+
+    const dbConfig = {
+      client: mongoClient,
+      databaseName: process.env.MONGO_DB_NAME!,
+      collectionName: process.env.MONGO_DB_COLLECTION!,
+
+    }
+
+    return { embeddingClient, plannerClient, synthClient, dbConfig };
   } catch (err: any) {
     console.error('[clients] Failed to construct passwordless OpenAI clients:', err?.message ?? err);
     throw err;

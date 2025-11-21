@@ -52,5 +52,5 @@ const agentCallbacks = [
     }
 ];
 
-export const callbacks = process.env.DEBUG === 'true' ? agentCallbacks : [];
+export const DEBUG_CALLBACKS = process.env.DEBUG === 'true' ? agentCallbacks : [];
 

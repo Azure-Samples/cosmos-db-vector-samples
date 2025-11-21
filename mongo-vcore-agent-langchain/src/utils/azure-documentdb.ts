@@ -1,14 +1,12 @@
 import {
   AzureCosmosDBMongoDBVectorStore,
   AzureCosmosDBMongoDBSimilarityType,
+  AzureCosmosDBMongoDBConfig
 } from "@langchain/azure-cosmosdb";
-import { AzureOpenAIEmbeddings, AzureChatOpenAI  } from "@langchain/openai";
+import { AzureOpenAIEmbeddings  } from "@langchain/openai";
 import { readFileSync } from 'fs';
 import { Document } from '@langchain/core/documents';
 import { HotelsData } from './types.js';
-import { tool } from '@langchain/core/tools';
-import { z } from 'zod';
-import { ChatPromptTemplate } from '@langchain/core/prompts';
 
 // Helper functions to get vector index options based on algorithm
 function getSimilarityType(similarity: string) {
@@ -64,63 +62,17 @@ function getVectorIndexOptions() {
   }
 }
 
-const auth = {
-  azureOpenAIApiKey: process.env.AZURE_OPENAI_API_KEY!,
-  azureOpenAIApiInstanceName: process.env.AZURE_OPENAI_API_INSTANCE_NAME!
-}
+export async function getStore(dataFilePath: string, embeddingClient: AzureOpenAIEmbeddings, dbConfig: AzureCosmosDBMongoDBConfig): Promise<AzureCosmosDBMongoDBVectorStore> {
 
-
-export const embeddingClient = new AzureOpenAIEmbeddings({
-  ...auth,
-  azureOpenAIApiEmbeddingsDeploymentName: process.env.AZURE_OPENAI_EMBEDDING_DEPLOYMENT!,
-  azureOpenAIApiVersion: process.env.AZURE_OPENAI_EMBEDDING_API_VERSION!,
-  maxRetries: 1,
-});
-
-export const plannerClient = new AzureChatOpenAI({
-  ...auth,
-  model: process.env.AZURE_OPENAI_PLANNER_DEPLOYMENT!,
-  temperature: 0, // Deterministic for consistent query refinement
-  maxRetries: 2,
-  azureOpenAIApiDeploymentName: process.env.AZURE_OPENAI_PLANNER_DEPLOYMENT,
-  azureOpenAIApiVersion: process.env.AZURE_OPENAI_PLANNER_API_VERSION,
-});
-
-export const synthClient = new AzureChatOpenAI({
-  ...auth,
-  model: process.env.AZURE_OPENAI_SYNTH_DEPLOYMENT!,
-  temperature: 0.3, // Slightly creative for natural responses
-  maxRetries: 1,
-  azureOpenAIApiDeploymentName: process.env.AZURE_OPENAI_SYNTH_DEPLOYMENT,
-  azureOpenAIApiVersion: process.env.AZURE_OPENAI_SYNTH_API_VERSION,
-});
-
-export async function getStore(dataFilePath: string, embeddingClient: AzureOpenAIEmbeddings): Promise<AzureCosmosDBMongoDBVectorStore> {
-
-  //const dbExists = process.env.DB_EXISTS === 'true' || process.env.DB_EXISTS === '1';
-
-  //return dbExists ? getExistingDbStore() : insertDocs(dataFilePath, embeddingClient);
-
-  return insertDocs(dataFilePath, embeddingClient);
-}
-
-async function getExistingDbStore(){
-  const store = new AzureCosmosDBMongoDBVectorStore(
-    embeddingClient,
-    {
-      connectionString: process.env.MONGO_CONNECTION_STRING,
-      databaseName: process.env.MONGO_DB_NAME!,
-      collectionName: process.env.MONGO_DB_COLLECTION!,
-      indexOptions: getVectorIndexOptions(),
-    }
-  );
-  return store;
+  return insertDocs(dataFilePath, embeddingClient, dbConfig);
 }
 
 export async function insertDocs(
   dataFilePath: string,
-  embeddingClient: AzureOpenAIEmbeddings
+  embeddingClient: AzureOpenAIEmbeddings,
+  dbConfig: AzureCosmosDBMongoDBConfig
 ): Promise<AzureCosmosDBMongoDBVectorStore> {
+
   const hotelsData: HotelsData = JSON.parse(readFileSync(dataFilePath, 'utf-8'));
 
   const documents = hotelsData.map(hotel => new Document({
@@ -145,9 +97,7 @@ export async function insertDocs(
     documents,
     embeddingClient,
     {
-      connectionString: process.env.MONGO_CONNECTION_STRING,
-      databaseName: process.env.MONGO_DB_NAME!,
-      collectionName: process.env.MONGO_DB_COLLECTION!,
+      ...dbConfig,
       indexOptions: getVectorIndexOptions(),
     }
   );
