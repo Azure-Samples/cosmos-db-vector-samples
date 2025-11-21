@@ -15,15 +15,15 @@ ms.custom:
 
 # Quickstart: LangChain Agent with vector search in Azure DocumentDB
 
-Build an intelligent AI agent using LangChain with the Azure DocumentDB Node.js client library. This agent uses vector search to find relevant hotels and provides personalized recommendations.
+Build an intelligent AI agent using LangChain and Azure Cosmos DB for MongoDB vCore. This quickstart demonstrates a two-agent architecture that performs semantic hotel search and generates personalized recommendations.
 
-This quickstart demonstrates a two-agent architecture:
-- **Planner Agent** (`gpt-4o-mini`, 30K tokens/min recommended): Transforms user queries and executes vector search using a custom tool
-- **Synthesizer Agent** (`gpt-4o`, 50K tokens/min recommended): Analyzes search results and provides comparative recommendations
+**Architecture:**
+- **Planner Agent** (`gpt-4o-mini`): Refines queries and executes vector search using a custom LangChain tool
+- **Synthesizer Agent** (`gpt-4o`): Analyzes search results and provides comparative recommendations
 
-The sample uses a hotel dataset in JSON format. The planner agent creates embeddings on-the-fly using the `text-embedding-3-small` model, performs vector similarity search, and the synthesizer agent generates natural language recommendations.
+The sample uses a hotel dataset with on-the-fly embedding generation via `text-embedding-3-small` and supports multiple vector index algorithms (IVF, HNSW, DiskANN).
 
-Find the [sample code](https://github.com/Azure-Samples/cosmos-db-vector-samples/tree/main/mongo-vcore-agent-langchain) on GitHub.
+Find the [complete source code](https://github.com/Azure-Samples/cosmos-db-vector-samples/tree/main/mongo-vcore-agent-langchain) on GitHub.
 
 ## Prerequisites
 
@@ -56,7 +56,7 @@ Find the [sample code](https://github.com/Azure-Samples/cosmos-db-vector-samples
 1. Install the required packages:
 
     ```bash
-    npm install @langchain/azure-cosmosdb @langchain/openai @langchain/core langchain zod @types/node
+    npm install @langchain/azure-cosmosdb @langchain/openai @langchain/core langchain zod mongodb
     ```
 
     - `@langchain/azure-cosmosdb`: LangChain integration for Azure Cosmos DB vector store
@@ -64,72 +64,22 @@ Find the [sample code](https://github.com/Azure-Samples/cosmos-db-vector-samples
     - `@langchain/core`: Core LangChain functionality
     - `langchain`: Main LangChain library with agent framework
     - `zod`: Schema validation for tool parameters
-    - `@types/node`: Type definitions for Node.js
+    - `mongodb`: MongoDB driver for database operations
 
-1. Create a `.env` file in your project root for environment variables:
+1. Install development dependencies:
 
-    ```ini
-    DEBUG=false
-    USE_PASSWORDLESS=false
-
-    # Azure OpenAI Shared Settings
-    AZURE_OPENAI_API_KEY="<your-azure-openai-api-key>"
-    AZURE_OPENAI_ENDPOINT="https://<your-resource-name>.openai.azure.com/"
-    AZURE_OPENAI_API_INSTANCE_NAME="<your-resource-name>"
-
-    # Synthesizer Model (generates final recommendations)
-    AZURE_OPENAI_SYNTH_API_VERSION="2025-01-01-preview"
-    AZURE_OPENAI_SYNTH_DEPLOYMENT="gpt-4o"
-
-    # Planner Model (handles tool calls and search)
-    AZURE_OPENAI_PLANNER_DEPLOYMENT="gpt-4o-mini"
-    AZURE_OPENAI_PLANNER_API_VERSION="2025-01-01-preview"
-
-    # Azure OpenAI Embedding Model Settings
-    AZURE_OPENAI_EMBEDDING_DEPLOYMENT="text-embedding-3-small"
-    AZURE_OPENAI_EMBEDDING_API_VERSION="2023-05-15"
-
-    FIELD_TO_EMBED="Description"
-    EMBEDDED_FIELD="vectors"
-    EMBEDDING_DIMENSIONS="1536"
-    EMBEDDING_BATCH_SIZE="16"
-
-    # Data File Paths and Vector Configuration
-    DATA_FILE_WITHOUT_VECTORS="../data/HotelsData_toCosmosDB.JSON"
-    QUERY="quintessential lodging near running trails, eateries, retail"
-
-    # Data Loading and Processing Settings
-    LOAD_SIZE_BATCH="100"
-
-    # MongoDB/Cosmos DB Connection Settings
-    AZURE_COSMOSDB_MONGODB_CONNECTION_STRING="<your-cosmos-db-connection-string>"
-    MONGO_CLUSTER_NAME="<your-cluster-name>"
-    MONGO_DB_NAME="Hotels"
-    MONGO_DB_COLLECTION="Hotels_ivf"
-    MONGO_DB_INDEX_NAME="vectorIndex_ivf"
-
-    # Vector Index Algorithm: vector-ivf (default), vector-hnsw, or vector-diskann
-    VECTOR_INDEX_ALGORITHM="vector-ivf"
-    VECTOR_SEARCH_STRATEGY="documentdb"  # or mongo or auto
-
-    # Vector Index Parameters
-    VECTOR_SIMILARITY="COS"  # Options: COS (cosine), L2 (euclidean), IP (inner product)
-    IVF_NUM_LISTS="10"  # Number of clusters for IVF index
-
-    # Agent Search Configuration
-    MAX_SEARCH_RESULTS="5"
-    SIMILARITY_THRESHOLD="0.7"
-
-    # Optional Settings
-    LANGSMITH_TRACING="false"
-    LANGSMITH_ENDPOINT="https://api.smith.langchain.com"
-    LANGSMITH_API_KEY=""
-    LANGSMITH_PROJECT=""
+    ```bash
+    npm install --save-dev @types/node typescript
     ```
 
-    Replace the placeholder values in the `.env` file with your own information:
+1. Create a `.env` file in your project root. You can copy the sample from the repository:
+
+    ```bash
+    curl -o .env https://raw.githubusercontent.com/Azure-Samples/cosmos-db-vector-samples/main/mongo-vcore-agent-langchain/.env.sample
+    ```
+
+    Then edit and replace these placeholder values:
     - `AZURE_OPENAI_API_KEY`: Your Azure OpenAI API key
-    - `AZURE_OPENAI_ENDPOINT`: Your Azure OpenAI resource endpoint URL
     - `AZURE_OPENAI_API_INSTANCE_NAME`: Your Azure OpenAI resource name
     - `AZURE_COSMOSDB_MONGODB_CONNECTION_STRING`: Your Azure Cosmos DB connection string
     - `MONGO_CLUSTER_NAME`: Your Cosmos DB cluster name
@@ -172,61 +122,175 @@ Edit the `package.json` file and add these scripts:
 
 ## Create the project structure
 
-Create the source directory structure for your TypeScript files:
+Create the source directory structure:
 
 ```bash
 mkdir -p src/utils
 ```
 
-Create the following files:
+Create these files:
 
 ```bash
 touch src/agent.ts
+touch src/vector-store.ts
 touch src/utils/prompts.ts
 touch src/utils/clients.ts
 touch src/utils/types.ts
-touch src/utils/azure-documentdb.ts
-touch src/utils/mongodb-cleanup.ts
-touch src/utils/tool-results-extraction.ts
 touch src/utils/debug-handlers.ts
 ```
 
-## Create type definitions
+## Create utility files
 
-Paste the following code into `src/utils/types.ts`:
+The sample uses utility files to organize configuration and shared functionality. You can find the complete implementation in the [GitHub repository](https://github.com/Azure-Samples/cosmos-db-vector-samples/tree/main/mongo-vcore-agent-langchain/src/utils):
+
+- **`src/utils/types.ts`**: TypeScript interfaces for Hotel data structures
+- **`src/utils/clients.ts`**: Azure OpenAI client configuration for embeddings, planner, and synthesizer models. Supports both API key and passwordless authentication with Azure Identity.
+- **`src/utils/prompts.ts`**: System prompts and tool descriptions for the two-agent architecture
+- **`src/utils/debug-handlers.ts`**: Optional debug callbacks for development and troubleshooting
+
+## Create the vector store module
+
+The `src/vector-store.ts` file consolidates all vector database operations. This section shows the key components. See the [complete implementation on GitHub](https://github.com/Azure-Samples/cosmos-db-vector-samples/blob/main/mongo-vcore-agent-langchain/src/vector-store.ts).
+
+### Initialize the vector store
+
+The `getStore()` function loads hotel data, creates LangChain documents, and initializes the vector store with automatic embedding generation:
 
 ```typescript
-export interface HotelData {
-  HotelId?: string;
-  HotelName?: string;
-  Description?: string;
-  Category?: string;
-  Tags?: string[];
-  ParkingIncluded?: boolean;
-  IsDeleted?: boolean;
-  LastRenovationDate?: string;
-  Rating?: number;
-  Address?: {
-    StreetAddress?: string;
-    City?: string;
-    StateProvince?: string;
-    PostalCode?: string;
-    Country?: string;
-  };
-  Score?: number;
-}
+export async function getStore(
+  dataFilePath: string,
+  embeddingClient: AzureOpenAIEmbeddings,
+  dbConfig: AzureCosmosDBMongoDBConfig
+): Promise<AzureCosmosDBMongoDBVectorStore> {
+  
+  const hotelsData: HotelsData = JSON.parse(readFileSync(dataFilePath, 'utf-8'));
 
-export interface JsonData {
-  [key: string]: unknown;
+  // Use destructuring to exclude unwanted properties
+  const documents = hotelsData.map(hotel => {
+    const { Description_fr, Location, Rooms, ...hotelData } = hotel;
+    
+    return new Document({
+      pageContent: `Hotel: ${hotel.HotelName}\n\n${hotel.Description}`,
+      metadata: hotelData,
+      id: hotel.HotelId.toString()
+    });
+  });
+
+  const store = await AzureCosmosDBMongoDBVectorStore.fromDocuments(
+    documents,
+    embeddingClient,
+    {
+      ...dbConfig,
+      indexOptions: getVectorIndexOptions(),
+    }
+  );
+
+  console.log(`Inserted ${documents.length} documents into Cosmos DB (Mongo API) vector store.`);
+  return store;
 }
 ```
 
-## Create client configuration
+This code demonstrates:
+- **Data transformation**: Uses TypeScript destructuring to exclude unnecessary fields (Description_fr, Location, Rooms)
+- **Document creation**: Combines hotel name and description in pageContent for semantic search
+- **Automatic embeddings**: `fromDocuments()` generates embeddings using the embedding client and inserts them into Cosmos DB
+- **Vector index**: Applies algorithm-specific configuration via `getVectorIndexOptions()`
 
-Paste the following code into `src/utils/clients.ts`:
+### Configure vector index algorithms
+
+The `getVectorIndexOptions()` function supports three vector search algorithms with configurable parameters:
 
 ```typescript
-import { AzureChatOpenAI, AzureOpenAIEmbeddings } from "@langchain/openai";
+function getVectorIndexOptions() {
+  const algorithm = process.env.VECTOR_INDEX_ALGORITHM || 'vector-ivf';
+  const dimensions = parseInt(process.env.EMBEDDING_DIMENSIONS || '1536');
+  const similarity = getSimilarityType(process.env.VECTOR_SIMILARITY || 'COS');
+  
+  const baseOptions = { dimensions, similarity };
+  
+  switch (algorithm) {
+    case 'vector-hnsw':
+      return {
+        kind: 'vector-hnsw' as const,
+        m: parseInt(process.env.HNSW_M || '16'),
+        efConstruction: parseInt(process.env.HNSW_EF_CONSTRUCTION || '64'),
+        ...baseOptions
+      };
+    case 'vector-diskann':
+      return {
+        kind: 'vector-diskann' as const,
+        ...baseOptions
+      };
+    case 'vector-ivf':
+    default:
+      return {
+        numLists: parseInt(process.env.IVF_NUM_LISTS || '10'),
+        ...baseOptions
+      };
+  }
+}
+```
+
+Algorithm characteristics:
+- **IVF (Inverted File Index)**: Default algorithm, balances speed and accuracy with configurable `numLists` parameter
+- **HNSW (Hierarchical Navigable Small World)**: Graph-based algorithm with `m` (connections per node) and `efConstruction` (index build quality) parameters
+- **DiskANN**: Microsoft Research algorithm optimized for large-scale vector search
+
+All algorithms support three similarity types: `COS` (cosine), `L2` (Euclidean distance), and `IP` (inner product).
+
+### Define the vector search tool
+
+The `getHotelsToMatchSearchQuery` tool enables the planner agent to execute semantic searches. This LangChain tool definition includes schema validation and vector search logic:
+
+```typescript
+export const getHotelsToMatchSearchQuery = tool(
+  async ({ query, nearestNeighbors }, config): Promise<string> => {
+    try {
+      const store = config.context.store as AzureCosmosDBMongoDBVectorStore;
+      const embeddingClient = config.context.embeddingClient as AzureOpenAIEmbeddings;
+
+      // Create query embedding and perform search
+      const queryVector = await embeddingClient.embedQuery(query);
+      const results = await store.similaritySearchVectorWithScore(queryVector, nearestNeighbors);
+      console.log(`Found ${results.length} documents from vector store`);
+
+      // Format results for synthesizer
+      const formatted = results.map(([doc, score]) => {
+        const md = doc.metadata as Partial<HotelForVectorStore>;
+        console.log(`Hotel: ${md.HotelName ?? 'N/A'}, Score: ${score}`);
+        return formatHotelForSynthesizer(md, score);
+      }).join('\n\n');
+      
+      return formatted;
+    } catch (error) {
+      console.error('Error in getHotelsToMatchSearchQuery tool:', error);
+      return 'Error occurred while searching for hotels.';
+    }
+  },
+  {
+    name: TOOL_NAME,
+    description: TOOL_DESCRIPTION,
+    schema: z.object({
+      query: z.string(),
+      nearestNeighbors: z.number().optional().default(5),
+    }),
+  }
+);
+```
+
+This tool implementation demonstrates:
+- **Zod schema validation**: Ensures `query` is a string and `nearestNeighbors` is a number (defaults to 5)
+- **Context injection**: Accesses the vector store and embedding client passed from the agent
+- **Query embedding**: Converts natural language query to vector using the same embedding model
+- **Vector similarity search**: Uses `similaritySearchVectorWithScore()` to find nearest neighbors with relevance scores
+- **Result formatting**: Structures hotel data and scores for the synthesizer agent to analyze
+
+## Create the Azure client connection code
+
+The `src/utils/clients.ts` file creates Azure OpenAI clients for embeddings, planner, and synthesizer models. Create `src/utils/clients.ts` or see the [complete implementation on GitHub](https://github.com/Azure-Samples/cosmos-db-vector-samples/blob/main/mongo-vcore-agent-langchain/src/utils/clients.ts):
+
+```typescript
+import { AzureCosmosDBMongoDBVectorStore } from "@langchain/azure-cosmosdb";
 
 export interface ClientConfig {
   embeddingClient: AzureOpenAIEmbeddings;
@@ -294,7 +358,7 @@ export function createClientsPasswordless(): ClientConfig {
 
 ## Create prompt templates
 
-Paste the following code into `src/utils/prompts.ts`:
+Paste the following code into `src/utils/prompts.ts` or see the [complete implementation on GitHub](https://github.com/Azure-Samples/cosmos-db-vector-samples/blob/main/mongo-vcore-agent-langchain/src/utils/prompts.ts):
 
 ```typescript
 export const TOOL_NAME = "search_hotels_collection";
@@ -377,163 +441,24 @@ Format your response using plain text (NO markdown formatting like ** or ###). U
 }
 ```
 
-## Create DocumentDB utilities
-
-Paste the following code into `src/utils/azure-documentdb.ts`:
-
-```typescript
-import { AzureCosmosDBMongoDBVectorStore } from "@langchain/azure-cosmosdb";
-import { AzureOpenAIEmbeddings } from "@langchain/openai";
-import { readFileSync } from "fs";
-import { JsonData } from "./types.js";
-
-export async function getStore(
-  dataFilePath: string,
-  embeddingClient: AzureOpenAIEmbeddings,
-  dbConfig: {
-    connectionString: string;
-    databaseName: string;
-    collectionName: string;
-    indexName: string;
-    embeddingKey: string;
-    textKey: string;
-    vectorSearchStrategy: string;
-  }
-): Promise<AzureCosmosDBMongoDBVectorStore> {
-  
-  // Read and parse data file
-  const rawData = readFileSync(dataFilePath, "utf-8");
-  const data = JSON.parse(rawData) as JsonData[];
-  console.log(`Loaded ${data.length} documents from ${dataFilePath}`);
-
-  // Create documents for vector store
-  const documents = data.map((doc) => ({
-    pageContent: doc[dbConfig.textKey] as string,
-    metadata: doc,
-  }));
-
-  // Initialize vector store with automatic embedding generation
-  const store = await AzureCosmosDBMongoDBVectorStore.fromDocuments(
-    documents,
-    embeddingClient,
-    {
-      connectionString: dbConfig.connectionString,
-      databaseName: dbConfig.databaseName,
-      collectionName: dbConfig.collectionName,
-      indexName: dbConfig.indexName,
-      embeddingKey: dbConfig.embeddingKey,
-      textKey: dbConfig.textKey,
-      vectorSearchStrategy: dbConfig.vectorSearchStrategy as any,
-    }
-  );
-
-  console.log(`Vector store initialized with ${documents.length} documents`);
-  return store;
-}
-```
-
-## Create cleanup utilities
-
-Paste the following code into `src/utils/mongodb-cleanup.ts`:
-
-```typescript
-import { MongoClient } from "mongodb";
-
-export async function deleteCosmosMongoDatabase(): Promise<void> {
-  const connectionString = process.env.AZURE_COSMOSDB_MONGODB_CONNECTION_STRING;
-  const databaseName = process.env.MONGO_DB_NAME;
-
-  if (!connectionString || !databaseName) {
-    console.log("Skipping database cleanup - connection details not provided");
-    return;
-  }
-
-  const client = new MongoClient(connectionString);
-
-  try {
-    await client.connect();
-    console.log("Connected to MongoDB for cleanup");
-
-    await client.db(databaseName).dropDatabase();
-    console.log(`Deleted database: ${databaseName}`);
-  } catch (error) {
-    console.error("Error during cleanup:", error);
-  } finally {
-    await client.close();
-    console.log("MongoDB connection closed");
-  }
-}
-```
-
-## Create tool result extraction
-
-Paste the following code into `src/utils/tool-results-extraction.ts`:
-
-```typescript
-import { BaseMessage } from "@langchain/core/messages";
-
-export function extractPlannerToolOutput(
-  messages: BaseMessage[],
-  nearestNeighbors: number
-): string {
-  // Find the tool message in the agent's message history
-  const toolMessage = messages.find((msg) => msg.name === "search_hotels_collection");
-
-  if (!toolMessage) {
-    console.warn(`No tool message found for search_hotels_collection`);
-    return "No search results available.";
-  }
-
-  const content = toolMessage.content as string;
-  console.log(`Extracted ${nearestNeighbors} results from tool output`);
-  return content;
-}
-```
-
 ## Create debug handlers
 
-Paste the following code into `src/utils/debug-handlers.ts`:
+The `src/utils/debug-handlers.ts` file provides optional debug callbacks for development and troubleshooting. When `DEBUG=true` is set in your environment, these callbacks log LLM and tool calls.
 
-```typescript
-export const DEBUG_CALLBACKS = process.env.DEBUG === "true" ? [
-  {
-    handleLLMStart: (llm: any, prompts: string[]) => {
-      console.log("LLM Start:", JSON.stringify(prompts, null, 2));
-    },
-    handleLLMEnd: (output: any) => {
-      console.log("LLM End:", JSON.stringify(output, null, 2));
-    },
-    handleChainStart: (chain: any) => {
-      console.log("Chain Start:", chain);
-    },
-    handleChainEnd: (outputs: any) => {
-      console.log("Chain End:", outputs);
-    },
-  },
-] : [];
-```
+See the complete implementation in [`src/utils/debug-handlers.ts`](https://github.com/Azure-Samples/cosmos-db-vector-samples/blob/main/mongo-vcore-agent-langchain/src/utils/debug-handlers.ts) on GitHub.
 
 ## Create the main agent code
 
-Paste the following code into `src/agent.ts`:
+The main `src/agent.ts` file orchestrates the two-agent workflow. Create `src/agent.ts` or see the [complete implementation on GitHub](https://github.com/Azure-Samples/cosmos-db-vector-samples/blob/main/mongo-vcore-agent-langchain/src/agent.ts):
 
 ```typescript
 import { AzureCosmosDBMongoDBVectorStore } from "@langchain/azure-cosmosdb";
-import { AzureOpenAIEmbeddings } from "@langchain/openai";
-import {
-  TOOL_NAME,
-  TOOL_DESCRIPTION,
-  PLANNER_SYSTEM_PROMPT,
-  SYNTHESIZER_SYSTEM_PROMPT,
-  createSynthesizerUserPrompt,
-} from "./utils/prompts.js";
-import { z } from "zod";
-import { createAgent, tool } from "langchain";
-import { createClientsPasswordless, createClients } from "./utils/clients.js";
-import { DEBUG_CALLBACKS } from "./utils/debug-handlers.js";
-import { extractPlannerToolOutput } from "./utils/tool-results-extraction.js";
-import { deleteCosmosMongoDatabase } from "./utils/mongodb-cleanup.js";
-import { getStore } from "./utils/azure-documentdb.js";
+import { TOOL_NAME, PLANNER_SYSTEM_PROMPT, SYNTHESIZER_SYSTEM_PROMPT, createSynthesizerUserPrompt } from './utils/prompts.js';
+import { z } from 'zod';
+import { createAgent } from "langchain";
+import { createClientsPasswordless, createClients } from './utils/clients.js';
+import { DEBUG_CALLBACKS } from './utils/debug-handlers.js';
+import { extractPlannerToolOutput, getStore, getHotelsToMatchSearchQuery, deleteCosmosMongoDatabase } from './vector-store.js';
 
 // Authentication
 const clients =
@@ -542,79 +467,10 @@ const clients =
     : createClients();
 const { embeddingClient, plannerClient, synthClient, dbConfig } = clients;
 
-console.log(`DEBUG mode is ${process.env.DEBUG === "true" ? "ON" : "OFF"}`);
+console.log(`DEBUG mode is ${process.env.DEBUG === 'true' ? 'ON' : 'OFF'}`);
+console.log(`DEBUG_CALLBACKS length: ${DEBUG_CALLBACKS.length}`);
 
-// Vector Search Tool
-const getHotelsToMatchSearchQuery = tool(
-  async ({ query, nearestNeighbors }, config): Promise<string> => {
-    try {
-      const store = config.context.store as AzureCosmosDBMongoDBVectorStore;
-      const embeddingClient = config.context.embeddingClient as AzureOpenAIEmbeddings;
-
-      // Create an embedding for the query
-      const queryVector = await embeddingClient.embedQuery(query);
-
-      // Perform similarity search
-      const results = await store.similaritySearchVectorWithScore(
-        queryVector,
-        nearestNeighbors
-      );
-      console.log(`Found ${results.length} documents from vector store`);
-
-      // Map results to hotel data
-      const hotels = results.map(([doc, score]) => {
-        const md = (doc.metadata || {}) as Record<string, any>;
-        return {
-          HotelId: md.HotelId,
-          HotelName: md.HotelName,
-          Description: md.Description,
-          Category: md.Category,
-          Tags: md.Tags || [],
-          ParkingIncluded: md.ParkingIncluded,
-          Rating: md.Rating,
-          Address: md.Address,
-          Score: score,
-        };
-      });
-
-      // Format results for the synthesizer
-      const formatted = hotels
-        .map((h) => {
-          const addr = (h.Address || {}) as Record<string, any>;
-          const tags = Array.isArray(h.Tags) ? h.Tags.join(", ") : String(h.Tags || "");
-          return [
-            "--- HOTEL START ---",
-            `HotelName: ${h.HotelName ?? "N/A"}`,
-            `Description: ${h.Description ?? ""}`,
-            `Category: ${h.Category ?? ""}`,
-            `Tags: ${tags}`,
-            `ParkingIncluded: ${h.ParkingIncluded === true}`,
-            `Rating: ${h.Rating ?? ""}`,
-            `Address.City: ${addr?.City ?? ""}`,
-            `Address.StateProvince: ${addr?.StateProvince ?? ""}`,
-            `Score: ${Number(h.Score ?? 0).toFixed(6)}`,
-            "--- HOTEL END ---",
-          ].join("\n");
-        })
-        .join("\n\n");
-
-      return formatted;
-    } catch (error) {
-      console.error("Error in search tool:", error);
-      return "Error occurred while searching for hotels.";
-    }
-  },
-  {
-    name: TOOL_NAME,
-    description: TOOL_DESCRIPTION,
-    schema: z.object({
-      query: z.string(),
-      nearestNeighbors: z.number().optional().default(5),
-    }),
-  }
-);
-
-// Planner Agent
+// Planner agent uses Vector Search Tool
 async function runPlannerAgent(
   userQuery: string,
   store: AzureCosmosDBMongoDBVectorStore,
@@ -643,17 +499,17 @@ async function runPlannerAgent(
   );
 
   const plannerMessages = agentResult.messages || [];
-  const searchResultsAsText = extractPlannerToolOutput(plannerMessages, nearestNeighbors);
-
+  const searchResultsAsText = extractPlannerToolOutput(plannerMessages);
+  
   return searchResultsAsText;
 }
 
-// Synthesizer Agent
-async function runSynthesizerAgent(
-  userQuery: string,
-  hotelContext: string
-): Promise<string> {
-  console.log("\n--- SYNTHESIZER ---");
+// Synthesizer agent function generates final user-friendly response
+async function runSynthesizerAgent(userQuery: string, hotelContext: string): Promise<string> {
+  console.log('\n--- SYNTHESIZER ---');
+
+  let conciseContext = hotelContext;
+  console.log(`Context size is ${conciseContext.length} characters`);
 
   const agent = createAgent({
     model: synthClient,
@@ -661,63 +517,50 @@ async function runSynthesizerAgent(
   });
 
   const agentResult = await agent.invoke({
-    messages: [
-      {
-        role: "user",
-        content: createSynthesizerUserPrompt(userQuery, hotelContext),
-      },
-    ],
+    messages: [{
+      role: 'user',
+      content: createSynthesizerUserPrompt(userQuery, conciseContext)
+    }]
   });
-
   const synthMessages = agentResult.messages;
   const finalAnswer = synthMessages[synthMessages.length - 1].content;
-  console.log(`Output: ${(finalAnswer as string).length} characters`);
   return finalAnswer as string;
 }
 
-// Main execution
+// Get vector store (get docs, create embeddings, insert docs)
 const store = await getStore(
   process.env.DATA_FILE_WITHOUT_VECTORS!,
   embeddingClient,
-  dbConfig
-);
+  dbConfig);
 
-const query =
-  process.env.QUERY || "quintessential lodging near running trails, eateries, retail";
+const query = process.env.QUERY || "quintessential lodging near running trails, eateries, retail";
+const nearestNeighbors = parseInt(process.env.NEAREST_NEIGHBORS || '5', 10);
 
 // Run planner agent
-const hotelContext = await runPlannerAgent(query, store, 5);
-if (process.env.DEBUG === "true") console.log(hotelContext);
+const hotelContext = await runPlannerAgent(query, store, nearestNeighbors);
+if (process.env.DEBUG==='true') console.log(hotelContext);
 
-// Run synthesizer agent
+// Run synth agent
 const finalAnswer = await runSynthesizerAgent(query, hotelContext);
 
-console.log("\n--- FINAL ANSWER ---");
+// // Get final recommendation (data + AI)
+console.log('\n--- FINAL ANSWER ---');
 console.log(finalAnswer);
 
-// Cleanup
+// Clean up (delete database)
 await store.close();
 await deleteCosmosMongoDatabase();
 ```
 
-This main module provides these features:
+This main module demonstrates:
 
-- Creates two specialized AI agents using LangChain's agent framework
-- Defines a custom vector search tool with schema validation
-- **Planner Agent**: Refines queries and executes the vector search tool
-- **Synthesizer Agent**: Analyzes results and generates comparative recommendations
-- Connects to Azure Cosmos DB for MongoDB vCore with vector search
-- Creates embeddings on-the-fly for hotel descriptions
+- **Authentication**: Supports both API key and passwordless authentication
+- **Two-agent workflow**: Planner executes tool, Synthesizer analyzes results
+- **Tool invocation**: Planner agent calls vector search with validated parameters
+- **Context passing**: Search results flow from planner to synthesizer
+- **Resource cleanup**: Closes connections and deletes test database
 - Performs semantic similarity search and returns scored results
 - Provides intelligent, context-aware hotel recommendations
-
-## Authenticate with Azure CLI
-
-Sign in to Azure CLI before you run the application so it can access Azure resources securely:
-
-```bash
-az login
-```
 
 ## Build and run the application
 
@@ -772,29 +615,6 @@ Deleted database: Hotels
 1. Select the [DocumentDB extension](https://marketplace.visualstudio.com/items?itemName=ms-azuretools.vscode-documentdb) in Visual Studio Code to connect to your Azure DocumentDB account.
 
 1. View the data and indexes in the Hotels database (before cleanup).
-
-## Understanding the two-agent architecture
-
-This quickstart demonstrates a sophisticated two-agent pattern:
-
-### Planner Agent (Tool Executor)
-
-- Uses `gpt-4o-mini` for efficient tool execution
-- Refines user queries for better semantic search
-- Calls the vector search tool with optimized parameters
-- Returns structured search results
-
-### Synthesizer Agent (Recommendation Generator)
-
-- Uses `gpt-4o` for high-quality natural language generation
-- Analyzes top search results comparatively
-- Identifies tradeoffs between options
-- Provides actionable recommendations with alternatives
-
-This architecture separates concerns:
-- **Search optimization** (planner) from **result interpretation** (synthesizer)
-- **Tool execution** from **content generation**
-- **Data retrieval** from **decision support**
 
 ## Clean up resources
 
