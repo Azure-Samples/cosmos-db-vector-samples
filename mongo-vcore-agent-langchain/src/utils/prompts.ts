@@ -9,12 +9,30 @@
 
 export const DEFAULT_QUERY = process.env.QUERY! || "quintessential lodging near running trails, eateries, retail";
 
+export const TOOL_NAME = 'search_hotels_collection';
+export const TOOL_DESCRIPTION = `REQUIRED TOOL - You MUST call this tool for EVERY hotel search request. This is the ONLY way to search the hotel database.
+
+Performs vector similarity search on the Hotels collection using Azure Cosmos DB for MongoDB vCore.
+
+INPUT REQUIREMENTS:
+- query (string, REQUIRED): Natural language search query describing desired hotel characteristics. Should be detailed and specific (e.g., "budget hotel near downtown with parking and wifi" not just "hotel").
+- nearestNeighbors (number, REQUIRED): Number of results to return (1-20). Use 3-5 for specific requests, 10-15 for broader searches.
+
+SEARCH BEHAVIOR:
+- Uses semantic vector search to find hotels matching the query description
+- Returns hotels ranked by similarity score
+- Includes hotel details: name, description, category, tags, rating, location, parking info
+
+MANDATORY: Every user request about finding, searching, or recommending hotels REQUIRES calling this tool. Do not attempt to answer without calling this tool first.
+`;
+
+
 export const PLANNER_SYSTEM_PROMPT = `You are a hotel search planner. Transform the user's request into a clear, detailed search query for a vector database.
 
-TASK: You MUST produce a JSON object that either (A) returns refined search parameters for the vector store, or (B) returns an explicit tool action instructing the agent to call the tool named "search_hotels_collection".
+CRITICAL REQUIREMENT: You MUST ALWAYS call the "${TOOL_NAME}" tool. This is MANDATORY for every request.
 
-Required tool-invocation format (preferred):
-{"tool": "search_hotels_collection", "args": {"query": "<refined query>", "nearestNeighbors": <1-20>}}
+Your response must be ONLY this JSON structure:
+{"tool": "${TOOL_NAME}", "args": {"query": "<refined query>", "nearestNeighbors": <1-20>}}
 
 QUERY REFINEMENT RULES:
 - If vague (e.g., "nice hotel"), add specific attributes: "hotel with high ratings and good amenities"
@@ -22,15 +40,14 @@ QUERY REFINEMENT RULES:
 - Preserve specific details from user (location, amenities, business/leisure)
 - Keep natural language - this is for semantic search
 - Don't just echo the input - improve it for better search results
+- nearestNeighbors: Use 3-5 for specific requests, 10-15 for broader requests, max 20
 
-EXAMPLES (tool-invocation):
-{"tool": "search_hotels_collection", "args": {"query": "hotel near downtown with good parking and wifi", "nearestNeighbors": 5}}
+EXAMPLES:
+User: "cheap hotel" → {"tool": "${TOOL_NAME}", "args": {"query": "budget-friendly hotel with good value and affordable rates", "nearestNeighbors": 10}}
+User: "hotel near downtown with parking" → {"tool": "${TOOL_NAME}", "args": {"query": "hotel near downtown with good parking and wifi", "nearestNeighbors": 5}}
+User: "nice place to stay" → {"tool": "${TOOL_NAME}", "args": {"query": "hotel with high ratings, good reviews, and quality amenities", "nearestNeighbors": 10}}
 
-EXAMPLES (fallback pure-search):
-{"query": "hotel with high ratings, good reviews, and quality amenities", "maxResults": 5}
-{"query": "budget-friendly hotel with good value", "maxResults": 10}
-
-Respond with ONLY valid JSON.`;
+DO NOT return any other format. ALWAYS include the tool and args structure.`;
 
 // ============================================================================
 // Synthesizer Prompts

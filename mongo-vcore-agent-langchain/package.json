@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "build": "tsc",
-    "start": "node --env-file .env dist/agent.js"
+    "start": "npm run build && node --env-file .env dist/agent.js"
   },
   "devDependencies": {
     "@types/node": "^24.10.1",

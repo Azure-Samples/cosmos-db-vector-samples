@@ -2,7 +2,7 @@ import {
   AzureCosmosDBMongoDBVectorStore
 } from "@langchain/azure-cosmosdb";
 import { AzureOpenAIEmbeddings } from "@langchain/openai";
-import { PLANNER_SYSTEM_PROMPT, SYNTHESIZER_SYSTEM_PROMPT, createSynthesizerUserPrompt } from './utils/prompts.js';
+import { TOOL_NAME, TOOL_DESCRIPTION, PLANNER_SYSTEM_PROMPT, SYNTHESIZER_SYSTEM_PROMPT, createSynthesizerUserPrompt } from './utils/prompts.js';
 import { z } from 'zod';
 import { createAgent, tool } from "langchain";
 import { createClientsPasswordless, createClients } from './utils/clients.js';
@@ -14,10 +14,14 @@ import { getStore } from './utils/azure-documentdb.js';
 // Authentication
 const clients = process.env.USE_PASSWORDLESS === 'true' || process.env.USE_PASSWORDLESS === '1' ? createClientsPasswordless() : createClients();
 const { embeddingClient, plannerClient, synthClient, dbConfig } = clients;
+console.log(`DEBUG mode is ${process.env.DEBUG === 'true' ? 'ON' : 'OFF'}`);
+console.log(`DEBUG_CALLBACKS length: ${DEBUG_CALLBACKS.length}`);
 
 // Vector Search Tool
 const getHotelsToMatchSearchQuery = tool(
   async ({ query, nearestNeighbors }, config): Promise<string> => {
+
+    try{
 
     const store = config.context.store as AzureCosmosDBMongoDBVectorStore;
     const embeddingClient = config.context.embeddingClient as AzureOpenAIEmbeddings;
@@ -77,10 +81,14 @@ const getHotelsToMatchSearchQuery = tool(
     }).join('\n\n');
 
     return formatted;
+    } catch (error) {
+      console.error('Error in getHotelsToMatchSearchQuery tool:', error);
+      return 'Error occurred while searching for hotels.';
+    }
   },
   {
-    name: "search_hotels_collection",
-    description: "Perform a vector search against the hotels collection to retrieve hotel documents used for recommendation and comparison.",
+    name: TOOL_NAME,
+    description: TOOL_DESCRIPTION,
     schema: z.object({
       query: z.string(),
       nearestNeighbors: z.number().optional().default(5),
@@ -96,7 +104,7 @@ async function runPlannerAgent(
 ): Promise<string> {
   console.log('\n--- PLANNER ---');
 
-  const userMessage = `Call the "search_hotels_collection" tool with the desired number of neighbors: nearestNeighbors="${nearestNeighbors}" and the query: query="${userQuery}". Respond ONLY with a tool response JSON output`;
+  const userMessage = `Call the "${TOOL_NAME}" tool with the desired number of neighbors: nearestNeighbors="${nearestNeighbors}" and the query: query="${userQuery}". Respond ONLY with a tool response JSON output`;
 
   const contextSchema = z.object({
     store: z.any(),
@@ -113,12 +121,12 @@ async function runPlannerAgent(
   const agentResult = await agent.invoke(
     { messages: [{ role: 'user', content: userMessage }] },
     // @ts-ignore
-    { context: { store, embeddingClient }, DEBUG_CALLBACKS }
+    { context: { store, embeddingClient }, callbacks: DEBUG_CALLBACKS }
   );
 
   const plannerMessages = agentResult.messages || [];
   const searchResultsAsText = extractPlannerToolOutput(plannerMessages, nearestNeighbors);
-
+  
   return searchResultsAsText;
 }
 
@@ -155,15 +163,16 @@ const store = await getStore(
 const query = process.env.QUERY || "quintessential lodging near running trails, eateries, retail";
 
 // Run planner agent
-//const hotelContext = await runPlannerAgent(query, store, 5);
+const hotelContext = await runPlannerAgent(query, store, 5);
+if (process.env.DEBUG==='true') console.log(hotelContext);
 
 // Run synth agent
-//const finalAnswer = await runSynthesizerAgent(query, hotelContext);
+const finalAnswer = await runSynthesizerAgent(query, hotelContext);
 
-// Get final recommendation (data + AI)
-//console.log('\n--- FINAL ANSWER ---');
-//console.log(finalAnswer);
+// // Get final recommendation (data + AI)
+console.log('\n--- FINAL ANSWER ---');
+console.log(finalAnswer);
 
-// Clean up (delete datbase)
+// Clean up (delete database)
 await store.close();
 await deleteCosmosMongoDatabase();

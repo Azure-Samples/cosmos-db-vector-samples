@@ -1,4 +1,4 @@
-
+import { TOOL_NAME } from './prompts.js';
 /**
  * Extracts the planner's tool output from an array of agent messages.
  *
@@ -34,7 +34,7 @@ export function extractPlannerToolOutput(plannerMessages: any[], nearestNeighbor
 
   const toolMsg = messages.find((m: any) => {
     if (!m) return false;
-    if (m?.name === 'search_hotels_collection') return true;
+    if (m?.name === TOOL_NAME) return true;
     if (m?.role === 'tool') return true;
     if (m?.tool_call_id) return true;
     return false;
@@ -42,7 +42,7 @@ export function extractPlannerToolOutput(plannerMessages: any[], nearestNeighbor
 
   // If the planner did not invoke the tool, throw an error so callers can handle it
   if (!toolMsg) {
-    throw new Error('Planner did not invoke the tool "search_hotels_collection".');
+    console.log(`Planner did not invoke the tool "${TOOL_NAME}".`);
   }
 
   const lastMessage = messages[messages.length - 1];
