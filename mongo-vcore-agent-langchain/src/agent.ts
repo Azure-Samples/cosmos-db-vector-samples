@@ -1,100 +1,21 @@
 import {
   AzureCosmosDBMongoDBVectorStore
 } from "@langchain/azure-cosmosdb";
-import { AzureOpenAIEmbeddings } from "@langchain/openai";
-import { TOOL_NAME, TOOL_DESCRIPTION, PLANNER_SYSTEM_PROMPT, SYNTHESIZER_SYSTEM_PROMPT, createSynthesizerUserPrompt } from './utils/prompts.js';
+import { TOOL_NAME, PLANNER_SYSTEM_PROMPT, SYNTHESIZER_SYSTEM_PROMPT, createSynthesizerUserPrompt } from './utils/prompts.js';
 import { z } from 'zod';
-import { createAgent, tool } from "langchain";
+import { createAgent } from "langchain";
 import { createClientsPasswordless, createClients } from './utils/clients.js';
 import { DEBUG_CALLBACKS } from './utils/debug-handlers.js';
 import { extractPlannerToolOutput } from './utils/tool-results-extraction.js';
 import { deleteCosmosMongoDatabase } from './utils/mongodb-cleanup.js';
 import { getStore } from './utils/azure-documentdb.js';
+import { getHotelsToMatchSearchQuery } from './utils/azure-documentdb.js';
 
 // Authentication
 const clients = process.env.USE_PASSWORDLESS === 'true' || process.env.USE_PASSWORDLESS === '1' ? createClientsPasswordless() : createClients();
 const { embeddingClient, plannerClient, synthClient, dbConfig } = clients;
 console.log(`DEBUG mode is ${process.env.DEBUG === 'true' ? 'ON' : 'OFF'}`);
 console.log(`DEBUG_CALLBACKS length: ${DEBUG_CALLBACKS.length}`);
-
-// Vector Search Tool
-const getHotelsToMatchSearchQuery = tool(
-  async ({ query, nearestNeighbors }, config): Promise<string> => {
-
-    try{
-
-    const store = config.context.store as AzureCosmosDBMongoDBVectorStore;
-    const embeddingClient = config.context.embeddingClient as AzureOpenAIEmbeddings;
-
-    // Create an embedding for the query using the shared embedding client
-    const queryVector = await embeddingClient.embedQuery(query);
-
-    // Perform similarity search on the vector store
-    const results = await store.similaritySearchVectorWithScore(queryVector, nearestNeighbors);
-    console.log(`Found ${results.length} documents from vector store`);
-
-    // Map results to the Hotel type (HotelsData) by extracting metadata fields
-    const hotels = results.map(([doc, score]) => {
-      const md = doc.metadata || {} as Record<string, any>;
-      return {
-        HotelId: md.HotelId,
-        HotelName: md.HotelName,
-        Description: md.Description,
-        Category: md.Category,
-        Tags: md.Tags || [],
-        ParkingIncluded: md.ParkingIncluded,
-        IsDeleted: md.IsDeleted,
-        LastRenovationDate: md.LastRenovationDate,
-        Rating: md.Rating,
-        Address: md.Address,
-        Score: score
-      };
-    });
-
-    hotels.map(hotel => {
-      console.log(`Hotel: ${hotel.HotelName}, Score: ${hotel.Score}`);
-    });
-
-    // Build a well-named, human-readable text block for each hotel with clear markers
-    const formatted = hotels.map(h => {
-      const addr = h.Address || {} as Record<string, any>;
-      const tags = Array.isArray(h.Tags) ? h.Tags.join(', ') : String(h.Tags || '');
-      return [
-        '--- HOTEL START ---',
-        `HotelId: ${h.HotelId ?? 'N/A'}`,
-        `HotelName: ${h.HotelName ?? 'N/A'}`,
-        `Description: ${h.Description ?? ''}`,
-        `Category: ${h.Category ?? ''}`,
-        `Tags: ${tags}`,
-        `ParkingIncluded: ${h.ParkingIncluded === true}`,
-        `IsDeleted: ${h.IsDeleted === true}`,
-        `LastRenovationDate: ${h.LastRenovationDate ?? ''}`,
-        `Rating: ${h.Rating ?? ''}`,
-        `Address.StreetAddress: ${addr?.StreetAddress ?? ''}`,
-        `Address.City: ${addr?.City ?? ''}`,
-        `Address.StateProvince: ${addr?.StateProvince ?? ''}`,
-        `Address.PostalCode: ${addr?.PostalCode ?? ''}`,
-        `Address.Country: ${addr?.Country ?? ''}`,
-        `Score: ${Number(h.Score ?? 0).toFixed(6)}`,
-        '--- HOTEL END ---'
-      ].join('\n');
-    }).join('\n\n');
-
-    return formatted;
-    } catch (error) {
-      console.error('Error in getHotelsToMatchSearchQuery tool:', error);
-      return 'Error occurred while searching for hotels.';
-    }
-  },
-  {
-    name: TOOL_NAME,
-    description: TOOL_DESCRIPTION,
-    schema: z.object({
-      query: z.string(),
-      nearestNeighbors: z.number().optional().default(5),
-    }),
-  }
-);
 
 // Planner agent uses Vector Search Tool
 async function runPlannerAgent(
@@ -108,7 +29,7 @@ async function runPlannerAgent(
 
   const contextSchema = z.object({
     store: z.any(),
-    embeddingClient: z.any(),
+    embeddingClient: z.any()
   });
 
   const agent = createAgent({
@@ -125,7 +46,7 @@ async function runPlannerAgent(
   );
 
   const plannerMessages = agentResult.messages || [];
-  const searchResultsAsText = extractPlannerToolOutput(plannerMessages, nearestNeighbors);
+  const searchResultsAsText = extractPlannerToolOutput(plannerMessages);
   
   return searchResultsAsText;
 }
@@ -161,9 +82,10 @@ const store = await getStore(
   dbConfig);
 
 const query = process.env.QUERY || "quintessential lodging near running trails, eateries, retail";
+const nearestNeighbors = parseInt(process.env.NEAREST_NEIGHBORS || '5', 10);
 
 // Run planner agent
-const hotelContext = await runPlannerAgent(query, store, 5);
+const hotelContext = await runPlannerAgent(query, store, nearestNeighbors);
 if (process.env.DEBUG==='true') console.log(hotelContext);
 
 // Run synth agent
