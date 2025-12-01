@@ -1,13 +1,13 @@
-# Cosmos DB Vector Samples (Go)
+# Azure DocumentDB Vector Samples (Go)
 
-This project demonstrates vector search capabilities using Azure Cosmos DB for MongoDB (vCore) with Go. It includes implementations of three different vector index types: DiskANN, HNSW, and IVF, along with utilities for embedding generation and data management.
+This project demonstrates vector search capabilities using Azure DocumentDB with Go. It includes implementations of three different vector index types: DiskANN, HNSW, and IVF, along with utilities for embedding generation and data management.
 
 ## Overview
 
 Vector search enables semantic similarity searching by converting text into high-dimensional vector representations (embeddings) and finding the most similar vectors in the database. This project shows how to:
 
 - Generate embeddings using Azure OpenAI
-- Store vectors in Cosmos DB for MongoDB (vCore)
+- Store vectors in Azure DocumentDB
 - Create and use different types of vector indexes
 - Perform similarity searches with various algorithms
 - Handle authentication using Azure Active Directory (passwordless) or connection strings
@@ -19,7 +19,7 @@ Before running this project, you need:
 ### Azure Resources
 1. **Azure subscription** with appropriate permissions
 2. **Azure OpenAI resource** with embedding model deployment
-3. **Azure Cosmos DB for MongoDB (vCore) resource**
+3. **Azure DocumentDB resource**
 4. **Azure CLI** installed and configured
 
 ### Development Environment
@@ -51,16 +51,16 @@ go mod download
 az login
 
 # Create resource group (if needed)
-az group create --name myResourceGroup --location eastus
+az group create --name <resource-group> --location <region>
 
 # Create Azure OpenAI resource
 az cognitiveservices account create \
-    --name myOpenAIResource \
-    --resource-group myResourceGroup \
-    --location eastus \
+    --name <open-ai-resource> \
+    --resource-group <resource-group> \
+    --location <region> \
     --kind OpenAI \
     --sku S0 \
-    --subscription mySubscription
+    --subscription <subscription>
 ```
 
 #### Deploy Embedding Model
@@ -70,9 +70,10 @@ az cognitiveservices account create \
 4. Choose **text-embedding-ada-002** model
 5. Note the deployment name for configuration
 
-#### Create Cosmos DB for MongoDB (vCore)
+#### Create Azure DocumentDB Resource
+```bash
 
-Create a Azure Cosmos DB for MongoDB vCore cluster by using the [Azure portal](https://learn.microsoft.com/azure/cosmos-db/mongodb/vcore/quickstart-portal), [Bicep](https://learn.microsoft.com/azure/cosmos-db/mongodb/vcore/quickstart-bicep), or [Terraform](https://learn.microsoft.com/azure/cosmos-db/mongodb/vcore/quickstart-terraform).
+Create a Azure DocumentDB cluster by using the [Azure portal](https://learn.microsoft.com/azure/documentdb/quickstart-portal), [Bicep](https://learn.microsoft.com/azure/documentdb/quickstart-bicep), or [Terraform](https://learn.microsoft.com/azure/documentdb/quickstart-terraform).
 
 ### Step 3: Configure Environment Variables
 
@@ -90,7 +91,7 @@ AZURE_OPENAI_EMBEDDING_ENDPOINT=https://your-openai-resource.openai.azure.com/
 AZURE_OPENAI_EMBEDDING_KEY=your-azure-openai-api-key
 AZURE_OPENAI_EMBEDDING_API_VERSION=2024-02-01
 
-# MongoDB/Cosmos DB Configuration
+# DocumentDB Configuration
 MONGO_CONNECTION_STRING=mongodb+srv://username:password@your-cluster.mongocluster.cosmos.azure.com/?tls=true&authMechanism=SCRAM-SHA-256&retrywrites=false&maxIdleTimeMS=120000
 MONGO_CLUSTER_NAME=vectorSearch
 
@@ -110,31 +111,32 @@ LOAD_SIZE_BATCH=100
 ```bash
 # Get OpenAI endpoint
 az cognitiveservices account show \
-    --name myOpenAIResource \
-    --resource-group myResourceGroup \
+    --name <open-ai-resource> \
+    --resource-group <resource-group> \
     --query "properties.endpoint" --output tsv
 
 # Get OpenAI key
 az cognitiveservices account keys list \
-    --name myOpenAIResource \
-    --resource-group myResourceGroup \
+    --name <open-ai-resource> \
+    --resource-group <resource-group> \
     --query "key1" --output tsv
 ```
 
-#### Cosmos DB Connection String
+#### DocumentDB Connection String
 ```bash
-# Get Cosmos DB connection string
-az cosmosdb keys list \
-    --name myCosmosAccount \
-    --resource-group myResourceGroup \
-    --type connection-strings \
-    --query "connectionStrings[0].connectionString" --output tsv
+# Get DocumentDB connection string
+az resource show \
+    --resource-group "<resource-group>" \
+    --name "<cluster-name>" \
+    --resource-type "Microsoft.DocumentDB/mongoClusters" \
+    --query "properties.connectionString" \
+    --latest-include-preview
 ```
 
 ### Step 5: Configure passwordless authentication (optional)
 To use passwordless authentication with Microsoft Entra ID, follow these steps:
 
-1. In your Azure Cosmos DB for MongoDB (vCore) resource, enable **Native DocumentDB** and **Microsoft Entra ID** authentication methods.
+1. In your Azure DocumentDB resource, enable **Native DocumentDB** and **Microsoft Entra ID** authentication methods.
 2. Assign your Microsoft Entra ID user the following roles on the Cosmos DB resource:
    - **Cosmos DB Account Reader Role**
    - **DocumentDB Account Contributor**
@@ -209,7 +211,7 @@ This utility shows:
 ## Important Notes
 
 ### Vector Index Limitations
-**One Index Per Field**: Cosmos DB for MongoDB (vCore) allows only one vector index per field. Each script automatically handles this by:
+**One Index Per Field**: Azure DocumentDB allows only one vector index per field. Each script automatically handles this by:
 
 1. **Dropping existing indexes**: Before creating a new vector index, the script removes any existing vector indexes on the same field
 2. **Safe switching**: You can run different vector index scripts in any order - each will clean up previous indexes first
@@ -232,12 +234,12 @@ Different vector index types require different cluster tiers:
 
 - **IVF**: Available on most tiers (including basic)
 - **HNSW**: Requires standard tier or higher
-- **DiskANN**: Requires premium/high-performance tier
+- **DiskANN**: Requires premium/high-performance tier. Available on M30 and above
 
 If you encounter "not enabled for this cluster tier" errors:
 1. Try a different index type (IVF is most widely supported)
 2. Consider upgrading your cluster tier
-3. Check the [Cosmos DB pricing page](https://azure.microsoft.com/pricing/details/cosmos-db/) for tier features
+3. Check the [Azure DocumentDB pricing page](https://azure.microsoft.com/pricing/details/document-db/) for tier features
 
 ## Authentication Options
 
@@ -266,8 +268,8 @@ defer mongoClient.Disconnect(ctx)
 **Setup for passwordless authentication:**
 
 1. Ensure you're logged in with `az login`
-2. Enable Native DocumentDB and Microsoft Entra ID authentication methods for your Azure Cosmos DB for MongoDB (vCore) resource.
-3. Grant your identity appropriate RBAC permissions on Cosmos DB. You need **Cosmos DB Account Reader Role** and **DocumentDB Account Contributor** roles assigned to your user.
+2. Enable **Native DocumentDB and Microsoft Entra ID authentication** methods for your Azure DocumentDB resource.
+3. Grant your identity appropriate RBAC permissions on your Azure DocumentDB instance. You need **Cosmos DB Account Reader Role** and **DocumentDB Account Contributor** roles assigned to your user.
 4. Set `MONGO_CLUSTER_NAME` instead of `MONGO_CONNECTION_STRING` in `.env`
 
 ### Method 2: Connection String Authentication
@@ -330,7 +332,7 @@ mongo-vcore-vector-search-go/
 
 1. **Authentication Errors**
    - Verify Azure OpenAI endpoint and key
-   - Check Cosmos DB connection string
+   - Check Azure DocumentDB connection string
    - Ensure proper RBAC permissions for passwordless authentication. You need **Cosmos DB Account Reader Role** and **DocumentDB Account Contributor** roles assigned to your user. Roles may take some time to propagate.
 
 2. **Embedding Generation Fails**
@@ -358,9 +360,9 @@ DEBUG=true
 ## Performance Considerations
 
 ### Choosing Vector Index Types
-- **Use DiskANN when**: Dataset is very large, memory is limited
-- **Use HNSW when**: Need fastest search, have sufficient memory
-- **Use IVF when**: Want configurable accuracy/speed trade-offs
+- **Use DiskANN when**: Dataset is very large, memory is limited, vector count is up to 500,000+
+- **Use HNSW when**: Need fastest search, have sufficient memory, vector count is up to 50,000
+- **Use IVF when**: Want configurable accuracy/speed trade-offs, vector count is under 10,000
 
 ### Tuning Parameters
 - **Batch sizes**: Adjust based on API rate limits and memory
@@ -369,14 +371,13 @@ DEBUG=true
 
 ### Cost Optimization
 - Use appropriate Azure OpenAI pricing tier
-- Consider Cosmos DB serverless vs provisioned throughput
 - Monitor API usage and optimize batch processing
 
 ## Further Resources
 
-- [Azure Cosmos DB for MongoDB (vCore) Documentation](https://learn.microsoft.com/azure/cosmos-db/mongodb/vcore/)
+- [Azure DocumentDB Documentation](https://learn.microsoft.com/azure/documentdb/)
 - [Azure OpenAI Service Documentation](https://learn.microsoft.com/azure/ai-services/openai/)
-- [Vector Search in Cosmos DB](https://learn.microsoft.com/azure/cosmos-db/mongodb/vcore/vector-search)
+- [Vector Search in Cosmos DB](https://learn.microsoft.com/azure/documentdb/vector-search)
 - [Go MongoDB Driver Documentation](https://pkg.go.dev/go.mongodb.org/mongo-driver/mongo)
 - [Azure SDK for Go Documentation](https://pkg.go.dev/github.com/Azure/azure-sdk-for-go)
 

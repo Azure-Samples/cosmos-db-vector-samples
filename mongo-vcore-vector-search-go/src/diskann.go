@@ -23,7 +23,7 @@ func CreateDiskANNVectorIndex(ctx context.Context, collection *mongo.Collection,
 		fmt.Printf("Warning: Could not drop existing indexes: %v\n", err)
 	}
 
-	// Use the native MongoDB command for Cosmos DB vector indexes
+	// Use the native MongoDB command for DocumentDB vector indexes
 	// Note: Must use bson.D for commands to preserve order and avoid "multi-key map" errors
 	indexCommand := bson.D{
 		{"createIndexes", collection.Name()},
@@ -31,7 +31,7 @@ func CreateDiskANNVectorIndex(ctx context.Context, collection *mongo.Collection,
 			{
 				{"name", fmt.Sprintf("diskann_index_%s", vectorField)},
 				{"key", bson.D{
-					{vectorField, "cosmosSearch"}, // Cosmos DB vector search index type
+					{vectorField, "cosmosSearch"}, // DocumentDB vector search index type
 				}},
 				{"cosmosSearchOptions", bson.D{
 					// DiskANN algorithm configuration
@@ -63,7 +63,7 @@ func CreateDiskANNVectorIndex(ctx context.Context, collection *mongo.Collection,
 		if strings.Contains(err.Error(), "not enabled for this cluster tier") {
 			fmt.Println("\nDiskANN indexes require a higher cluster tier.")
 			fmt.Println("Try one of these alternatives:")
-			fmt.Println("  • Upgrade your Cosmos DB cluster to a higher tier")
+			fmt.Println("  • Upgrade your DocumentDB cluster to a higher tier")
 			fmt.Println("  • Use HNSW instead: go run src/hnsw.go")
 			fmt.Println("  • Use IVF instead: go run src/ivf.go")
 		}
@@ -85,11 +85,11 @@ func PerformDiskANNVectorSearch(ctx context.Context, collection *mongo.Collectio
 	}
 
 	// Construct the aggregation pipeline for vector search
-	// Cosmos DB for MongoDB vCore uses $search with cosmosSearch
+	// DocumentDB uses $search with cosmosSearch
 	pipeline := []bson.M{
 		{
 			"$search": bson.M{
-				// Use cosmosSearch for vector operations in Cosmos DB
+				// Use cosmosSearch for vector operations in DocumentDB
 				"cosmosSearch": bson.M{
 					// The query vector to search for
 					"vector": queryEmbedding,

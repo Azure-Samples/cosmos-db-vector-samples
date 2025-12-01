@@ -32,9 +32,9 @@ func formatIndexInfo(indexInfo IndexInfo) string {
 	}
 	lines = append(lines, fmt.Sprintf("Index Name: %s", name))
 
-	// Check if this is a vector index by looking for Cosmos DB vector search configuration
+	// Check if this is a vector index by looking for DocumentDB vector search configuration
 	if indexInfo.CosmosSearchOptions != nil && len(indexInfo.CosmosSearchOptions) > 0 {
-		lines = append(lines, "Type: Cosmos DB Vector Search Index")
+		lines = append(lines, "Type: DocumentDB Vector Search Index")
 
 		// Vector search specific details
 		if similarity, ok := indexInfo.CosmosSearchOptions["similarity"]; ok {
