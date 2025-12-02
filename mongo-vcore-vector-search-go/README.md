@@ -71,41 +71,10 @@ az cognitiveservices account create \
 5. Note the deployment name for configuration
 
 #### Create Azure DocumentDB Resource
-```bash
 
 Create a Azure DocumentDB cluster by using the [Azure portal](https://learn.microsoft.com/azure/documentdb/quickstart-portal), [Bicep](https://learn.microsoft.com/azure/documentdb/quickstart-bicep), or [Terraform](https://learn.microsoft.com/azure/documentdb/quickstart-terraform).
 
-### Step 3: Configure Environment Variables
-
-1. Copy the example environment file:
-```bash
-cp .env.example .env
-```
-
-2. Edit `.env` file with your Azure resource information:
-
-```env
-# Azure OpenAI Configuration
-AZURE_OPENAI_EMBEDDING_MODEL=text-embedding-ada-002
-AZURE_OPENAI_EMBEDDING_ENDPOINT=https://your-openai-resource.openai.azure.com/
-AZURE_OPENAI_EMBEDDING_KEY=your-azure-openai-api-key
-AZURE_OPENAI_EMBEDDING_API_VERSION=2024-02-01
-
-# DocumentDB Configuration
-MONGO_CONNECTION_STRING=mongodb+srv://username:password@your-cluster.mongocluster.cosmos.azure.com/?tls=true&authMechanism=SCRAM-SHA-256&retrywrites=false&maxIdleTimeMS=120000
-MONGO_CLUSTER_NAME=vectorSearch
-
-# Data Configuration (defaults should work)
-DATA_FILE_WITHOUT_VECTORS=../data/HotelsData_toCosmosDB_Vector.json
-DATA_FILE_WITH_VECTORS=../data/HotelsData_toCosmosDB_Vector.json
-FIELD_TO_EMBED=Description
-EMBEDDED_FIELD=DescriptionVector
-EMBEDDING_DIMENSIONS=1536
-EMBEDDING_SIZE_BATCH=16
-LOAD_SIZE_BATCH=100
-```
-
-### Step 4: Get Your Connection Information
+### Step 3: Get Your Connection Information
 
 #### Azure OpenAI Endpoint and Key
 ```bash
@@ -131,6 +100,37 @@ az resource show \
     --resource-type "Microsoft.DocumentDB/mongoClusters" \
     --query "properties.connectionString" \
     --latest-include-preview
+```
+
+### Step 4: Configure Environment Variables
+
+1. Copy the example environment file:
+
+```bash
+cp .env.example .env
+```
+
+2. Edit `.env` file with your Azure resource information:
+
+```env
+# Azure OpenAI Configuration
+AZURE_OPENAI_EMBEDDING_MODEL=text-embedding-ada-002
+AZURE_OPENAI_EMBEDDING_ENDPOINT=https://your-openai-resource.openai.azure.com/
+AZURE_OPENAI_EMBEDDING_KEY=your-azure-openai-api-key
+AZURE_OPENAI_EMBEDDING_API_VERSION=2024-02-01
+
+# DocumentDB Configuration
+MONGO_CONNECTION_STRING=mongodb+srv://username:password@your-cluster.mongocluster.cosmos.azure.com/?tls=true&authMechanism=SCRAM-SHA-256&retrywrites=false&maxIdleTimeMS=120000
+MONGO_CLUSTER_NAME=vectorSearch
+
+# Data Configuration (defaults should work)
+DATA_FILE_WITHOUT_VECTORS=../data/HotelsData_toCosmosDB_Vector.json
+DATA_FILE_WITH_VECTORS=../data/HotelsData_toCosmosDB_Vector.json
+FIELD_TO_EMBED=Description
+EMBEDDED_FIELD=DescriptionVector
+EMBEDDING_DIMENSIONS=1536
+EMBEDDING_SIZE_BATCH=16
+LOAD_SIZE_BATCH=100
 ```
 
 ### Step 5: Configure passwordless authentication (optional)
