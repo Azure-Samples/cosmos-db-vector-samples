@@ -10,11 +10,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Azure/azure-sdk-for-go/sdk/ai/azopenai"
-	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	"github.com/joho/godotenv"
+	"github.com/openai/openai-go/v3"
+	"github.com/openai/openai-go/v3/azure"
+	"github.com/openai/openai-go/v3/option"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -87,13 +88,13 @@ func getEnvOrDefault(key, defaultValue string) string {
 }
 
 // GetClients creates MongoDB and Azure OpenAI clients with connection string authentication
-func GetClients() (*mongo.Client, *azopenai.Client, error) {
+func GetClients() (*mongo.Client, openai.Client, error) {
 	ctx := context.Background()
 
 	// Get MongoDB connection string
 	mongoConnectionString := os.Getenv("MONGO_CONNECTION_STRING")
 	if mongoConnectionString == "" {
-		return nil, nil, fmt.Errorf("MONGO_CONNECTION_STRING environment variable is required. " +
+		return nil, openai.Client{}, fmt.Errorf("MONGO_CONNECTION_STRING environment variable is required. " +
 			"Set it to your DocumentDB connection string or use GetClientsPasswordless() for OIDC auth")
 	}
 
@@ -108,13 +109,13 @@ func GetClients() (*mongo.Client, *azopenai.Client, error) {
 
 	mongoClient, err := mongo.Connect(ctx, clientOptions)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to connect to MongoDB: %v", err)
+		return nil, openai.Client{}, fmt.Errorf("failed to connect to MongoDB: %v", err)
 	}
 
 	// Test the connection
 	err = mongoClient.Ping(ctx, nil)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to ping MongoDB: %v", err)
+		return nil, openai.Client{}, fmt.Errorf("failed to ping MongoDB: %v", err)
 	}
 
 	// Get Azure OpenAI configuration
@@ -122,33 +123,31 @@ func GetClients() (*mongo.Client, *azopenai.Client, error) {
 	azureOpenAIKey := os.Getenv("AZURE_OPENAI_EMBEDDING_KEY")
 
 	if azureOpenAIEndpoint == "" || azureOpenAIKey == "" {
-		return nil, nil, fmt.Errorf("Azure OpenAI endpoint and key are required")
+		return nil, openai.Client{}, fmt.Errorf("Azure OpenAI endpoint and key are required")
 	}
 
 	// Create Azure OpenAI client
-	keyCredential := azcore.NewKeyCredential(azureOpenAIKey)
-	azureOpenAIClient, err := azopenai.NewClientWithKeyCredential(azureOpenAIEndpoint, keyCredential, nil)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to create Azure OpenAI client: %v", err)
-	}
+	openAIClient := openai.NewClient(
+		option.WithBaseURL(fmt.Sprintf("%s/openai/v1", azureOpenAIEndpoint)),
+		option.WithAPIKey(azureOpenAIKey))
 
-	return mongoClient, azureOpenAIClient, nil
+	return mongoClient, openAIClient, nil
 }
 
 // GetClientsPasswordless creates MongoDB and Azure OpenAI clients with passwordless authentication
-func GetClientsPasswordless() (*mongo.Client, *azopenai.Client, error) {
+func GetClientsPasswordless() (*mongo.Client, openai.Client, error) {
 	ctx := context.Background()
 
 	// Get MongoDB cluster name
 	clusterName := os.Getenv("MONGO_CLUSTER_NAME")
 	if clusterName == "" {
-		return nil, nil, fmt.Errorf("MONGO_CLUSTER_NAME environment variable is required")
+		return nil, openai.Client{}, fmt.Errorf("MONGO_CLUSTER_NAME environment variable is required")
 	}
 
 	// Create Azure credential
 	credential, err := azidentity.NewDefaultAzureCredential(nil)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to create Azure credential: %v", err)
+		return nil, openai.Client{}, fmt.Errorf("failed to create Azure credential: %v", err)
 	}
 
 	// Attempt OIDC authentication
@@ -157,23 +156,22 @@ func GetClientsPasswordless() (*mongo.Client, *azopenai.Client, error) {
 	fmt.Println("Attempting OIDC authentication...")
 	mongoClient, err := connectWithOIDC(ctx, mongoURI, credential)
 	if err != nil {
-		return nil, nil, fmt.Errorf("OIDC authentication failed: %v", err)
+		return nil, openai.Client{}, fmt.Errorf("OIDC authentication failed: %v", err)
 	}
 	fmt.Println("OIDC authentication successful!")
 
 	// Get Azure OpenAI endpoint
 	azureOpenAIEndpoint := os.Getenv("AZURE_OPENAI_EMBEDDING_ENDPOINT")
 	if azureOpenAIEndpoint == "" {
-		return nil, nil, fmt.Errorf("AZURE_OPENAI_EMBEDDING_ENDPOINT environment variable is required")
+		return nil, openai.Client{}, fmt.Errorf("AZURE_OPENAI_EMBEDDING_ENDPOINT environment variable is required")
 	}
 
 	// Create Azure OpenAI client with credential-based authentication
-	azureOpenAIClient, err := azopenai.NewClient(azureOpenAIEndpoint, credential, nil)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to create Azure OpenAI client: %v", err)
-	}
+	openAIClient := openai.NewClient(
+		option.WithBaseURL(fmt.Sprintf("%s/openai/v1", azureOpenAIEndpoint)),
+		azure.WithTokenCredential(credential), nil)
 
-	return mongoClient, azureOpenAIClient, nil
+	return mongoClient, openAIClient, nil
 }
 
 // connectWithOIDC attempts to connect using OIDC authentication
@@ -429,10 +427,12 @@ func PrintSearchResults(results []SearchResult, maxResults int, showScore bool) 
 }
 
 // GenerateEmbedding generates an embedding for the given text using Azure OpenAI
-func GenerateEmbedding(ctx context.Context, client *azopenai.Client, text, modelName string) ([]float64, error) {
-	resp, err := client.GetEmbeddings(ctx, azopenai.EmbeddingsOptions{
-		Input:          []string{text},
-		DeploymentName: &modelName,
+func GenerateEmbedding(ctx context.Context, client openai.Client, text, modelName string) ([]float64, error) {
+	resp, err := client.Embeddings.New(ctx, openai.EmbeddingNewParams{
+		Input: openai.EmbeddingNewParamsInputUnion{
+			OfString: openai.String(text),
+		},
+		Model: modelName,
 	}, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate embedding: %v", err)

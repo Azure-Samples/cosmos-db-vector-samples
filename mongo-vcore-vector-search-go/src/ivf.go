@@ -7,10 +7,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/openai/openai-go/v3"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
-
-	"github.com/Azure/azure-sdk-for-go/sdk/ai/azopenai"
 )
 
 // CreateIVFVectorIndex creates an IVF (Inverted File) vector index on the specified field
@@ -72,11 +71,11 @@ func CreateIVFVectorIndex(ctx context.Context, collection *mongo.Collection, vec
 }
 
 // PerformIVFVectorSearch performs a vector search using IVF algorithm
-func PerformIVFVectorSearch(ctx context.Context, collection *mongo.Collection, azureOpenAIClient *azopenai.Client, queryText, vectorField, modelName string, topK int, numProbes int) ([]SearchResult, error) {
+func PerformIVFVectorSearch(ctx context.Context, collection *mongo.Collection, openaAIClient openai.Client, queryText, vectorField, modelName string, topK int, numProbes int) ([]SearchResult, error) {
 	fmt.Printf("Performing IVF vector search for: '%s'\n", queryText)
 
 	// Generate embedding vector for the search query
-	queryEmbedding, err := GenerateEmbedding(ctx, azureOpenAIClient, queryText, modelName)
+	queryEmbedding, err := GenerateEmbedding(ctx, openaAIClient, queryText, modelName)
 	if err != nil {
 		return nil, fmt.Errorf("error generating embedding: %v", err)
 	}
