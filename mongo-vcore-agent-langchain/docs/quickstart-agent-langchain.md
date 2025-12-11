@@ -15,7 +15,7 @@ ms.custom:
 
 # Quickstart: LangChain Agent with vector search in Azure DocumentDB
 
-Build an intelligent AI agent using LangChain and Azure Cosmos DB for MongoDB vCore. This quickstart demonstrates a two-agent architecture that performs semantic hotel search and generates personalized recommendations.
+Build an intelligent AI agent using LangChain and Azure DocumentDB (with MongoDB compatibility). This quickstart demonstrates a two-agent architecture that performs semantic hotel search and generates personalized recommendations.
 
 **Architecture:**
 - **Planner Agent** (`gpt-4o-mini`): Refines queries and executes vector search using a custom LangChain tool
@@ -49,23 +49,23 @@ Find the [complete source code](https://github.com/Azure-Samples/cosmos-db-vecto
   <!-- - Assign role in Azure Portal: Azure OpenAI resource → Access control (IAM) → Add role assignment -->
   <!-- - See [Azure OpenAI RBAC roles](https://learn.microsoft.com/azure/ai-services/openai/how-to/role-based-access-control) -->
 
-- **Azure Cosmos DB for MongoDB vCore cluster** with vector search support:
+- **Azure DocumentDB (with MongoDB compatibility) cluster** with vector search support:
   - **Cluster tier requirements** based on vector index algorithm:
     - **IVF (Inverted File Index)**: M10 or higher (default algorithm)
     - **HNSW (Hierarchical Navigable Small World)**: M30 or higher (graph-based)
-    - **DiskANN**: M40 or higher (optimized for large-scale)
+    - **DiskANN**: M30 or higher (optimized for large-scale)
   - **Firewall configuration**: REQUIRED - Add your client IP address to the cluster's firewall rules
     - Find your IP: `curl -4 ifconfig.me`
-    - Configure in Azure Portal: Cosmos DB cluster → Networking → Firewall
+    - Configure in Azure Portal: DocumentDB cluster → Networking → Firewall
     - See [Configure firewall rules](https://learn.microsoft.com/azure/cosmos-db/mongodb/vcore/how-to-configure-firewall) for detailed instructions
     - Without proper firewall configuration, connection attempts will fail
   <!-- TODO: Add tabbed conceptual for passwordless authentication -->
   <!-- Tab 1: Connection String (default) - current content above -->
   <!-- Tab 2: Passwordless (Microsoft Entra ID) -->
   <!-- - RBAC role required: DocumentDB Account Contributor or custom role with read/write permissions -->
-  <!-- - Assign role in Azure Portal: Cosmos DB account → Access control (IAM) → Add role assignment -->
+  <!-- - Assign role in Azure Portal: DocumentDB account → Access control (IAM) → Add role assignment -->
   <!-- - Configure Microsoft Entra authentication on cluster -->
-  <!-- - See [Cosmos DB RBAC](https://learn.microsoft.com/azure/cosmos-db/mongodb/vcore/security) -->
+  <!-- - See [DocumentDB RBAC](https://learn.microsoft.com/azure/cosmos-db/mongodb/vcore/security) -->
 
 ### Development tools
 
@@ -104,7 +104,7 @@ Find the [complete source code](https://github.com/Azure-Samples/cosmos-db-vecto
     npm install @langchain/azure-cosmosdb @langchain/openai @langchain/core langchain zod mongodb
     ```
 
-    - `@langchain/azure-cosmosdb`: LangChain integration for Azure Cosmos DB vector store
+    - `@langchain/azure-cosmosdb`: LangChain integration for DocumentDB
     - `@langchain/openai`: LangChain integration for Azure OpenAI
     - `@langchain/core`: Core LangChain functionality
     - `langchain`: Main LangChain library with agent framework
@@ -137,11 +137,11 @@ Find the [complete source code](https://github.com/Azure-Samples/cosmos-db-vecto
     - `AZURE_OPENAI_PLANNER_DEPLOYMENT`: Your gpt-4o-mini deployment name
     - `AZURE_OPENAI_SYNTH_DEPLOYMENT`: Your gpt-4o deployment name
     - `AZURE_OPENAI_EMBEDDING_DEPLOYMENT`: Your text-embedding-3-small deployment name
-    - `AZURE_COSMOSDB_MONGODB_CONNECTION_STRING`: Your Azure Cosmos DB connection string
-    - `MONGO_CLUSTER_NAME`: Your Cosmos DB cluster name
+    - `AZURE_DOCUMENTDB_MONGODB_CONNECTION_STRING`: Your Azure DocumentDB connection string
+    - `MONGO_CLUSTER_NAME`: Your DocumentDB cluster name
     <!-- Tab 2: Passwordless (Microsoft Entra ID) -->
     <!-- Set `USE_PASSWORDLESS=true` in .env -->
-    <!-- Remove or comment out: AZURE_OPENAI_API_KEY and AZURE_COSMOSDB_MONGODB_CONNECTION_STRING -->
+    <!-- Remove or comment out: AZURE_OPENAI_API_KEY and AZURE_DOCUMENTDB_MONGODB_CONNECTION_STRING -->
     <!-- Ensure you're signed in with Azure CLI: `az login` -->
     <!-- Your Azure identity must have appropriate RBAC roles assigned (see Prerequisites) -->
 
@@ -215,7 +215,7 @@ The `src/vector-store.ts` file consolidates all vector database operations. This
 
 ### Initialize the vector store
 
-The `getStore()` function performs the complete vector store setup: reads hotel documents from JSON, generates vector embeddings, creates the database and collection if they don't exist, inserts documents into Cosmos DB, and creates the vector index for the selected algorithm:
+The `getStore()` function performs the complete vector store setup: reads hotel documents from JSON, generates vector embeddings, creates the database and collection if they don't exist, inserts documents into DocumentDB, and creates the vector index for the selected algorithm:
 
 ```typescript
 export async function getStore(
@@ -246,7 +246,7 @@ export async function getStore(
     }
   );
 
-  console.log(`Inserted ${documents.length} documents into Cosmos DB (Mongo API) vector store.`);
+  console.log(`Inserted ${documents.length} documents into DocumentDB vector store.`);
   return store;
 }
 ```
@@ -256,8 +256,8 @@ This code demonstrates:
 - **Data transformation**: Uses TypeScript destructuring to exclude unnecessary fields (Description_fr, Location, Rooms)
 - **Document creation**: Combines hotel name and description in pageContent for semantic search
 - **Generate vectors**: `fromDocuments()` calls the embedding client to create vector embeddings for each document
-- **Create database and collection**: Automatically creates the Cosmos DB database and collection if they don't already exist
-- **Insert documents**: Stores documents with their embeddings into Cosmos DB collection
+- **Create database and collection**: Automatically creates the DocumentDB database and collection if they don't already exist
+- **Insert documents**: Stores documents with their embeddings into DocumentDB collection
 - **Create vector index**: Automatically creates the vector index based on the selected algorithm (IVF, HNSW, or DiskANN) via `getVectorIndexOptions()`
 
 ### Configure vector index algorithms
@@ -441,7 +441,7 @@ export const TOOL_NAME = "search_hotels_collection";
 
 export const TOOL_DESCRIPTION = `REQUIRED TOOL - You MUST call this tool for EVERY hotel search request. This is the ONLY way to search the hotel database.
 
-Performs vector similarity search on the Hotels collection using Azure Cosmos DB for MongoDB vCore.
+Performs vector similarity search on the Hotels collection using Azure DocumentDB (with MongoDB compatibility).
 
 INPUT REQUIREMENTS:
 - query (string, REQUIRED): Natural language search query describing desired hotel characteristics. Should be detailed and specific (e.g., "budget hotel near downtown with parking and wifi" not just "hotel").
@@ -698,16 +698,16 @@ The application automatically deletes the test database after execution. Delete 
 
 ## Common issues
 
-### Connection failures to Cosmos DB
+### Connection failures to DocumentDB
 
 If you receive connection timeout or authentication errors:
 
-1. **Verify firewall configuration**: Ensure your client IP is added to the Cosmos DB cluster firewall rules
+1. **Verify firewall configuration**: Ensure your client IP is added to the DocumentDB cluster firewall rules
    - Run `curl -4 ifconfig.me` to get your current IP address
-   - Add the IP in Azure Portal: Cosmos DB cluster → Networking → Firewall
+   - Add the IP in Azure Portal: DocumentDB cluster → Networking → Firewall
    - See [Configure firewall rules](https://learn.microsoft.com/azure/cosmos-db/mongodb/vcore/how-to-configure-firewall)
 
-2. **Check connection string**: Verify your `AZURE_COSMOSDB_MONGODB_CONNECTION_STRING` is correct and includes authentication credentials
+2. **Check connection string**: Verify your `AZURE_DOCUMENTDB_MONGODB_CONNECTION_STRING` is correct and includes authentication credentials
 
 ### Rate limiting (429 errors)
 
@@ -726,13 +726,13 @@ If you encounter "Rate limit exceeded" errors:
 
 If vector index creation fails:
 
-1. **Verify cluster tier**: Ensure your Cosmos DB cluster meets the minimum tier requirement for your chosen algorithm:
+1. **Verify cluster tier**: Ensure your DocumentDB cluster meets the minimum tier requirement for your chosen algorithm:
    - IVF: M10+
    - HNSW: M30+
-   - DiskANN: M40+
+   - DiskANN: M30+
 
 ## Related content
 
 - [Vector store in Azure DocumentDB](vector-search.md)
-- [LangChain Azure Cosmos DB Integration](https://js.langchain.com/docs/integrations/vectorstores/azure_cosmosdb)
+- [LangChain Azure DocumentDB Integration](https://js.langchain.com/docs/integrations/vectorstores/azure_cosmosdb)
 - [LangChain Agent Framework](https://js.langchain.com/docs/concepts/agents)
