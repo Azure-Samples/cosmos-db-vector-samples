@@ -433,7 +433,7 @@ func GenerateEmbedding(ctx context.Context, client openai.Client, text, modelNam
 			OfString: openai.String(text),
 		},
 		Model: modelName,
-	}, nil)
+	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate embedding: %v", err)
 	}
