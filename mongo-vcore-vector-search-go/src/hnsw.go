@@ -7,10 +7,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/openai/openai-go/v3"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
-
-	"github.com/Azure/azure-sdk-for-go/sdk/ai/azopenai"
 )
 
 // CreateHNSWVectorIndex creates an HNSW (Hierarchical Navigable Small World) vector index on the specified field
@@ -75,11 +74,11 @@ func CreateHNSWVectorIndex(ctx context.Context, collection *mongo.Collection, ve
 }
 
 // PerformHNSWVectorSearch performs a vector search using HNSW algorithm
-func PerformHNSWVectorSearch(ctx context.Context, collection *mongo.Collection, azureOpenAIClient *azopenai.Client, queryText, vectorField, modelName string, topK int, efSearch int) ([]SearchResult, error) {
+func PerformHNSWVectorSearch(ctx context.Context, collection *mongo.Collection, openAIClient openai.Client, queryText, vectorField, modelName string, topK int, efSearch int) ([]SearchResult, error) {
 	fmt.Printf("Performing HNSW vector search for: '%s'\n", queryText)
 
 	// Convert query text to embedding vector
-	queryEmbedding, err := GenerateEmbedding(ctx, azureOpenAIClient, queryText, modelName)
+	queryEmbedding, err := GenerateEmbedding(ctx, openAIClient, queryText, modelName)
 	if err != nil {
 		return nil, fmt.Errorf("error generating embedding: %v", err)
 	}

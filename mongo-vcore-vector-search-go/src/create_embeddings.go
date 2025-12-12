@@ -7,8 +7,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/Azure/azure-sdk-for-go/sdk/ai/azopenai"
 	"github.com/joho/godotenv"
+	"github.com/openai/openai-go/v3"
 )
 
 // CreateEmbeddings generates embeddings for a list of texts using Azure OpenAI.
@@ -24,7 +24,7 @@ import (
 // Returns:
 //   - List of embedding vectors, where each vector is a list of floats
 //   - Error if the API call fails
-func CreateEmbeddings(ctx context.Context, texts []string, azureOpenAIClient *azopenai.Client, modelName string) ([][]float32, error) {
+func CreateEmbeddings(ctx context.Context, texts []string, openAIClient openai.Client, modelName string) ([][]float64, error) {
 	if len(texts) == 0 {
 		return nil, fmt.Errorf("no texts provided for embedding")
 	}
@@ -33,16 +33,19 @@ func CreateEmbeddings(ctx context.Context, texts []string, azureOpenAIClient *az
 
 	// Call Azure OpenAI embedding API
 	// The response contains embeddings for all input texts
-	resp, err := azureOpenAIClient.GetEmbeddings(ctx, azopenai.EmbeddingsOptions{
-		Input:          texts,
-		DeploymentName: &modelName,
-	}, nil)
+	resp, err := openAIClient.Embeddings.New(ctx, openai.EmbeddingNewParams{
+		Input: openai.EmbeddingNewParamsInputUnion{
+			OfArrayOfStrings: texts,
+		},
+		Model: modelName,
+	})
+
 	if err != nil {
 		return nil, fmt.Errorf("error generating embeddings: %v", err)
 	}
 
 	// Extract embedding vectors from the API response
-	embeddings := make([][]float32, len(resp.Data))
+	embeddings := make([][]float64, len(resp.Data))
 	for i, item := range resp.Data {
 		embeddings[i] = item.Embedding
 	}
@@ -62,7 +65,7 @@ func CreateEmbeddings(ctx context.Context, texts []string, azureOpenAIClient *az
 //   - fieldToEmbed: Name of the field containing text to embed
 //   - embeddedField: Name of the field where embeddings will be stored
 //   - modelName: Name of the embedding model to use
-func ProcessEmbeddingBatch(ctx context.Context, dataBatch []map[string]interface{}, azureOpenAIClient *azopenai.Client, fieldToEmbed, embeddedField, modelName string) error {
+func ProcessEmbeddingBatch(ctx context.Context, dataBatch []map[string]interface{}, openAIClient openai.Client, fieldToEmbed, embeddedField, modelName string) error {
 	// Extract texts that need embeddings
 	var textsToEmbed []string
 	var indicesWithText []int // Track which documents have text to embed
@@ -82,7 +85,7 @@ func ProcessEmbeddingBatch(ctx context.Context, dataBatch []map[string]interface
 
 	// Generate embeddings for all texts in this batch
 	if len(textsToEmbed) > 0 {
-		embeddings, err := CreateEmbeddings(ctx, textsToEmbed, azureOpenAIClient, modelName)
+		embeddings, err := CreateEmbeddings(ctx, textsToEmbed, openAIClient, modelName)
 		if err != nil {
 			return fmt.Errorf("failed to create embeddings: %v", err)
 		}

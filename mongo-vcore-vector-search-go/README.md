@@ -23,7 +23,7 @@ Before running this project, you need:
 4. **Azure CLI** installed and configured
 
 ### Development Environment
-- **Go 1.21 or higher**
+- **Go 1.24 or higher**
 - **Git** (for cloning the repository)
 - **Visual Studio Code** (recommended) or another Go IDE
 

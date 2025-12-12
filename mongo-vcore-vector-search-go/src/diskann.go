@@ -10,7 +10,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 
-	"github.com/Azure/azure-sdk-for-go/sdk/ai/azopenai"
+	"github.com/openai/openai-go/v3"
 )
 
 // CreateDiskANNVectorIndex creates a DiskANN vector index on the specified field
@@ -75,11 +75,11 @@ func CreateDiskANNVectorIndex(ctx context.Context, collection *mongo.Collection,
 }
 
 // PerformDiskANNVectorSearch performs a vector search using DiskANN algorithm
-func PerformDiskANNVectorSearch(ctx context.Context, collection *mongo.Collection, azureOpenAIClient *azopenai.Client, queryText, vectorField, modelName string, topK int) ([]SearchResult, error) {
+func PerformDiskANNVectorSearch(ctx context.Context, collection *mongo.Collection, openAIClient openai.Client, queryText, vectorField, modelName string, topK int) ([]SearchResult, error) {
 	fmt.Printf("Performing DiskANN vector search for: '%s'\n", queryText)
 
 	// Generate embedding for the query text
-	queryEmbedding, err := GenerateEmbedding(ctx, azureOpenAIClient, queryText, modelName)
+	queryEmbedding, err := GenerateEmbedding(ctx, openAIClient, queryText, modelName)
 	if err != nil {
 		return nil, fmt.Errorf("error generating embedding: %v", err)
 	}
