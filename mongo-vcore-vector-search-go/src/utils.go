@@ -402,27 +402,24 @@ func PrintSearchResults(results []SearchResult, maxResults int, showScore bool) 
 	for i := 0; i < maxResults; i++ {
 		result := results[i]
 
-		// Extract hotel data from the document
+		// Extract HotelName from document (assuming bson.D structure)
+		doc := result.Document.(bson.D)
 		var hotelName string
-		if doc, ok := result.Document.(bson.M); ok {
-			if name, exists := doc["HotelName"]; exists {
-				hotelName = fmt.Sprintf("%v", name)
-			}
-		} else if doc, ok := result.Document.(map[string]interface{}); ok {
-			if name, exists := doc["HotelName"]; exists {
-				hotelName = fmt.Sprintf("%v", name)
+		for _, elem := range doc {
+			if elem.Key == "HotelName" {
+				hotelName = fmt.Sprintf("%v", elem.Value)
+				break
 			}
 		}
+
+		// Display results
+		fmt.Printf("%d. HotelName: %s", i+1, hotelName)
 
 		if showScore {
-			fmt.Printf("HotelName: %s, Score: %.4f\n", hotelName, result.Score)
-		} else {
-			fmt.Printf("HotelName: %s\n", hotelName)
+			fmt.Printf(", Score: %.4f", result.Score)
 		}
-	}
 
-	if len(results) > maxResults {
-		fmt.Printf("\n... and %d more results\n", len(results)-maxResults)
+		fmt.Println()
 	}
 }
 
