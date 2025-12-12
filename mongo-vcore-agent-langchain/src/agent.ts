@@ -4,18 +4,16 @@ import {
 import { TOOL_NAME, PLANNER_SYSTEM_PROMPT, SYNTHESIZER_SYSTEM_PROMPT, createSynthesizerUserPrompt } from './utils/prompts.js';
 import { z } from 'zod';
 import { createAgent } from "langchain";
-import { createClientsPasswordless, createClients } from './utils/clients.js';
+import { createClientsPasswordless, createClients} from './utils/clients.js';
 import { DEBUG_CALLBACKS } from './utils/debug-handlers.js';
-import { extractPlannerToolOutput, getStore, getHotelsToMatchSearchQuery, deleteCosmosMongoDatabase } from './vector-store.js';
+import { extractPlannerToolOutput, getStore, getHotelsToMatchSearchQuery, getExistingStore } from './vector-store.js';
+import { deleteCosmosMongoDatabase } from './cleanup.js';
 
-// Authentication
-const clients = process.env.USE_PASSWORDLESS === 'true' || process.env.USE_PASSWORDLESS === '1' ? createClientsPasswordless() : createClients();
-const { embeddingClient, plannerClient, synthClient, dbConfig } = clients;
-console.log(`DEBUG mode is ${process.env.DEBUG === 'true' ? 'ON' : 'OFF'}`);
-console.log(`DEBUG_CALLBACKS length: ${DEBUG_CALLBACKS.length}`);
 
 // Planner agent uses Vector Search Tool
 async function runPlannerAgent(
+  plannerClient: any,
+  embeddingClient: any,
   userQuery: string,
   store: AzureCosmosDBMongoDBVectorStore,
   nearestNeighbors = 5
@@ -44,12 +42,12 @@ async function runPlannerAgent(
 
   const plannerMessages = agentResult.messages || [];
   const searchResultsAsText = extractPlannerToolOutput(plannerMessages);
-  
+
   return searchResultsAsText;
 }
 
 // Synthesizer agent function generates final user-friendly response
-async function runSynthesizerAgent(userQuery: string, hotelContext: string): Promise<string> {
+async function runSynthesizerAgent(synthClient: any, userQuery: string, hotelContext: string): Promise<string> {
   console.log('\n--- SYNTHESIZER ---');
 
   let conciseContext = hotelContext;
@@ -72,26 +70,36 @@ async function runSynthesizerAgent(userQuery: string, hotelContext: string): Pro
   return finalAnswer as string;
 }
 
-// Get vector store (get docs, create embeddings, insert docs)
-const store = await getStore(
-  process.env.DATA_FILE_WITHOUT_VECTORS!,
-  embeddingClient,
-  dbConfig);
+try {
+  // Authentication
+  const clients = process.env.USE_PASSWORDLESS === 'true' || process.env.USE_PASSWORDLESS === '1' ? createClientsPasswordless() : createClients();
+  const { embeddingClient, plannerClient, synthClient, dbConfig } = clients;
+  console.log(`DEBUG mode is ${process.env.DEBUG === 'true' ? 'ON' : 'OFF'}`);
+  console.log(`DEBUG_CALLBACKS length: ${DEBUG_CALLBACKS.length}`);
 
-const query = process.env.QUERY || "quintessential lodging near running trails, eateries, retail";
-const nearestNeighbors = parseInt(process.env.NEAREST_NEIGHBORS || '5', 10);
 
-// Run planner agent
-const hotelContext = await runPlannerAgent(query, store, nearestNeighbors);
-if (process.env.DEBUG==='true') console.log(hotelContext);
+  // Get vector store (get docs, create embeddings, insert docs)
+  const store = await getExistingStore(
+    embeddingClient,
+    dbConfig);
 
-// Run synth agent
-const finalAnswer = await runSynthesizerAgent(query, hotelContext);
+  const query = process.env.QUERY || "quintessential lodging near running trails, eateries, retail";
+  const nearestNeighbors = parseInt(process.env.NEAREST_NEIGHBORS || '5', 10);
 
-// // Get final recommendation (data + AI)
-console.log('\n--- FINAL ANSWER ---');
-console.log(finalAnswer);
+  //Run planner agent
+  const hotelContext = await runPlannerAgent(plannerClient, embeddingClient, query, store, nearestNeighbors);
+  if (process.env.DEBUG === 'true') console.log(hotelContext);
 
-// Clean up (delete database)
-await store.close();
-await deleteCosmosMongoDatabase();
+  //Run synth agent
+  const finalAnswer = await runSynthesizerAgent(synthClient, query, hotelContext);
+  // Get final recommendation (data + AI)
+  console.log('\n--- FINAL ANSWER ---');
+  console.log(finalAnswer);
+
+  // Clean up (delete database)
+  //await store.close();
+  //await deleteCosmosMongoDatabase();
+} catch (error) {
+  console.error('Error running agent:', error);
+}
+

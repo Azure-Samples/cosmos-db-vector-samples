@@ -92,6 +92,21 @@ function formatHotelForSynthesizer(md: Partial<HotelForVectorStore>, score: numb
   ].join('\n');
 }
 
+// Get existing vector store without uploading documents
+export async function getExistingStore(
+  embeddingClient: AzureOpenAIEmbeddings,
+  dbConfig: AzureCosmosDBMongoDBConfig
+): Promise<AzureCosmosDBMongoDBVectorStore> {
+  
+  const store = new AzureCosmosDBMongoDBVectorStore(embeddingClient, {
+    ...dbConfig,
+    indexOptions: getVectorIndexOptions(),
+  });
+
+  console.log(`Connected to existing vector store: ${dbConfig.databaseName}.${dbConfig.collectionName}`);
+  return store;
+}
+
 // Initialize vector store with hotel data
 export async function getStore(
   dataFilePath: string,
@@ -164,7 +179,7 @@ export const getHotelsToMatchSearchQuery = tool(
 /**
  * Delete a Cosmos DB (Mongo API) database by name.
  *
- * Uses the `AZURE_COSMOSDB_MONGODB_CONNECTION_STRING` environment variable to connect.
+ * Uses the `AZURE_DOCUMENTDB_CONNECTION_STRING` environment variable to connect.
  * Example env var: `mongodb://username:password@host:port/?ssl=true&replicaSet=globaldb`
  *
  * @param databaseName - The name of the database to drop.
@@ -174,9 +189,9 @@ export async function deleteCosmosMongoDatabase(): Promise<void> {
     console.log(`\n\nCLEAN UP\n\n`);
 
     const databaseName = process.env.MONGO_DB_NAME;
-    const connectionString = process.env.AZURE_COSMOSDB_MONGODB_CONNECTION_STRING;
+    const connectionString = process.env.AZURE_DOCUMENTDB_CONNECTION_STRING;
     if (!connectionString) {
-        throw new Error('Environment variable AZURE_COSMOSDB_MONGODB_CONNECTION_STRING is not set.');
+        throw new Error('Environment variable AZURE_DOCUMENTDB_CONNECTION_STRING is not set.');
     }
 
     const client = new MongoClient(connectionString);

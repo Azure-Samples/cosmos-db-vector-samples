@@ -19,7 +19,7 @@ const CREDENTIAL = new DefaultAzureCredential();
 
 // Token callback for MongoDB OIDC authentication
 async function azureIdentityTokenCallback(
-  params: OIDCCallbackParams, 
+  params: OIDCCallbackParams,
   credential: TokenCredential
 ): Promise<{ accessToken: string; expiresInSeconds: number }> {
   const tokenResponse: AccessToken | null = await credential.getToken([DOCUMENT_DB_SCOPE]);
@@ -29,8 +29,6 @@ async function azureIdentityTokenCallback(
   };
 }
 
-// Token provider for Azure OpenAI
-const AZURE_OPENAI_AD_TOKEN_PROVIDER = getBearerTokenProvider(CREDENTIAL, OPENAI_SCOPE);
 
 // Debug logging
 const DEBUG = process.env.DEBUG === 'true' || process.env.DEBUG === '1';
@@ -53,7 +51,7 @@ if (DEBUG) {
       HAS_EMBEDDING_DEPLOYMENT: !!process.env.AZURE_OPENAI_EMBEDDING_DEPLOYMENT,
       HAS_PLANNER_DEPLOYMENT: !!process.env.AZURE_OPENAI_PLANNER_DEPLOYMENT,
       HAS_SYNTH_DEPLOYMENT: !!process.env.AZURE_OPENAI_SYNTH_DEPLOYMENT,
-      HAS_CONNECTION_STRING: !!process.env.AZURE_COSMOSDB_MONGODB_CONNECTION_STRING,
+      HAS_CONNECTION_STRING: !!process.env.AZURE_DOCUMENTDB_CONNECTION_STRING,
     });
   }
 }
@@ -96,7 +94,8 @@ export function createClients() {
     });
 
     const dbConfig = {
-      connectionString: process.env.AZURE_COSMOSDB_MONGODB_CONNECTION_STRING!,
+      instance: process.env.AZURE_DOCUMENTDB_INSTANCE!,
+      connectionString: process.env.AZURE_DOCUMENTDB_CONNECTION_STRING!,
       databaseName: process.env.MONGO_DB_NAME!,
       collectionName: process.env.MONGO_DB_COLLECTION!
     };
@@ -109,23 +108,6 @@ export function createClients() {
   }
 }
 
-// Create MongoDB client with passwordless authentication
-function getMongoPasswordless() {
-  const clusterName = process.env.MONGO_CLUSTER_NAME!;
-  return new MongoClient(
-    `mongodb+srv://${clusterName}.global.mongocluster.cosmos.azure.com/`, 
-    {
-      connectTimeoutMS: 30000,
-      tls: true,
-      retryWrites: true,
-      authMechanism: 'MONGODB-OIDC',
-      authMechanismProperties: {
-        OIDC_CALLBACK: (params: OIDCCallbackParams) => azureIdentityTokenCallback(params, CREDENTIAL),
-        ALLOWED_HOSTS: ['*.azure.com']
-      }
-    }
-  );
-}
 
 // Create clients with passwordless authentication
 export function createClientsPasswordless() {
@@ -136,31 +118,57 @@ export function createClientsPasswordless() {
     }
 
     const embeddingClient = new AzureOpenAIEmbeddings({
-      azureADTokenProvider: AZURE_OPENAI_AD_TOKEN_PROVIDER,
-      azureOpenAIApiEmbeddingsDeploymentName: process.env.AZURE_OPENAI_EMBEDDING_DEPLOYMENT,
-      azureOpenAIApiVersion: process.env.AZURE_OPENAI_EMBEDDING_API_VERSION,
-      maxRetries: 1,
+      azureADTokenProvider: getBearerTokenProvider(
+        CREDENTIAL,
+        "https://cognitiveservices.azure.com/.default",
+      ),
+      azureOpenAIApiInstanceName: process.env.AZURE_OPENAI_API_INSTANCE_NAME!,
+      azureOpenAIApiEmbeddingsDeploymentName:
+        process.env.AZURE_OPENAI_EMBEDDING_MODEL!,
+      azureOpenAIApiVersion: process.env.AZURE_OPENAI_EMBEDDING_API_VERSION!,
+      azureOpenAIBasePath: `https://${process.env.AZURE_OPENAI_API_INSTANCE_NAME}.openai.azure.com/openai/deployments`
     });
 
     const plannerClient = new AzureChatOpenAI({
-      azureADTokenProvider: AZURE_OPENAI_AD_TOKEN_PROVIDER,
-      model: process.env.AZURE_OPENAI_PLANNER_DEPLOYMENT!,
-      temperature: 0,
-      azureOpenAIApiDeploymentName: process.env.AZURE_OPENAI_PLANNER_DEPLOYMENT,
-      azureOpenAIApiVersion: process.env.AZURE_OPENAI_PLANNER_API_VERSION,
+      azureADTokenProvider: getBearerTokenProvider(
+        CREDENTIAL,
+        "https://cognitiveservices.azure.com/.default",
+      ),
+      azureOpenAIApiInstanceName: process.env.AZURE_OPENAI_API_INSTANCE_NAME!,
+      azureOpenAIApiDeploymentName:
+        process.env.AZURE_OPENAI_PLANNER_DEPLOYMENT!,
+      azureOpenAIApiVersion: process.env.AZURE_OPENAI_PLANNER_API_VERSION!,
+      azureOpenAIBasePath: `https://${process.env.AZURE_OPENAI_API_INSTANCE_NAME}.openai.azure.com/openai/deployments`,
     });
 
     const synthClient = new AzureChatOpenAI({
-      azureADTokenProvider: AZURE_OPENAI_AD_TOKEN_PROVIDER,
-      model: process.env.AZURE_OPENAI_SYNTH_DEPLOYMENT!,
-      temperature: 0.3,
-      azureOpenAIApiDeploymentName: process.env.AZURE_OPENAI_SYNTH_DEPLOYMENT,
-      azureOpenAIApiVersion: process.env.AZURE_OPENAI_SYNTH_API_VERSION,
+      azureADTokenProvider: getBearerTokenProvider(
+        CREDENTIAL,
+        "https://cognitiveservices.azure.com/.default",
+      ),
+      azureOpenAIApiInstanceName: process.env.AZURE_OPENAI_API_INSTANCE_NAME!,
+      azureOpenAIApiDeploymentName:
+        process.env.AZURE_OPENAI_SYNTH_DEPLOYMENT!,
+      azureOpenAIApiVersion: process.env.AZURE_OPENAI_SYNTH_API_VERSION!,
+      azureOpenAIBasePath: `https://${process.env.AZURE_OPENAI_API_INSTANCE_NAME}.openai.azure.com/openai/deployments`,
     });
 
-    const mongoClient = getMongoPasswordless();
+    const mongoClient = new MongoClient(
+      `mongodb+srv://${process.env.AZURE_DOCUMENTDB_INSTANCE!}.global.mongocluster.cosmos.azure.com/`,
+      {
+        connectTimeoutMS: 30000,
+        tls: true,
+        retryWrites: true,
+        authMechanism: 'MONGODB-OIDC',
+        authMechanismProperties: {
+          OIDC_CALLBACK: (params: OIDCCallbackParams) => azureIdentityTokenCallback(params, CREDENTIAL),
+          ALLOWED_HOSTS: ['*.azure.com']
+        }
+      }
+    );
 
     const dbConfig = {
+      instance: process.env.AZURE_DOCUMENTDB_INSTANCE!,
       client: mongoClient,
       databaseName: process.env.MONGO_DB_NAME!,
       collectionName: process.env.MONGO_DB_COLLECTION!,

@@ -404,7 +404,7 @@ export function createClients(): ClientConfig {
     plannerClient,
     synthClient,
     dbConfig: {
-      connectionString: process.env.AZURE_COSMOSDB_MONGODB_CONNECTION_STRING!,
+      connectionString: process.env.AZURE_DOCUMENT_DB_CONNECTION_STRING!,
       databaseName: process.env.MONGO_DB_NAME!,
       collectionName: process.env.MONGO_DB_COLLECTION!,
       indexName: process.env.MONGO_DB_INDEX_NAME!,

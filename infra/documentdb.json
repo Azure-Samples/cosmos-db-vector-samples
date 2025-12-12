@@ -1,0 +1,186 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "_generator": {
+      "name": "bicep",
+      "version": "0.39.26.7824",
+      "templateHash": "4752528668771688368"
+    },
+    "description": "Provisions resources for an Azure Cosmos DB for MongoDB vCore cluster."
+  },
+  "parameters": {
+    "name": {
+      "type": "string",
+      "metadata": {
+        "description": "The name of the Azure Cosmos DB for MongoDB vCore cluster."
+      }
+    },
+    "location": {
+      "type": "string",
+      "metadata": {
+        "description": "Primary location for the resources."
+      }
+    },
+    "tags": {
+      "type": "object",
+      "metadata": {
+        "description": "Tags to be applied to the resource."
+      }
+    },
+    "principalId": {
+      "type": "string",
+      "metadata": {
+        "description": "Principal identifier of the identity that is deploying the template."
+      }
+    },
+    "managedIdentityPrincipalId": {
+      "type": "string",
+      "metadata": {
+        "description": "Principal identifier of the identity that is used for the web application."
+      }
+    },
+    "mongoAdmin": {
+      "type": "string",
+      "defaultValue": "app",
+      "metadata": {
+        "description": "The password for the administrator login."
+      }
+    },
+    "mongoPassword": {
+      "type": "securestring",
+      "defaultValue": "[newGuid()]",
+      "metadata": {
+        "description": "The password for the administrator login."
+      }
+    },
+    "pipeline": {
+      "type": "bool",
+      "defaultValue": false,
+      "metadata": {
+        "description": "Indicates if the deployment is being executed from a pipeline."
+      }
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.DocumentDB/mongoClusters",
+      "apiVersion": "2025-04-01-preview",
+      "name": "[parameters('name')]",
+      "location": "[parameters('location')]",
+      "tags": "[parameters('tags')]",
+      "properties": {
+        "administrator": {
+          "userName": "[parameters('mongoAdmin')]",
+          "password": "[parameters('mongoPassword')]"
+        },
+        "compute": {
+          "tier": "M10"
+        },
+        "sharding": {
+          "shardCount": 1
+        },
+        "storage": {
+          "sizeGb": 32
+        },
+        "highAvailability": {
+          "targetMode": "Disabled"
+        },
+        "publicNetworkAccess": "Enabled",
+        "authConfig": {
+          "allowedModes": [
+            "MicrosoftEntraID",
+            "NativeAuth"
+          ]
+        }
+      }
+    },
+    {
+      "type": "Microsoft.DocumentDB/mongoClusters/users",
+      "apiVersion": "2025-04-01-preview",
+      "name": "[format('{0}/{1}', parameters('name'), parameters('managedIdentityPrincipalId'))]",
+      "properties": {
+        "identityProvider": {
+          "type": "MicrosoftEntraID",
+          "properties": {
+            "principalType": "ServicePrincipal"
+          }
+        },
+        "roles": [
+          {
+            "db": "admin",
+            "role": "dbOwner"
+          }
+        ]
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.DocumentDB/mongoClusters', parameters('name'))]"
+      ]
+    },
+    {
+      "condition": "[and(and(not(parameters('pipeline')), not(equals(parameters('principalId'), ''))), not(equals(parameters('principalId'), parameters('managedIdentityPrincipalId'))))]",
+      "type": "Microsoft.DocumentDB/mongoClusters/users",
+      "apiVersion": "2025-04-01-preview",
+      "name": "[format('{0}/{1}', parameters('name'), parameters('principalId'))]",
+      "properties": {
+        "identityProvider": {
+          "type": "MicrosoftEntraID",
+          "properties": {
+            "principalType": "User"
+          }
+        },
+        "roles": [
+          {
+            "db": "admin",
+            "role": "dbOwner"
+          }
+        ]
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.DocumentDB/mongoClusters', parameters('name'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.DocumentDB/mongoClusters/firewallRules",
+      "apiVersion": "2025-04-01-preview",
+      "name": "[format('{0}/{1}', parameters('name'), 'allow-azure-services')]",
+      "properties": {
+        "startIpAddress": "0.0.0.0",
+        "endIpAddress": "0.0.0.0"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.DocumentDB/mongoClusters', parameters('name'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.DocumentDB/mongoClusters/firewallRules",
+      "apiVersion": "2025-04-01-preview",
+      "name": "[format('{0}/{1}', parameters('name'), 'allow-all-ip-addresses')]",
+      "properties": {
+        "startIpAddress": "0.0.0.0",
+        "endIpAddress": "255.255.255.255"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.DocumentDB/mongoClusters', parameters('name'))]"
+      ]
+    }
+  ],
+  "outputs": {
+    "name": {
+      "type": "string",
+      "value": "[parameters('name')]"
+    },
+    "resourceId": {
+      "type": "string",
+      "value": "[resourceId('Microsoft.DocumentDB/mongoClusters', parameters('name'))]"
+    },
+    "endpoint": {
+      "type": "string",
+      "value": "[format('{0}.global.mongocluster.cosmos.azure.com', parameters('name'))]"
+    },
+    "connectionString": {
+      "type": "string",
+      "value": "[format('mongodb://{0}:{1}@{2}.global.mongocluster.cosmos.azure.com:10255/?ssl=true&replicaSet=globaldb&retrywrites=false&maxIdleTimeMS=120000&appName=@{3}@', parameters('mongoAdmin'), parameters('mongoPassword'), parameters('name'), parameters('name'))]"
+    }
+  }
+}

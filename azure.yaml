@@ -1,0 +1,44 @@
+name: DocumentDB AI samples
+
+infra:
+  bicep:
+    path: ./infra/main.bicep
+    parameters:
+      principalId: ${AZURE_PRINCIPAL_ID}
+
+hooks:
+  
+  postprovision:
+    posix: 
+      shell: sh
+      run: |
+        # Get environment values for the application
+        azd env get-values > .env
+        echo "" >> .env
+        echo "# Application default configuration" >> .env
+        cat ./mongo-vcore-agent-langchain/.env.default >> .env
+        echo "Environment configured with Azure and application defaults."
+    windows:
+      shell: pwsh
+      run: |
+        azd env get-values > .env
+        Add-Content -Path .env -Value ""
+        Add-Content -Path .env -Value "# Application default configuration"
+        Get-Content ./mongo-vcore-agent-langchain/.env.default | Add-Content -Path .env
+        Write-Host "Environment configured with Azure and application defaults."
+
+  postdown:
+    posix:
+      shell: sh
+      run: |
+        echo "Cleaning up environment file..."
+        rm -f .env
+        echo "Environment file removed."
+    windows:
+      shell: pwsh
+      run: |
+        Write-Host "Cleaning up environment file..."
+        Remove-Item -Path .env -ErrorAction SilentlyContinue
+        Write-Host "Environment file removed."
+
+services:
