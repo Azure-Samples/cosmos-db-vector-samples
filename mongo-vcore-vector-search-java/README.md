@@ -16,21 +16,22 @@ Vector search enables semantic similarity searching by converting text into high
 
 Before running this project, you need:
 
-### Azure Resources
+### Azure resources
 1. **Azure subscription** with appropriate permissions
 2. **Azure OpenAI resource** with embedding model deployment
 3. **Azure DocumentDB resource**
 4. **Azure CLI** installed and configured
 
-### Development Environment
-- **Java 21 or higher**
-- **Maven 3.6 or higher**
-- **Git** (for cloning the repository)
-- **Visual Studio Code** (recommended) or another Java IDE
+### Development environment
 
-## Setup Instructions
+- [Java 21 or higher](https://learn.microsoft.com/en-us/java/openjdk/download)
+- [Maven 3.6 or higher](https://maven.apache.org/download.cgi)
+- [Git](https://git-scm.com/downloads) (for cloning the repository)
+- [Visual Studio Code](https://code.visualstudio.com/) (recommended) or another Java IDE
 
-### Step 1: Clone and Setup Project
+## Setup instructions
+
+### Step 1: Clone and setup project
 
 ```bash
 # Clone this repository
@@ -41,9 +42,10 @@ cd cosmos-db-vector-samples/mongo-vcore-vector-search-java
 mvn clean compile
 ```
 
-### Step 2: Create Azure Resources
+### Step 2: Create Azure resources
 
-#### Create Azure OpenAI Resource
+#### Create Azure OpenAI resource
+
 ```bash
 # Login to Azure
 az login
@@ -61,46 +63,43 @@ az cognitiveservices account create \
     --subscription <subscription>
 ```
 
-#### Deploy Embedding Model
+#### Deploy embedding model
+
 1. Go to Azure OpenAI Studio (https://oai.azure.com/)
 2. Navigate to your OpenAI resource
 3. Go to **Model deployments** and create a new deployment
 4. Choose **text-embedding-ada-002** model
 5. Note the deployment name for configuration
 
-#### Create Azure DocumentDB Resource
+#### Create Azure DocumentDB resource
 
 Create a Azure DocumentDB cluster by using the [Azure portal](https://learn.microsoft.com/azure/documentdb/quickstart-portal), [Bicep](https://learn.microsoft.com/azure/documentdb/quickstart-bicep), or [Terraform](https://learn.microsoft.com/azure/documentdb/quickstart-terraform).
 
-### Step 3: Get Your Connection Information
+### Step 3: Get your resource information
 
-#### Azure OpenAI Endpoint and Key
+#### Azure OpenAI endpoint
+
 ```bash
 # Get OpenAI endpoint
 az cognitiveservices account show \
     --name <open-ai-resource> \
     --resource-group <resource-group> \
     --query "properties.endpoint" --output tsv
-
-# Get OpenAI key
-az cognitiveservices account keys list \
-    --name <open-ai-resource> \
-    --resource-group <resource-group> \
-    --query "key1" --output tsv
 ```
 
-#### DocumentDB Connection String
+#### DocumentDB cluster name
+
+You'll need your DocumentDB cluster name (e.g., `my-cluster`), which you can find in the Azure portal or retrieve using:
+
 ```bash
-# Get DocumentDB connection string
-az resource show \
+# List DocumentDB clusters in your resource group
+az resource list \
     --resource-group "<resource-group>" \
-    --name "<cluster-name>" \
     --resource-type "Microsoft.DocumentDB/mongoClusters" \
-    --query "properties.connectionString" \
-    --latest-include-preview
+    --query "[].name" --output tsv
 ```
 
-### Step 4: Configure Application Properties
+### Step 4: Configure application properties
 
 Edit the `src/main/resources/application.properties` file with your Azure resource information:
 
@@ -123,12 +122,19 @@ LOAD_SIZE_BATCH=100
 
 Alternatively, you can set these as environment variables which will take precedence over the properties file.
 
-### Step 5: Configure Passwordless Authentication
+### Step 5: Configure passwordless authentication
 
-This sample uses passwordless authentication with Microsoft Entra ID. Follow these steps to configure it:
+This sample uses passwordless authentication with Microsoft Entra ID for both Azure OpenAI and DocumentDB. Follow these steps to configure it:
 
-1. In your Azure DocumentDB resource, enable **Native DocumentDB** and **Microsoft Entra ID** authentication methods.
-2. Assign your Microsoft Entra ID user the following roles on the Cosmos DB resource:
+#### For Azure OpenAI
+
+Assign your Microsoft Entra ID user the following role on the Azure OpenAI resource:
+   - **Cognitive Services OpenAI User** (or **Cognitive Services OpenAI Contributor** for broader permissions)
+
+#### For Azure DocumentDB
+
+1. In your Azure DocumentDB resource, enable **Native DocumentDB and Microsoft Entra ID** authentication methods.
+2. Assign your Microsoft Entra ID user the following roles on the DocumentDB resource:
    - **Cosmos DB Account Reader Role**
    - **DocumentDB Account Contributor**
 
@@ -136,7 +142,8 @@ This sample uses passwordless authentication with Microsoft Entra ID. Follow the
 
 The project includes several Java classes that demonstrate different aspects of vector search:
 
-### 1. DiskANN Vector Search
+### 1. DiskANN vector search
+
 Run DiskANN (Disk-based Approximate Nearest Neighbor) search:
 
 ```bash
@@ -148,7 +155,8 @@ DiskANN is optimized for:
 - Efficient disk-based storage
 - Good balance of speed and accuracy
 
-### 2. HNSW Vector Search
+### 2. HNSW vector search
+
 Run HNSW (Hierarchical Navigable Small World) search:
 
 ```bash
@@ -161,7 +169,8 @@ HNSW provides:
 - Hierarchical graph structure
 - Good for real-time applications
 
-### 3. IVF Vector Search
+### 3. IVF vector search
+
 Run IVF (Inverted File) search:
 
 ```bash
@@ -174,7 +183,7 @@ IVF features:
 - Configurable accuracy vs speed trade-offs
 - Efficient for large vector datasets
 
-## Project Structure
+## Project structure
 
 ```
 mongo-vcore-vector-search-java/
@@ -193,9 +202,10 @@ mongo-vcore-vector-search-java/
 └── data/                            # Hotel data files with vectors
 ```
 
-## Important Notes
+## Important notes
 
-### Vector Index Limitations
+### Vector index limitations
+
 **One Index Per Field**: Azure DocumentDB allows only one vector index per field. Each sample automatically handles this by:
 
 1. **Dropping existing collections**: Before creating a new vector index, each sample drops and recreates the collection
@@ -213,7 +223,8 @@ mvn compile exec:java -Dexec.mainClass="com.azure.documentdb.samples.IVF"      #
 - Each run creates a new collection with fresh data and the appropriate vector index
 - No manual cleanup required
 
-### Cluster Tier Requirements
+### Cluster tier requirements
+
 Different vector index types require different cluster tiers:
 
 - **IVF**: Available on most tiers (including basic)
@@ -225,26 +236,29 @@ If you encounter "not enabled for this cluster tier" errors:
 2. Consider upgrading your cluster tier
 3. Check the [Azure DocumentDB pricing page](https://azure.microsoft.com/pricing/details/documentdb/) for tier features
 
-## Key Features
+## Key features
 
-### Vector Index Types
+### Vector index types
+
 - **DiskANN**: Optimized for large datasets with disk-based storage
 - **HNSW**: High-performance hierarchical graph structure
 - **IVF**: Clustering-based approach with configurable accuracy
 
 ### Authentication
+
 - Passwordless authentication with Microsoft Entra ID using DefaultAzureCredential
 - Azure AD authentication and RBAC for enhanced security
 - Automatic token rotation and renewal
 
-### Sample Data
+### Sample data
+
 - Real hotel dataset with descriptions, locations, and amenities
 - Pre-configured for embedding generation
 - Includes various hotel types and price ranges
 
 ## Troubleshooting
 
-### Common Issues
+### Common issues
 
 1. **Authentication Errors**
    - Ensure Azure CLI is logged in: `az login`
@@ -272,23 +286,26 @@ If you encounter "not enabled for this cluster tier" errors:
    - Check that the cluster is running
    - Verify `MONGO_CLUSTER_NAME` is set correctly
 
-## Performance Considerations
+## Performance considerations
 
-### Choosing Vector Index Types
+### Choosing vector index types
+
 - **Use DiskANN when**: Dataset is very large, memory is limited, vector count is up to 500,000+
 - **Use HNSW when**: Need fastest search, have sufficient memory, vector count is up to 50,000
 - **Use IVF when**: Want configurable accuracy/speed trade-offs, vector count is under 10,000
 
-### Tuning Parameters
+### Tuning parameters
+
 - **Batch sizes**: Adjust `LOAD_SIZE_BATCH` and `EMBEDDING_SIZE_BATCH` based on API rate limits and memory
 - **Vector dimensions**: Must match your embedding model (1536 for text-embedding-ada-002)
 - **Index parameters**: Tune for your specific accuracy/speed requirements
 
-### Cost Optimization
+### Cost optimization
+
 - Use appropriate Azure OpenAI pricing tier
 - Monitor API usage and optimize batch processing
 
-## Further Resources
+## Further resources
 
 - [Azure DocumentDB Documentation](https://learn.microsoft.com/azure/documentdb/)
 - [Azure OpenAI Service Documentation](https://learn.microsoft.com/azure/cognitive-services/openai/)
