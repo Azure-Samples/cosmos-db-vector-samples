@@ -105,12 +105,12 @@ func ProcessEmbeddingBatch(ctx context.Context, dataBatch []map[string]interface
 
 // EmbeddingConfig holds configuration for the embedding creation process
 type EmbeddingConfig struct {
-	ModelName     string
-	InputFile     string
-	OutputFile    string
-	FieldToEmbed  string
-	EmbeddedField string
-	BatchSize     int
+	ModelName          string
+	DataWithoutVectors string
+	DataWithVectors    string
+	FieldToEmbed       string
+	EmbeddedField      string
+	BatchSize          int
 }
 
 // LoadEmbeddingConfig loads configuration from environment variables
@@ -124,12 +124,12 @@ func LoadEmbeddingConfig() *EmbeddingConfig {
 	batchSize, _ := strconv.Atoi(getEnvOrDefault("EMBEDDING_SIZE_BATCH", "16"))
 
 	return &EmbeddingConfig{
-		ModelName:     getEnvOrDefault("AZURE_OPENAI_EMBEDDING_MODEL", "text-embedding-ada-002"),
-		InputFile:     getEnvOrDefault("DATA_FILE_WITHOUT_VECTORS", "data/HotelsData_toCosmosDB_Vector.json"),
-		OutputFile:    getEnvOrDefault("DATA_FILE_WITH_VECTORS", "data/HotelsData_with_vectors.json"),
-		FieldToEmbed:  getEnvOrDefault("FIELD_TO_EMBED", "Description"),
-		EmbeddedField: getEnvOrDefault("EMBEDDED_FIELD", "DescriptionVector"),
-		BatchSize:     batchSize,
+		ModelName:          getEnvOrDefault("AZURE_OPENAI_EMBEDDING_MODEL", "text-embedding-ada-002"),
+		DataWithoutVectors: getEnvOrDefault("DATA_FILE_WITHOUT_VECTORS", "HotelsData_toCosmosDB.json"),
+		DataWithVectors:    getEnvOrDefault("DATA_FILE_WITH_VECTORS", "data/HotelsData_toCosmosDB_Vector.json"),
+		FieldToEmbed:       getEnvOrDefault("FIELD_TO_EMBED", "Description"),
+		EmbeddedField:      getEnvOrDefault("EMBEDDED_FIELD", "DescriptionVector"),
+		BatchSize:          batchSize,
 	}
 }
 
@@ -149,8 +149,8 @@ func main() {
 	config := LoadEmbeddingConfig()
 
 	fmt.Printf("Configuration:\n")
-	fmt.Printf("  Input file: %s\n", config.InputFile)
-	fmt.Printf("  Output file: %s\n", config.OutputFile)
+	fmt.Printf("  Input file: %s\n", config.DataWithoutVectors)
+	fmt.Printf("  Output file: %s\n", config.DataWithVectors)
 	fmt.Printf("  Field to embed: %s\n", config.FieldToEmbed)
 	fmt.Printf("  Embedding field: %s\n", config.EmbeddedField)
 	fmt.Printf("  Batch size: %d\n", config.BatchSize)
@@ -169,8 +169,8 @@ func main() {
 	}()
 
 	// Read the input data file
-	fmt.Printf("\nReading input data from %s...\n", config.InputFile)
-	data, err := ReadFileReturnJSON(config.InputFile)
+	fmt.Printf("\nReading input data from %s...\n", config.DataWithoutVectors)
+	data, err := ReadFileReturnJSON(config.DataWithoutVectors)
 	if err != nil {
 		log.Fatalf("Failed to read input file: %v", err)
 	}
@@ -212,8 +212,8 @@ func main() {
 	}
 
 	// Save the enhanced data with embeddings
-	fmt.Printf("\nSaving enhanced data to %s...\n", config.OutputFile)
-	err = WriteFileJSON(data, config.OutputFile)
+	fmt.Printf("\nSaving enhanced data to %s...\n", config.DataWithVectors)
+	err = WriteFileJSON(data, config.DataWithVectors)
 	if err != nil {
 		log.Fatalf("Failed to save output file: %v", err)
 	}
