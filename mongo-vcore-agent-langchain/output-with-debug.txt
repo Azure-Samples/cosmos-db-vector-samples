@@ -1,0 +1,45 @@
+Debugger attached.
+[clients] Env present: {
+  HAS_AZURE_OPENAI_API_KEY: true,
+  HAS_AZURE_OPENAI_INSTANCE: true,
+  HAS_EMBEDDING_DEPLOYMENT: true,
+  HAS_PLANNER_DEPLOYMENT: true,
+  HAS_SYNTH_DEPLOYMENT: true
+}
+Inserted 50 documents into Cosmos DB (Mongo API) vector store.
+
+--- PLANNER ---
+[planner][LLM start] prompts= 1
+
+[planner][LLM end] output keys= [ 'generations', 'llmOutput' ]
+[planner][Tool Start] {"lc":1,"type":"not_implemented","id":["langchain","tools","DynamicStructuredTool"]}
+Found 5 documents from vector store
+Hotel: Trails End Motel, Score: 0.5055183466960066
+Hotel: White Mountain Lodge & Suites, Score: 0.48586606895125417
+Hotel: Country Comfort Inn, Score: 0.4850101453077966
+Hotel: Nordick's Valley Motel, Score: 0.4820755720138584
+Hotel: Countryside Hotel, Score: 0.46501458659985484
+[planner][Tool End] output summary= {"lc":1,"type":"constructor","id":["langchain_core","messages","ToolMessage"],"kwargs":{"status":"success","content":"--- HOTEL START ---\nHotelId: 40\nHotelName: Trails End Motel\nDescription: Only 8
+[planner][LLM start] prompts= 1
+
+[planner][LLM end] output keys= [ 'generations', 'llmOutput' ]
+
+--- SYNTHESIZER ---
+Context size is 3285 characters
+Output: 1055 characters of final recommendation
+
+--- FINAL ANSWER ---
+1. COMPARISON SUMMARY:
+• Trails End Motel has the highest rating (3.2) and is closest to downtown Scottsdale, offering free wifi, parking, and a restaurant. It is budget-friendly but has an older renovation date (2017).
+• White Mountain Lodge & Suites is a resort and spa with the lowest rating (2.4) but offers unique amenities like a pool, meditation gardens, and weekend entertainment. It is located in Denver's forest area.
+• Country Comfort Inn has a moderate rating (2.5) and offers extended-stay amenities like living room suites and kitchens. It is situated in Bellevue, WA, and includes free wifi and parking.
+
+2. BEST OVERALL:
+Trails End Motel is the best overall choice due to its higher rating, proximity to downtown Scottsdale, and essential amenities like free wifi and parking.
+
+3. ALTERNATIVE PICKS:
+• Choose White Mountain Lodge & Suites if you prefer resort amenities and a forest setting for relaxation and unique experiences.
+• Choose Country Comfort Inn if you need extended-stay facilities and a location near a lake in Bellevue, WA.
+
+
+CLEAN UP

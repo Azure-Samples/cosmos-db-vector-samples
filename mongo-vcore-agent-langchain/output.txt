@@ -1,0 +1,39 @@
+--- PLANNER ---
+Inserted 50 documents into Cosmos DB (Mongo API) vector store.
+
+--- PLANNER ---
+Found 5 documents from vector store
+Hotel: Trails End Motel, Score: 0.5073973234059103
+Hotel: Country Comfort Inn, Score: 0.4834342579167197
+Hotel: White Mountain Lodge & Suites, Score: 0.48180457841185287
+Hotel: Nordick's Valley Motel, Score: 0.47944122552872037
+Hotel: Countryside Hotel, Score: 0.4609394462316405
+
+--- SYNTHESIZER ---
+Context size is 3285 characters
+Output: 1306 characters of final recommendation
+
+--- FINAL ANSWER ---
+1. COMPARISON SUMMARY:
+• Trails End Motel: Rating 3.2, Score 0.507397, located in Scottsdale, AZ, budget category, offers free wifi, restaurant, bar, and parking included. 
+• Country Comfort Inn: Rating 2.5, Score 0.483434, located in Bellevue, WA, extended-stay category, offers free wifi, laundry service, free parking, and 24-hour front desk service. 
+• White Mountain Lodge & Suites: Rating 2.4, Score 0.481805, located in Denver, CO, resort and spa category, offers continental breakfast, pool, restaurant, and parking included.
+
+Tradeoffs:
+• Trails End Motel has the highest rating and score but is a budget option with fewer amenities.
+• Country Comfort Inn offers extended-stay amenities like kitchens and living room suites but has the lowest rating.
+• White Mountain Lodge & Suites offers unique resort amenities like hot stone massages and evening entertainment but has the lowest score and rating.
+
+2. BEST OVERALL:
+Trails End Motel is the best overall due to its higher rating, score, and convenient amenities like free wifi, restaurant, and bar.
+
+3. ALTERNATIVE PICKS:
+• Choose Country Comfort Inn if you need extended-stay amenities like kitchens and living room suites.
+• Choose White Mountain Lodge & Suites if you prefer resort-style amenities and a unique experience in a forest setting.
+
+
+CLEAN UP
+
+
+Connected to Mongo endpoint. Dropping database: Hotels
+Successfully dropped database "Hotels".
