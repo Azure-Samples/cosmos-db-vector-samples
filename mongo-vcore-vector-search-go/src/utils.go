@@ -169,7 +169,7 @@ func GetClientsPasswordless() (*mongo.Client, openai.Client, error) {
 	// Create Azure OpenAI client with credential-based authentication
 	openAIClient := openai.NewClient(
 		option.WithBaseURL(fmt.Sprintf("%s/openai/v1", azureOpenAIEndpoint)),
-		azure.WithTokenCredential(credential), nil)
+		azure.WithTokenCredential(credential))
 
 	return mongoClient, openAIClient, nil
 }
