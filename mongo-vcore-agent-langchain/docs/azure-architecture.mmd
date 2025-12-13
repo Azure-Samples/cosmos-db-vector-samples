@@ -1,0 +1,73 @@
+%% Azure Resources Architecture
+%% This diagram shows the Azure infrastructure and resource relationships
+%% Using Azure brand colors: #0078D4 (blue), #50E6FF (light blue), #00188F (dark blue)
+
+graph TB
+    subgraph Azure["<b>Azure Cloud Platform</b>"]
+        style Azure fill:#0078D4,stroke:#00188F,stroke-width:4px,color:#fff
+        
+        subgraph Identity["<b>Identity & Access</b>"]
+            style Identity fill:#50E6FF,stroke:#0078D4,stroke-width:2px,color:#000
+            MI[("Managed Identity<br/>(User-Assigned)")]
+            style MI fill:#fff,stroke:#0078D4,stroke-width:2px,color:#000
+        end
+        
+        subgraph AI["<b>Azure OpenAI Service</b>"]
+            style AI fill:#50E6FF,stroke:#0078D4,stroke-width:2px,color:#000
+            AOAI["Azure OpenAI<br/>Instance"]
+            style AOAI fill:#fff,stroke:#0078D4,stroke-width:2px,color:#000
+            
+            subgraph Models["Models"]
+                style Models fill:#E3F2FD,stroke:#0078D4,stroke-width:1px,color:#000
+                Planner["gpt-4o-mini<br/>(Planner)"]
+                Synth["gpt-4o<br/>(Synthesizer)"]
+                Embed["text-embedding-3-small<br/>(Embeddings)"]
+                style Planner fill:#fff,stroke:#0078D4,stroke-width:1px,color:#000
+                style Synth fill:#fff,stroke:#0078D4,stroke-width:1px,color:#000
+                style Embed fill:#fff,stroke:#0078D4,stroke-width:1px,color:#000
+            end
+        end
+        
+        subgraph Database["<b>Azure Cosmos DB</b>"]
+            style Database fill:#50E6FF,stroke:#0078D4,stroke-width:2px,color:#000
+            Mongo[("Cosmos DB for<br/>MongoDB vCore<br/>Cluster")]
+            style Mongo fill:#fff,stroke:#0078D4,stroke-width:2px,color:#000
+            
+            subgraph Data["Data Structure"]
+                style Data fill:#E3F2FD,stroke:#0078D4,stroke-width:1px,color:#000
+                DB[(Database:<br/>hotels)]
+                Coll[(Collection:<br/>hotel_data)]
+                Index["Vector Index<br/>(IVF/HNSW/DiskANN)"]
+                style DB fill:#fff,stroke:#0078D4,stroke-width:1px,color:#000
+                style Coll fill:#fff,stroke:#0078D4,stroke-width:1px,color:#000
+                style Index fill:#fff,stroke:#0078D4,stroke-width:1px,color:#000
+            end
+        end
+        
+        subgraph AppService["<b>Compute & Hosting</b>"]
+            style AppService fill:#50E6FF,stroke:#0078D4,stroke-width:2px,color:#000
+            App["LangChain Agent<br/>Application<br/>(Node.js/TypeScript)"]
+            style App fill:#fff,stroke:#0078D4,stroke-width:2px,color:#000
+        end
+    end
+    
+    %% Relationships
+    MI -.->|"Authenticates<br/>(RBAC)"| AOAI
+    MI -.->|"Authenticates<br/>(OIDC)"| Mongo
+    App -->|"Uses"| MI
+    App -->|"Generates<br/>Embeddings"| Embed
+    App -->|"Plans Query"| Planner
+    App -->|"Synthesizes<br/>Response"| Synth
+    App -->|"Vector Search"| Mongo
+    Mongo --> DB
+    DB --> Coll
+    Coll --> Index
+    
+    %% Legend
+    subgraph Legend["<b>Legend</b>"]
+        style Legend fill:#f5f5f5,stroke:#666,stroke-width:1px,color:#000
+        L1["Solid Line: Direct Usage"]
+        L2["Dotted Line: Authentication"]
+        style L1 fill:#fff,stroke:#666,stroke-width:1px,color:#000
+        style L2 fill:#fff,stroke:#666,stroke-width:1px,color:#000
+    end

@@ -7,8 +7,6 @@ import { createAgent } from "langchain";
 import { createClientsPasswordless, createClients} from './utils/clients.js';
 import { DEBUG_CALLBACKS } from './utils/debug-handlers.js';
 import { extractPlannerToolOutput, getStore, getHotelsToMatchSearchQuery, getExistingStore } from './vector-store.js';
-import { deleteCosmosMongoDatabase } from './cleanup.js';
-
 
 // Planner agent uses Vector Search Tool
 async function runPlannerAgent(
@@ -96,9 +94,7 @@ try {
   console.log('\n--- FINAL ANSWER ---');
   console.log(finalAnswer);
 
-  // Clean up (delete database)
-  //await store.close();
-  //await deleteCosmosMongoDatabase();
+  process.exit(0);
 } catch (error) {
   console.error('Error running agent:', error);
 }

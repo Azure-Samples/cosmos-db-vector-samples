@@ -2,7 +2,7 @@ import { MongoClient, OIDCCallbackParams } from 'mongodb';
 import { AccessToken, DefaultAzureCredential, TokenCredential } from '@azure/identity';
 
 const DOCUMENT_DB_SCOPE = 'https://ossrdbms-aad.database.windows.net/.default';
-const credential = new DefaultAzureCredential();
+const CREDENTIAL = new DefaultAzureCredential();
 
 // OIDC token callback for MongoDB authentication
 async function azureIdentityTokenCallback(
@@ -16,15 +16,27 @@ async function azureIdentityTokenCallback(
   };
 }
 
-async function testMongoConnection() {
+/**
+ * Delete a Cosmos DB (Mongo API) database by name using passwordless OIDC authentication.
+ *
+ * Uses DefaultAzureCredential for passwordless authentication with MONGODB-OIDC.
+ * Requires MONGO_CLUSTER_NAME environment variable.
+ *
+ * @param databaseName - The name of the database to drop. If not provided, uses MONGO_DB_NAME env var.
+ */
+export async function deleteCosmosMongoDatabase(databaseName?: string): Promise<void> {
+  console.log(`\n\nCLEAN UP\n\n`);
+
+  const dbName = databaseName || process.env.MONGO_DB_NAME;
   const clusterName = process.env.MONGO_CLUSTER_NAME;
   
   if (!clusterName) {
-    throw new Error('MONGO_CLUSTER_NAME is not set in environment');
+    throw new Error('Environment variable MONGO_CLUSTER_NAME is not set.');
   }
 
-  console.log('Connecting to MongoDB cluster:', clusterName);
-  console.log('Using DefaultAzureCredential for authentication...\n');
+  if (!dbName) {
+    throw new Error('Database name not provided and MONGO_DB_NAME environment variable is not set.');
+  }
 
   const connectionString = `mongodb+srv://${clusterName}.global.mongocluster.cosmos.azure.com/`;
   
@@ -34,41 +46,19 @@ async function testMongoConnection() {
     retryWrites: true,
     authMechanism: 'MONGODB-OIDC',
     authMechanismProperties: {
-      OIDC_CALLBACK: (params: OIDCCallbackParams) => azureIdentityTokenCallback(params, credential),
+      OIDC_CALLBACK: (params: OIDCCallbackParams) => azureIdentityTokenCallback(params, CREDENTIAL),
       ALLOWED_HOSTS: ['*.azure.com']
     }
   });
 
   try {
-    // Connect to the cluster
+    console.log(`Connecting to cluster: ${clusterName}`);
     await client.connect();
-    console.log('✅ Successfully connected to MongoDB!\n');
-
-    // List all databases
-    const adminDb = client.db().admin();
-    const databasesList = await adminDb.listDatabases();
-    
-    console.log('📚 Databases:');
-    for (const db of databasesList.databases) {
-      console.log(`  - ${db.name} `);
-    }
-    console.log();
-
-  } catch (error) {
-    console.error('❌ Connection failed:', error);
-    throw error;
+    console.log(`Dropping database: ${dbName}`);
+    const db = client.db(dbName);
+    await db.dropDatabase();
+    console.log(`✓ Database "${dbName}" deleted successfully`);
   } finally {
-    await client.close();
-    console.log('\n✅ Connection closed');
+    await client.close(true);
   }
 }
-
-// Run if executed directly
-if (import.meta.url === `file://${process.argv[1]}`) {
-  testMongoConnection().catch((error) => {
-    console.error(error);
-    process.exit(1);
-  });
-}
-
-export { testMongoConnection };

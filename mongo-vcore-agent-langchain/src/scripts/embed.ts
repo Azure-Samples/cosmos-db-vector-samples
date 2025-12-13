@@ -3,7 +3,8 @@ import {
   getBearerTokenProvider,
 } from "@azure/identity";
 import { AzureOpenAIEmbeddings } from "@langchain/openai";
-try {
+
+export async function testEmbeddings() {
   const credentials = new DefaultAzureCredential();
   const azureADTokenProvider = getBearerTokenProvider(
     credentials,
@@ -33,6 +34,13 @@ try {
   ]);
   console.log("Embeddings with Managed Identity:");
   console.log(vectors);
-} catch (error) {
-  console.error("Error using Managed Identity for embeddings:", error);
+  return vectors;
+}
+
+// Run if executed directly
+if (import.meta.url === `file://${process.argv[1]}`) {
+  testEmbeddings().catch((error) => {
+    console.error("Error using Managed Identity for embeddings:", error);
+    process.exit(1);
+  });
 }

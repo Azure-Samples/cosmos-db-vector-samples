@@ -6,12 +6,9 @@
   "type": "module",
   "scripts": {
     "build": "tsc",
-    "start": "npm run build && node --env-file ../.env dist/agent.js",
-    "embed": "npm run build && node --env-file ../.env dist/scripts/embed.js",
-    "planner": "npm run build && node --env-file ../.env dist/scripts/llm-planner.js",
-    "synth": "npm run build && node --env-file ../.env dist/scripts/llm-synth.js",
-    "mongo": "npm run build && node --env-file ../.env dist/scripts/mongo.js",
+    "auth": "npm run build && node --env-file ../.env dist/scripts/test-auth.js",
     "upload": "npm run build && node --env-file ../.env dist/upload-documents.js",
+    "start": "npm run build && node --env-file ../.env dist/agent.js",
     "cleanup": "npm run build && node --env-file ../.env dist/cleanup.js"
   },
   "devDependencies": {
