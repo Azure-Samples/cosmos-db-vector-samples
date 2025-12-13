@@ -124,10 +124,10 @@ MONGO_CONNECTION_STRING=mongodb+srv://username:password@your-cluster.mongocluste
 MONGO_CLUSTER_NAME=vectorSearch
 
 # Data Configuration (defaults should work)
-DATA_FILE_WITHOUT_VECTORS=data/HotelsData_toCosmosDB_Vector.json
+DATA_FILE_WITHOUT_VECTORS=data/HotelsData_toCosmosDB.json
 DATA_FILE_WITH_VECTORS=data/HotelsData_toCosmosDB_Vector.json
 FIELD_TO_EMBED=Description
-EMBEDDED_FIELD=DescriptionVector
+EMBEDDED_FIELD=text_embedding_ada_002
 EMBEDDING_DIMENSIONS=1536
 EMBEDDING_SIZE_BATCH=16
 LOAD_SIZE_BATCH=100
