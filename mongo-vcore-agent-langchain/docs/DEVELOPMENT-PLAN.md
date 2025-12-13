@@ -75,11 +75,11 @@
   - Test planner model (send "hello" message)
   - Test synth model (send "hello" message)
   - Test MongoDB connection (list databases)
-- [ ] Run tests until all pass ✅
+- [ ] Run test until all pass: `npm run auth` ✅
 
 **Deliverable**: `test-auth` script that validates all 4 service connections
 
-**Acceptance Criteria**: All tests pass, indicating proper authentication and connectivity
+**Acceptance Criteria**: Running `npm run auth` shows all 4 tests passing with summary report
 
 ---
 

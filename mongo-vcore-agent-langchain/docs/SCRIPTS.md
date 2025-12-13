@@ -9,6 +9,16 @@ These scripts help you validate that your Azure environment is correctly configu
 - **Azure OpenAI** - Embedding and chat completion models
 - **Azure Cosmos DB for MongoDB vCore** - Database connection with OIDC authentication
 
+## Quick Start
+
+**Run all verification tests with a single command:**
+
+```bash
+npm run auth
+```
+
+This comprehensive test suite runs all four verification scripts below and provides a summary report. Use this as your first step to validate your Azure environment.
+
 ## Prerequisites
 
 1. **Run infrastructure deployment:**
@@ -26,6 +36,31 @@ These scripts help you validate that your Azure environment is correctly configu
    ```
 
 ## Scripts
+
+### `test-auth.ts` (Recommended)
+Comprehensive authentication test suite that runs all verification scripts below.
+
+**Validates:**
+- All four Azure service connections in sequence
+- Displays detailed configuration information
+- Provides pass/fail summary report
+
+**Run:**
+```bash
+npm run auth
+```
+
+**What it tests:**
+1. Azure OpenAI Embeddings API
+2. Azure OpenAI Chat (Planner model)
+3. Azure OpenAI Chat (Synthesizer model)
+4. Azure Cosmos DB MongoDB connection
+
+---
+
+### Individual Verification Scripts
+
+You can also run each test individually if you need to troubleshoot a specific service:
 
 ### `embed.ts`
 Tests Azure OpenAI Embeddings API with passwordless authentication.
@@ -135,8 +170,10 @@ AZURE_TENANT_ID="your-tenant-id"
 
 ## Next Steps
 
-After verifying all scripts run successfully:
+After running `npm run auth` successfully (all tests pass):
 
-1. Run the full agent application: `npm run start`
-2. Upload hotel data: `npm run upload`
+1. Upload hotel data: `npm run upload`
+2. Run the full agent application: `npm run start`
 3. Test vector search queries with the two-agent pipeline
+
+**If tests fail:** Run individual scripts (`npm run embed`, `npm run planner`, etc.) to isolate the issue.
