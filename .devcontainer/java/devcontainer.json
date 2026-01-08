@@ -1,0 +1,20 @@
+{
+  "name": "Java 21 + Maven Dev Container",
+  "image": "mcr.microsoft.com/openjdk/jdk:21-ubuntu",
+  "features": {
+    "ghcr.io/devcontainers-contrib/features/maven:1": {},
+    "ghcr.io/devcontainers/features/azure-cli:1": {},
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {},
+    "ghcr.io/azure/azure-dev/azd:0": {}
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-azuretools.vscode-cosmosdb",
+        "buildwithlayer.mongodb-integration-expert-qS6DB",
+        "mongodb.mongodb-vscode",
+        "ms-azuretools.vscode-documentdb"
+      ]
+    }
+  }
+}
