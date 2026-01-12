@@ -144,10 +144,9 @@ async function main() {
         console.log('Performing exact vector search with Flat index...');
         const { resources, requestCharge } = await container.items
             .query({
-                query: "SELECT TOP 5 c.HotelName, c.Description, c.Rating, VectorDistance(c[@embeddedField], @embedding) AS SimilarityScore FROM c ORDER BY VectorDistance(c[@embeddedField], @embedding)",
+                query: `SELECT TOP 5 c.HotelName, c.Description, c.Rating, VectorDistance(c.${config.embeddedField}, @embedding) AS SimilarityScore FROM c ORDER BY VectorDistance(c.${config.embeddedField}, @embedding)`,
                 parameters: [
-                    { name: "@embedding", value: createEmbeddedForQueryResponse.data[0].embedding },
-                    { name: "@embeddedField", value: config.embeddedField }
+                    { name: "@embedding", value: createEmbeddedForQueryResponse.data[0].embedding }
                 ]
             })
             .fetchAll();
