@@ -276,7 +276,7 @@ export function estimateMonthlyRUCost(options: {
 
 /**
  * Validates a field name to ensure it's a safe identifier for use in queries.
- * This prevents SQL injection when using string interpolation in query construction.
+ * This prevents NoSQL injection when using string interpolation in query construction.
  * 
  * @param fieldName - The field name to validate
  * @returns The validated field name

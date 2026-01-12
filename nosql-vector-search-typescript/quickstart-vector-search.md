@@ -184,11 +184,15 @@ const queryEmbedding = await aiClient.embeddings.create({
 });
 
 // Perform vector similarity search
+// Note: In production, use validateFieldName() from utils.ts to prevent NoSQL injection
+import { validateFieldName } from './utils.js';
+const embeddedField = validateFieldName(process.env.EMBEDDED_FIELD!);
+
 const { resources } = await container.items.query({
     query: `SELECT TOP 5 c.HotelName, c.Description, c.Rating, 
-            VectorDistance(c.text_embedding_ada_002, @embedding) AS SimilarityScore 
+            VectorDistance(c.${embeddedField}, @embedding) AS SimilarityScore 
             FROM c 
-            ORDER BY VectorDistance(c.text_embedding_ada_002, @embedding)`,
+            ORDER BY VectorDistance(c.${embeddedField}, @embedding)`,
     parameters: [
         { name: "@embedding", value: queryEmbedding.data[0].embedding }
     ]
