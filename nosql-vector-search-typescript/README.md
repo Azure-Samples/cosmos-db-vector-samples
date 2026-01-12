@@ -65,20 +65,56 @@ Before you begin, ensure you have:
 
 ## 🚀 Getting Started
 
-### 1. Clone the Repository
+### Option A: Automated Provisioning (Recommended)
+
+Use the provided Azure CLI script to automatically create all required resources with proper RBAC roles:
+
+```bash
+# Set your Azure AD user principal
+export USER_PRINCIPAL="your-email@domain.com"
+
+# Run the provisioning script
+./provision-azure-resources.sh
+```
+
+The script will:
+- Create a resource group
+- Create a user-assigned managed identity
+- Create an Azure Cosmos DB account (NoSQL API) with database and container
+- Create an Azure OpenAI account with text-embedding-ada-002 model deployed
+- Assign proper RBAC roles for both control plane and data plane access:
+  - **Cosmos DB**: Built-in Data Contributor (data plane) + DocumentDB Account Contributor (control plane)
+  - **Azure OpenAI**: Cognitive Services OpenAI User
+- Output environment configuration ready to copy to your `.env` file
+
+**Customization Options:**
+
+```bash
+# Customize resource names and location
+export USER_PRINCIPAL="your-email@domain.com"
+export RESOURCE_PREFIX="my-vector-demo"
+export LOCATION="eastus2"
+./provision-azure-resources.sh
+```
+
+After the script completes, copy the environment configuration output to your `.env` file.
+
+### Option B: Manual Setup
+
+#### 1. Clone the Repository
 
 ```bash
 git clone https://github.com/Azure-Samples/cosmos-db-vector-samples.git
 cd cosmos-db-vector-samples/nosql-vector-search-typescript
 ```
 
-### 2. Install Dependencies
+#### 2. Install Dependencies
 
 ```bash
 npm install
 ```
 
-### 3. Configure Environment Variables
+#### 3. Configure Environment Variables
 
 Create a `.env` file from the example:
 
@@ -106,7 +142,78 @@ EMBEDDING_DIMENSIONS=1536
 LOAD_SIZE_BATCH=50
 ```
 
-### 4. Authenticate with Azure
+#### 4. Set Up Azure Resources and RBAC
+
+**Create Cosmos DB Account:**
+
+```bash
+# Create Cosmos DB account
+az cosmosdb create \
+    --name <your-cosmos-account> \
+    --resource-group <your-rg> \
+    --location eastus \
+    --kind GlobalDocumentDB
+```
+
+**Assign Cosmos DB RBAC Roles:**
+
+Cosmos DB has custom RBAC roles for data plane access:
+
+```bash
+# Get your user object ID
+USER_ID=$(az ad user show --id your-email@domain.com --query id -o tsv)
+
+# Get Cosmos DB resource ID
+COSMOS_ID=$(az cosmosdb show --name <your-cosmos-account> --resource-group <your-rg> --query id -o tsv)
+
+# Assign data plane access (Cosmos DB Built-in Data Contributor)
+az cosmosdb sql role assignment create \
+    --account-name <your-cosmos-account> \
+    --resource-group <your-rg> \
+    --role-definition-id "00000000-0000-0000-0000-000000000002" \
+    --principal-id $USER_ID \
+    --scope $COSMOS_ID
+
+# Assign control plane access (DocumentDB Account Contributor)
+az role assignment create \
+    --assignee $USER_ID \
+    --role "DocumentDB Account Contributor" \
+    --scope $COSMOS_ID
+```
+
+**Create Azure OpenAI and Assign Roles:**
+
+```bash
+# Create Azure OpenAI account
+az cognitiveservices account create \
+    --name <your-openai-account> \
+    --resource-group <your-rg> \
+    --kind OpenAI \
+    --sku S0 \
+    --location eastus
+
+# Get OpenAI resource ID
+OPENAI_ID=$(az cognitiveservices account show --name <your-openai-account> --resource-group <your-rg> --query id -o tsv)
+
+# Assign OpenAI User role
+az role assignment create \
+    --assignee $USER_ID \
+    --role "Cognitive Services OpenAI User" \
+    --scope $OPENAI_ID
+
+# Deploy embedding model
+az cognitiveservices account deployment create \
+    --name <your-openai-account> \
+    --resource-group <your-rg> \
+    --deployment-name text-embedding-ada-002 \
+    --model-name text-embedding-ada-002 \
+    --model-version "2" \
+    --model-format OpenAI \
+    --sku-name "Standard" \
+    --sku-capacity 10
+```
+
+#### 5. Authenticate with Azure
 
 The samples use **managed identity** for passwordless authentication:
 
@@ -114,7 +221,7 @@ The samples use **managed identity** for passwordless authentication:
 az login
 ```
 
-### 5. Generate Embeddings (Optional)
+#### 6. Generate Embeddings (Optional)
 
 If you need to generate embeddings for your data:
 
