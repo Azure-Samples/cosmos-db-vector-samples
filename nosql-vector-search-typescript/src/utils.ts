@@ -273,3 +273,31 @@ export function estimateMonthlyRUCost(options: {
     }
   };
 }
+
+/**
+ * Validates a field name to ensure it's a safe identifier for use in queries.
+ * This prevents SQL injection when using string interpolation in query construction.
+ * 
+ * @param fieldName - The field name to validate
+ * @returns The validated field name
+ * @throws Error if the field name contains invalid characters
+ * 
+ * @example
+ * ```typescript
+ * const safeField = validateFieldName(config.embeddedField);
+ * const query = `SELECT * FROM c WHERE c.${safeField} = @value`;
+ * ```
+ */
+export function validateFieldName(fieldName: string): string {
+    // Allow only alphanumeric characters and underscores, must start with letter or underscore
+    const validIdentifierPattern = /^[A-Za-z_][A-Za-z0-9_]*$/;
+    
+    if (!validIdentifierPattern.test(fieldName)) {
+        throw new Error(
+            `Invalid field name: "${fieldName}". ` +
+            `Field names must start with a letter or underscore and contain only letters, numbers, and underscores.`
+        );
+    }
+    
+    return fieldName;
+}

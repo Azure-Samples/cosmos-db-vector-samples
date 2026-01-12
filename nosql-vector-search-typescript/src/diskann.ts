@@ -19,7 +19,7 @@
  */
 
 import path from 'path';
-import { readFileReturnJson, getClientsPasswordless } from './utils.js';
+import { readFileReturnJson, getClientsPasswordless, validateFieldName } from './utils.js';
 import { VectorEmbeddingPolicy, VectorEmbeddingDataType, VectorEmbeddingDistanceFunction, IndexingPolicy, VectorIndexType } from '@azure/cosmos';
 
 // ESM specific features - create __dirname equivalent
@@ -142,9 +142,13 @@ async function main() {
 
         // Perform the vector similarity search using VectorDistance
         console.log('Performing vector similarity search with DiskANN...');
+        
+        // Validate field name to prevent SQL injection
+        const safeEmbeddedField = validateFieldName(config.embeddedField);
+        
         const { resources, requestCharge } = await container.items
             .query({
-                query: `SELECT TOP 5 c.HotelName, c.Description, c.Rating, VectorDistance(c.${config.embeddedField}, @embedding) AS SimilarityScore FROM c ORDER BY VectorDistance(c.${config.embeddedField}, @embedding)`,
+                query: `SELECT TOP 5 c.HotelName, c.Description, c.Rating, VectorDistance(c.${safeEmbeddedField}, @embedding) AS SimilarityScore FROM c ORDER BY VectorDistance(c.${safeEmbeddedField}, @embedding)`,
                 parameters: [
                     { name: "@embedding", value: createEmbeddedForQueryResponse.data[0].embedding }
                 ]
