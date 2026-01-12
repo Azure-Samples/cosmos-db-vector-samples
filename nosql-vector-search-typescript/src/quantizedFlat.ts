@@ -1,7 +1,7 @@
 /**
  * QuantizedFlat Vector Index Demo for Azure Cosmos DB NoSQL
  * 
- * QuantizedFlat uses quantization techniques (based on Microsoft's DiskANN research)
+ * QuantizedFlat uses vector quantization techniques
  * to compress vectors for faster and more efficient similarity search.
  * 
  * Key Characteristics:
@@ -46,7 +46,7 @@ async function main() {
     try {
         
         if (!aiClient) {
-            throw new Error('OpenAI client is not configured properly. Please check your environment variables.');
+            throw new Error('Azure OpenAI client is not configured properly. Please check your environment variables.');
         }
 
         if (!dbClient) {

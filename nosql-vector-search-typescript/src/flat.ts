@@ -46,7 +46,7 @@ async function main() {
     try {
         
         if (!aiClient) {
-            throw new Error('OpenAI client is not configured properly. Please check your environment variables.');
+            throw new Error('Azure OpenAI client is not configured properly. Please check your environment variables.');
         }
 
         if (!dbClient) {
