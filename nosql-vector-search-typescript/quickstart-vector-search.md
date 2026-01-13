@@ -217,7 +217,22 @@ The app logging and output show:
 - Search results with hotel names and similarity scores
 
 ```output
-TBD
+Database ready: Hotels
+Created container: hotels_flat
+Reading JSON file from C:\Users\diberry\repos\samples\cosmos-db-vector-samples\data\HotelsData_toCosmosDB_Vector.json
+Processing in batches of 50...
+
+--- Insert Summary ---
+Total: 50, Inserted: 50, Failed: 0
+
+--- Search Results ---
+1. Royal Cottage Resort, Score: 0.4991
+2. Country Comfort Inn, Score: 0.4786
+3. Nordick's Valley Motel, Score: 0.4635
+4. Economy Universe Motel, Score: 0.4461
+5. Roach Motel, Score: 0.4388
+
+Request Charge: 5.37 RUs
 ```
 
 ## View and manage data in Visual Studio Code
