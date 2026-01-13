@@ -129,6 +129,40 @@ Find the sample code with resource provisioning on [GitHub](https://github.com/A
 
 1. Copy the `HotelsData_toCosmosDB_Vector.json` [raw data file with vectors](https://raw.githubusercontent.com/Azure-Samples/cosmos-db-vector-samples/refs/heads/main/data/HotelsData_toCosmosDB_Vector.json) to your project root.
 
+## Understand the document schema
+
+Before building the application, understand how vectors are stored in Cosmos DB documents. Each hotel document contains:
+
+- **Standard fields**: `HotelId`, `HotelName`, `Description`, `Category`, etc.
+- **Vector field**: `DescriptionVector` - an array of 1536 floating-point numbers representing the semantic meaning of the hotel description
+
+Here's a simplified example of a hotel document structure:
+
+```json
+{
+  "HotelId": "1",
+  "HotelName": "Stay-Kay City Hotel",
+  "Description": "This classic hotel is fully-refurbished...",
+  "Rating": 3.6,
+  "DescriptionVector": [
+    -0.04886505,
+    -0.02030743,
+    0.01763356,
+    ...
+    // 1536 dimensions total
+  ]
+}
+```
+
+**Key points about storing embeddings:**
+
+- **Vector arrays** are stored as standard JSON arrays in your documents
+- **Vector policy** defines the path (`/DescriptionVector`), data type (`float32`), dimensions (1536), and distance function (cosine)
+- **Indexing policy** creates a vector index on the vector field for efficient similarity search
+- The vector field should be **excluded from standard indexing** to optimize insertion performance
+
+For more information on vector policies and indexing, see [Vector search in Azure Cosmos DB for NoSQL](https://learn.microsoft.com/en-us/azure/cosmos-db/vector-search).
+
 ## Create npm scripts
 
 Edit the `package.json` file and add these scripts:
@@ -164,15 +198,54 @@ Paste the following code into the `ALGO.ts` file.
 
 [!INSERT FILE]
 
-This main module provides these features:
+This main module demonstrates the complete vector search workflow:
 
-- Includes utility functions
-- Creates a configuration object for environment variables
-- Creates clients for Azure OpenAI and Cosmos DB
-- Connects to Cosmos DB, creates a database and collection, inserts data, and creates standard indexes
-- Creates a vector index using flat, quantizedFlat, or DiskANN
-- Creates an embedding for a sample query text using the OpenAI client. You can change the query at the top of the file
-- Runs a vector search using the embedding and prints the results
+### 1. Generate embeddings with Azure OpenAI
+
+The code creates embeddings for query text:
+
+```typescript
+const createEmbeddedForQueryResponse = await aiClient.embeddings.create({
+    model: config.deployment,
+    input: [config.query]
+});
+```
+
+This converts text like "quintessential lodging near running trails" into a 1536-dimension vector that captures its semantic meaning. For more details on generating embeddings, see [Azure OpenAI embeddings documentation](https://learn.microsoft.com/en-us/azure/ai-foundry/openai/how-to/embeddings).
+
+### 2. Store vectors in Cosmos DB
+
+Documents with vector arrays are inserted using the `insertData` utility function:
+
+```typescript
+const insertSummary = await insertData(config, container, data.slice(0, config.batchSize));
+```
+
+This inserts hotel documents including their pre-generated `DescriptionVector` arrays into the container.
+
+### 3. Run vector similarity search
+
+The code performs a vector search using the `VectorDistance` function:
+
+```typescript
+const { resources, requestCharge } = await container.items
+    .query({
+        query: `SELECT TOP 5 c.HotelName, c.Description, c.Rating, VectorDistance(c.${safeEmbeddedField}, @embedding) AS SimilarityScore FROM c ORDER BY VectorDistance(c.${safeEmbeddedField}, @embedding)`,
+        parameters: [
+            { name: "@embedding", value: createEmbeddedForQueryResponse.data[0].embedding }
+        ]
+    })
+    .fetchAll();
+```
+
+**What this query returns:**
+
+- Top 5 most similar hotels based on vector distance
+- Hotel properties: `HotelName`, `Description`, `Rating`
+- `SimilarityScore`: A numeric value indicating how similar each hotel is to your query
+- Results ordered from most similar to least similar
+
+For more information on the `VectorDistance` function, see [VectorDistance documentation](https://learn.microsoft.com/en-us/cosmos-db/query/vectordistance).
 
 ## Create utility functions
 
@@ -234,6 +307,51 @@ Total: 50, Inserted: 50, Failed: 0
 
 Request Charge: 5.37 RUs
 ```
+
+## Understand distance metrics and similarity scores
+
+### Distance metrics
+
+Azure Cosmos DB for NoSQL supports three distance functions for vector similarity:
+
+| Distance Function | Score Range | Interpretation | Best For |
+|------------------|-------------|----------------|----------|
+| **Cosine** (default) | -1 to +1 | +1 = most similar<br>-1 = least similar | General text similarity, Azure OpenAI embeddings (used in this quickstart) |
+| **Euclidean** (L2) | 0 to +∞ | 0 = most similar<br>Higher = less similar | Spatial data, when magnitude matters |
+| **Dot Product** | -∞ to +∞ | Higher positive = more similar<br>Lower/negative = less similar | When vector magnitudes are normalized |
+
+The distance function is set in the **vector embedding policy** when creating the container:
+
+```typescript
+const vectorEmbeddingPolicy: VectorEmbeddingPolicy = {
+    vectorEmbeddings: [
+        {
+            path: "/DescriptionVector",
+            dataType: VectorEmbeddingDataType.Float32,
+            dimensions: 1536,
+            distanceFunction: VectorEmbeddingDistanceFunction.Cosine, // Can be Cosine, Euclidean, or DotProduct
+        }
+    ],
+};
+```
+
+### Interpreting similarity scores
+
+In the example output using **cosine similarity**:
+
+- **0.4991** (Royal Cottage Resort) - Highest similarity, best match for "lodging near running trails, eateries, retail"
+- **0.4388** (Roach Motel) - Lower similarity, still relevant but less matching
+- Scores closer to **1.0** indicate stronger semantic similarity
+- Scores near **0** indicate little similarity
+- Negative scores indicate dissimilarity (rare with well-formed embeddings)
+
+**Important notes:**
+
+- Absolute score values depend on your embedding model and data
+- Focus on **relative ranking** rather than absolute thresholds
+- Azure OpenAI embeddings work best with cosine similarity
+
+For detailed information on distance functions, see [What are distance functions?](https://learn.microsoft.com/en-us/azure/cosmos-db/gen-ai/distance-functions)
 
 ## View and manage data in Visual Studio Code
 
