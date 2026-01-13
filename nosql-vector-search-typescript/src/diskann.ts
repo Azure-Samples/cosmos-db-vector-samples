@@ -1,25 +1,5 @@
-/**
- * DiskANN Vector Index Demo for Azure Cosmos DB NoSQL
- * 
- * DiskANN (Disk-based Approximate Nearest Neighbors) is Microsoft's cutting-edge algorithm
- * for scalable, high-performance vector search at massive scale.
- * 
- * Key Characteristics:
- * - Best for: Large-scale datasets (50,000+ vectors per partition)
- * - Accuracy: High recall with configurable trade-offs
- * - Performance: Very fast, optimized for billions of vectors
- * - Memory: Efficient disk-backed graph index
- * - Dimensions: Supports up to 4096 dimensions
- * 
- * Use Cases:
- * - AI-powered semantic search
- * - Retrieval-Augmented Generation (RAG) patterns
- * - Large-scale recommendation systems
- * - Enterprise search with millions of QPS
- */
-
 import path from 'path';
-import { readFileReturnJson, getClientsPasswordless, validateFieldName } from './utils.js';
+import { readFileReturnJson, getClientsPasswordless, validateFieldName, insertData, printSearchResults } from './utils.js';
 import { VectorEmbeddingPolicy, VectorEmbeddingDataType, VectorEmbeddingDistanceFunction, IndexingPolicy, VectorIndexType } from '@azure/cosmos';
 
 // ESM specific features - create __dirname equivalent
@@ -29,9 +9,9 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 const config = {
-    query: "find a modern hotel with great city views and luxury amenities",
+    query: "quintessential lodging near running trails, eateries, retail",
     dbName: "Hotels",
-    collectionName: "hotels-diskann",
+    collectionName: "hotels_diskann",
     dataFile: process.env.DATA_FILE_WITH_VECTORS!,
     batchSize: parseInt(process.env.LOAD_SIZE_BATCH! || '50', 10),
     embeddedField: process.env.EMBEDDED_FIELD!,
@@ -46,23 +26,15 @@ async function main() {
     try {
         
         if (!aiClient) {
-            throw new Error('Azure OpenAI client is not configured properly. Please check your environment variables.');
+            throw new Error('AI client is not configured. Please check your environment variables.');
         }
-
         if (!dbClient) {
-            throw new Error('Cosmos DB client is not configured properly. Please check your environment variables.');
+            throw new Error('Database client is not configured. Please check your environment variables.');
         }
 
-        console.log('\n========================================');
-        console.log('DiskANN Vector Index Demo');
-        console.log('========================================\n');
-
-        // Get database reference
         const { database } = await dbClient.databases.createIfNotExists({ id: config.dbName });
-        console.log(`Database '${config.dbName}' ready.`);
+        console.log('Database ready:', config.dbName);
 
-        // Create the vector embedding policy
-        // This defines how vectors are stored and indexed
         const vectorEmbeddingPolicy: VectorEmbeddingPolicy = {
             vectorEmbeddings: [
                 {
@@ -74,8 +46,6 @@ async function main() {
             ],
         };
 
-        // Create the indexing policy with DiskANN vector index
-        // DiskANN provides best performance for large-scale vector search
         const indexingPolicy: IndexingPolicy = {
             vectorIndexes: [
                 { 
@@ -95,8 +65,7 @@ async function main() {
             ]
         };
 
-        // Create container with vector indexing
-        const { resource: containerdef } = await database.containers.createIfNotExists({
+        await database.containers.createIfNotExists({
             id: config.collectionName,
             vectorEmbeddingPolicy: vectorEmbeddingPolicy,
             indexingPolicy: indexingPolicy,
@@ -104,48 +73,18 @@ async function main() {
                 paths: ['/HotelId']
             }
         });
-        console.log(`Container '${config.collectionName}' created with DiskANN index.\n`);
+        console.log('Created container:', config.collectionName);
 
-        // Get container reference
         const container = database.container(config.collectionName);
-
-        // Load and insert hotel data with embeddings
-        console.log('Loading hotel data with embeddings...');
         const data = await readFileReturnJson(path.join(__dirname, "..", config.dataFile));
-        console.log(`Loaded ${data.length} hotels from file.`);
+        const insertSummary = await insertData(config, container, data.slice(0, config.batchSize));
 
-        console.log('\nInserting documents...');
-        let inserted = 0;
-        for (const doc of data.slice(0, config.batchSize)) {
-            try {
-                await container.items.create(doc);
-                inserted++;
-                if (inserted % 10 === 0) {
-                    process.stdout.write(`\rInserted ${inserted}/${Math.min(config.batchSize, data.length)} documents...`);
-                }
-            } catch (error: any) {
-                if (error.code !== 409) { // Ignore duplicate key errors
-                    console.error(`\nError inserting document:`, error.message);
-                }
-            }
-        }
-        console.log(`\n✓ Inserted ${inserted} documents successfully.\n`);
-
-        // Create embedding for the query
-        console.log(`Query: "${config.query}"`);
-        console.log('Generating embedding for query...');
         const createEmbeddedForQueryResponse = await aiClient.embeddings.create({
             model: config.deployment,
             input: [config.query]
         });
-        console.log('✓ Query embedding generated.\n');
 
-        // Perform the vector similarity search using VectorDistance
-        console.log('Performing vector similarity search with DiskANN...');
-        
-        // Validate field name to prevent SQL injection
         const safeEmbeddedField = validateFieldName(config.embeddedField);
-        
         const { resources, requestCharge } = await container.items
             .query({
                 query: `SELECT TOP 5 c.HotelName, c.Description, c.Rating, VectorDistance(c.${safeEmbeddedField}, @embedding) AS SimilarityScore FROM c ORDER BY VectorDistance(c.${safeEmbeddedField}, @embedding)`,
@@ -155,32 +94,7 @@ async function main() {
             })
             .fetchAll();
 
-        console.log('✓ Search completed.\n');
-
-        // Display results
-        console.log('========================================');
-        console.log('Top 5 Results (DiskANN Index)');
-        console.log('========================================\n');
-
-        resources.forEach((item, index) => {
-            console.log(`${index + 1}. ${item.HotelName}`);
-            console.log(`   Similarity Score: ${item.SimilarityScore.toFixed(4)}`);
-            console.log(`   Rating: ${item.Rating}/5.0`);
-            console.log(`   Description: ${item.Description.substring(0, 120)}...`);
-            console.log('');
-        });
-
-        console.log('========================================');
-        console.log('Understanding Similarity Scores');
-        console.log('========================================\n');
-        console.log('Cosine Similarity Range: 0.0 to 1.0');
-        console.log('- 1.0 = Identical vectors (perfect match)');
-        console.log('- 0.9-0.99 = Very similar (highly relevant)');
-        console.log('- 0.8-0.89 = Similar (relevant)');
-        console.log('- 0.7-0.79 = Somewhat similar');
-        console.log('- < 0.7 = Different (less relevant)\n');
-
-        console.log(`Request Charge: ${requestCharge} RUs\n`);
+        printSearchResults(insertSummary, resources, requestCharge);
 
     } catch (error) {
         console.error('App failed:', error);
