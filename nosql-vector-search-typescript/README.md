@@ -46,7 +46,7 @@ This project demonstrates:
 
 ✅ **Embedding Generation** - Generate vector embeddings using Azure OpenAI  
 ✅ **Vector Storage** - Store embeddings in JSON documents in Cosmos DB  
-✅ **Vector Indexing** - Three indexing algorithms (DiskANN, Flat, QuantizedFlat)  
+✅ **Vector Indexing** - Multiple indexing algorithms (DiskANN and QuantizedFlat are recommended)  
 ✅ **Similarity Search** - Query with `VectorDistance` for nearest neighbors  
 ✅ **Managed Identity** - Passwordless authentication with Azure AD  
 ✅ **Distance Metrics** - Support for Cosine, Euclidean (L2), and DotProduct  
@@ -266,11 +266,9 @@ Embeddings are stored as arrays within your JSON documents:
 
 ## 🎯 Vector Index Types
 
-Cosmos DB for NoSQL supports three vector indexing algorithms:
+Cosmos DB for NoSQL supports three vector indexing algorithms. **For production workloads, we strongly recommend using QuantizedFlat or DiskANN** instead of Flat.
 
-### 1. **DiskANN** (Recommended for Large Scale)
-
-**Best for:** 50,000+ vectors, enterprise-scale applications
+### 1. **DiskANN** (Recommended for Production at Scale)
 
 ```typescript
 vectorIndexes: [
@@ -279,31 +277,15 @@ vectorIndexes: [
 ```
 
 **Characteristics:**
-- ⚡ Very fast queries (optimized for millions of QPS)
+- ⚡ Optimized for low latency, highly scalable workloads
 - 📊 High recall with configurable trade-offs
-- 💾 Efficient memory usage (disk-backed graph index)
+- 💾 Efficient RU consumption at scale
 - 📐 Supports up to 4096 dimensions
 - 🎯 Ideal for RAG, semantic search, recommendations
+- ✅ **Recommended for most production scenarios**
 
-### 2. **Flat** (Exact Search)
+### 2. **QuantizedFlat** (Recommended for General Use)
 
-**Best for:** Small datasets, maximum accuracy required
-
-```typescript
-vectorIndexes: [
-    { path: "/vector", type: VectorIndexType.Flat }
-]
-```
-
-**Characteristics:**
-- ✅ 100% recall (exact k-NN search)
-- 🐌 Slower for large datasets (brute-force)
-- 📏 Supports up to 505 dimensions
-- 🔍 Perfect for development and testing
-
-### 3. **QuantizedFlat** (Balanced Performance)
-
-**Best for:** Medium to large datasets, good accuracy with better performance
 
 ```typescript
 vectorIndexes: [
@@ -312,25 +294,53 @@ vectorIndexes: [
 ```
 
 **Characteristics:**
-- 🚀 Fast queries (better than Flat)
-- 📊 ~100% recall (minimal accuracy loss)
-- 💰 Cost-effective (reduced storage)
+- 🚀 Faster brute-force search on quantized vectors
+- 📊 Say high recall, not ~100%.
 - 📐 Supports up to 4096 dimensions
-- ⚖️ Best balance of speed and accuracy
+- ⚖️ Best balance of speed, accuracy, and cost
+- ✅ **Recommended for most use cases**
+
+### 3. **Flat** (Not Recommended for General Use)
+
+**⚠️ Important:** Flat index should **NOT** be used in general. We strongly recommend using **QuantizedFlat or DiskANN** instead.
+
+**Only use Flat for:** Testing purposes, very small datasets (hundreds of vectors), and small dimensional vectors (<100 dimensions)
+
+**Why you should avoid Flat:** It has severe performance limitations, poor scalability, and is restricted to only 505 dimensions, making it unsuitable for most modern embedding models and production scenarios.
+
+```typescript
+vectorIndexes: [
+    { path: "/vector", type: VectorIndexType.Flat }
+]
+```
+
+**Characteristics:**
+- ✅ 100% recall (exact k-NN search using brute-force)
+- 🐌 Very slow for any significant dataset size
+- ⚠️ Severe performance degradation as data grows
+- 📏 Limited to only 505 dimensions
+- 🧪 Only suitable for testing or tiny datasets
+- ❌ **Not recommended for production use**
+
+**Why avoid Flat?**
+- Poor scalability and query performance
+- Dimension limitations prevent use with many modern embedding models
+- QuantizedFlat provides nearly identical accuracy with far better performance
+- No production benefits over QuantizedFlat or DiskANN
 
 ### Comparison Table
 
-| Index Type      | Accuracy  | Performance | Scale    | Dimensions | Use Case                  |
-|----------------|-----------|-------------|----------|------------|---------------------------|
-| Flat           | 100%      | Slow        | Small    | ≤ 505      | Dev/test, max accuracy    |
-| QuantizedFlat  | ~100%     | Fast        | Large    | ≤ 4096     | Production, balanced      |
-| DiskANN        | High      | Very Fast   | Massive  | ≤ 4096     | Enterprise, RAG, AI apps  |
+| Index Type      | Accuracy  | Performance | Scale                  | Dimensions | Use Case                                                                                  |
+|----------------|-----------|-------------|------------------------|-----------|---------------------------------------------------------------------------------------------|
+| **DiskANN**    | High      | Very Fast   | 50k+ vectors           | ≤ 4096     | Production, medium-to-large scale and when cost-efficiency/latency at scale are important |
+| **QuantizedFlat** | ~100%  | Fast        | Up to 50k+ vectors     | ≤ 4096     | Production or when searches isolated to small number of vectors with partition key filter |
+| **Flat**       | 100%      | Very Slow   | Thousands of vectors   | ≤ 505      | Dev/test on small dimensional vectors                                                      |
 
 ## 📏 Distance Metrics
 
 Cosmos DB supports three distance functions for measuring vector similarity:
 
-### 1. **Cosine Similarity** (Default, Recommended)
+### 1. **Cosine Similarity** (Recommended)
 
 Measures the angle between vectors, independent of magnitude.
 
@@ -338,8 +348,7 @@ Measures the angle between vectors, independent of magnitude.
 distanceFunction: VectorEmbeddingDistanceFunction.Cosine
 ```
 
-**Score Range:** 0.0 to 1.0 (higher = more similar)  
-**Best for:** Text embeddings, semantic search  
+**Score Range:** 0.0 to 1.0 - Higher scores (closer to 1.0) indicate greater similarity, while lower scores indicate less similarity  
 **Example:** `"hotel by lake"` vs `"lakeside accommodation"` → Score: 0.92
 
 ### 2. **Euclidean Distance (L2)**
@@ -351,7 +360,6 @@ distanceFunction: VectorEmbeddingDistanceFunction.Euclidean
 ```
 
 **Score Range:** 0.0 to ∞ (lower = more similar)  
-**Best for:** When magnitude matters, image embeddings  
 **Example:** Two similar images → Distance: 1.23
 
 ### 3. **Dot Product**
@@ -363,7 +371,6 @@ distanceFunction: VectorEmbeddingDistanceFunction.DotProduct
 ```
 
 **Score Range:** -∞ to +∞ (higher = more similar)  
-**Best for:** Normalized vectors, recommendation systems  
 **Example:** User preferences vs item features → Score: 0.87
 
 ## 💻 Code Examples
@@ -474,29 +481,29 @@ npm run start:embed
 
 Reads hotel data, generates embeddings via Azure OpenAI, and saves to file.
 
-### Run DiskANN Demo
+### Run DiskANN Demo (Recommended)
 
 ```bash
 npm run start:diskann
 ```
 
-Demonstrates vector search with DiskANN index (best for large-scale).
+Demonstrates vector search with DiskANN index - recommended for production at scale.
 
-### Run Flat Index Demo
-
-```bash
-npm run start:flat
-```
-
-Demonstrates exact vector search with Flat index (100% accurate).
-
-### Run QuantizedFlat Demo
+### Run QuantizedFlat Demo (Recommended)
 
 ```bash
 npm run start:quantizedflat
 ```
 
-Demonstrates balanced vector search with QuantizedFlat index.
+Demonstrates balanced vector search with QuantizedFlat index - recommended for general use.
+
+### Run Flat Index Demo (Testing Only)
+
+```bash
+npm run start:flat
+```
+
+Demonstrates exact vector search with Flat index. **Note:** This is provided for testing purposes only and is not recommended for production use. Use QuantizedFlat or DiskANN instead.
 
 ### All-in-One Demo
 
@@ -538,16 +545,6 @@ Top 5 Results (DiskANN Index)
    Rating: 4.0/5.0
    Description: Waterfront hotel with scenic harbor views...
 ```
-
-### Interpreting Similarity Scores (Cosine)
-
-| Score Range | Interpretation          | Example Use Case                    |
-|-------------|------------------------|-------------------------------------|
-| 0.95 - 1.0  | Nearly identical       | Duplicate detection                 |
-| 0.90 - 0.94 | Very similar           | Highly relevant search results      |
-| 0.80 - 0.89 | Similar                | Relevant recommendations            |
-| 0.70 - 0.79 | Somewhat similar       | Broader semantic matches            |
-| < 0.70      | Different              | May not be relevant                 |
 
 ### What Does a Query Return?
 
