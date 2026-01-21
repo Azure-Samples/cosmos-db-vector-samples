@@ -60,7 +60,7 @@ Before you begin, ensure you have:
 - **Node.js** - Version 18.x or higher ([Download](https://nodejs.org/))
 - **TypeScript** - Installed globally (`npm install -g typescript`)
 - **Azure Cosmos DB Account** - NoSQL API account ([Create via Portal](https://learn.microsoft.com/azure/cosmos-db/quickstart-template-bicep))
-- **Azure OpenAI Service** - With `text-embedding-ada-002` model deployed ([Setup Guide](https://learn.microsoft.com/azure/ai-services/openai/how-to/create-resource))
+- **Azure OpenAI Service** - With `text-embedding-3-small` model deployed ([Setup Guide](https://learn.microsoft.com/azure/ai-services/openai/how-to/create-resource))
 - **Azure CLI** - For authentication ([Install Guide](https://learn.microsoft.com/cli/azure/install-azure-cli))
 
 ## 🚀 Getting Started
@@ -81,7 +81,7 @@ The script will:
 - Create a resource group
 - Create a user-assigned managed identity
 - Create an Azure Cosmos DB account (NoSQL API) with database and container
-- Create an Azure OpenAI account with text-embedding-ada-002 model deployed
+- Create an Azure OpenAI account with text-embedding-3-small model deployed
 - Assign proper RBAC roles for both control plane and data plane access:
   - **Cosmos DB**: Built-in Data Contributor (data plane) + DocumentDB Account Contributor (control plane)
   - **Azure OpenAI**: Cognitive Services OpenAI User
@@ -126,7 +126,7 @@ Edit `.env` with your Azure resource information:
 
 ```env
 # Azure OpenAI Configuration
-AZURE_OPENAI_EMBEDDING_MODEL=text-embedding-ada-002
+AZURE_OPENAI_EMBEDDING_MODEL=text-embedding-3-small
 AZURE_OPENAI_EMBEDDING_API_VERSION=2023-05-15
 AZURE_OPENAI_EMBEDDING_ENDPOINT=https://<your-resource>.openai.azure.com
 
@@ -137,7 +137,7 @@ COSMOS_ENDPOINT=https://<your-account>.documents.azure.com:443/
 DATA_FILE_WITHOUT_VECTORS=../data/HotelsData_toCosmosDB.JSON
 DATA_FILE_WITH_VECTORS=../data/HotelsData_toCosmosDB_Vector.json
 FIELD_TO_EMBED=Description
-EMBEDDED_FIELD=text_embedding_ada_002
+EMBEDDED_FIELD=vector
 EMBEDDING_DIMENSIONS=1536
 LOAD_SIZE_BATCH=50
 ```
@@ -205,8 +205,8 @@ az role assignment create \
 az cognitiveservices account deployment create \
     --name <your-openai-account> \
     --resource-group <your-rg> \
-    --deployment-name text-embedding-ada-002 \
-    --model-name text-embedding-ada-002 \
+    --deployment-name text-embedding-3-small \
+    --model-name text-embedding-3-small \
     --model-version "2" \
     --model-format OpenAI \
     --sku-name "Standard" \
@@ -423,7 +423,7 @@ await database.containers.createIfNotExists({
 ```typescript
 // Generate embedding using Azure OpenAI
 const embedding = await aiClient.embeddings.create({
-    model: "text-embedding-ada-002",
+    model: "text-embedding-3-small",
     input: ["This classic hotel is fully-refurbished..."]
 });
 
@@ -444,7 +444,7 @@ await container.items.create(hotel);
 ```typescript
 // Generate embedding for search query
 const queryEmbedding = await aiClient.embeddings.create({
-    model: "text-embedding-ada-002",
+    model: "text-embedding-3-small",
     input: ["find a hotel by a lake"]
 });
 
