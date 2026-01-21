@@ -260,7 +260,7 @@ Embeddings are stored as arrays within your JSON documents:
   "HotelName": "Stay-Kay City Hotel",
   "Description": "This classic hotel is fully-refurbished...",
   "Rating": 3.6,
-  "text_embedding_ada_002": [0.021, -0.045, 0.123, ..., 0.089]
+  "vector": [0.021, -0.045, 0.123, ..., 0.089]
 }
 ```
 
@@ -274,7 +274,7 @@ Cosmos DB for NoSQL supports three vector indexing algorithms:
 
 ```typescript
 vectorIndexes: [
-    { path: "/text_embedding_ada_002", type: VectorIndexType.DiskANN }
+    { path: "/vector", type: VectorIndexType.DiskANN }
 ]
 ```
 
@@ -291,7 +291,7 @@ vectorIndexes: [
 
 ```typescript
 vectorIndexes: [
-    { path: "/text_embedding_ada_002", type: VectorIndexType.Flat }
+    { path: "/vector", type: VectorIndexType.Flat }
 ]
 ```
 
@@ -307,7 +307,7 @@ vectorIndexes: [
 
 ```typescript
 vectorIndexes: [
-    { path: "/text_embedding_ada_002", type: VectorIndexType.QuantizedFlat }
+    { path: "/vector", type: VectorIndexType.QuantizedFlat }
 ]
 ```
 
@@ -385,7 +385,7 @@ const client = new CosmosClient({
 // Define vector embedding policy
 const vectorEmbeddingPolicy: VectorEmbeddingPolicy = {
     vectorEmbeddings: [{
-        path: "/text_embedding_ada_002",
+        path: "/vector",
         dataType: VectorEmbeddingDataType.Float32,
         dimensions: 1536,
         distanceFunction: VectorEmbeddingDistanceFunction.Cosine,
@@ -395,10 +395,10 @@ const vectorEmbeddingPolicy: VectorEmbeddingPolicy = {
 // Define indexing policy with vector index
 const indexingPolicy: IndexingPolicy = {
     vectorIndexes: [
-        { path: "/text_embedding_ada_002", type: VectorIndexType.DiskANN }
+        { path: "/vector", type: VectorIndexType.DiskANN }
     ],
     includedPaths: [{ path: "/*" }],
-    excludedPaths: [{ path: "/text_embedding_ada_002/*" }]
+    excludedPaths: [{ path: "/vector/*" }]
 };
 
 // Create container
@@ -426,7 +426,7 @@ const hotel = {
     HotelName: "Stay-Kay City Hotel",
     Description: "This classic hotel is fully-refurbished...",
     Rating: 3.6,
-    text_embedding_ada_002: embedding.data[0].embedding
+    vector: embedding.data[0].embedding
 };
 
 await container.items.create(hotel);
@@ -444,9 +444,9 @@ const queryEmbedding = await aiClient.embeddings.create({
 // Perform vector similarity search
 const { resources } = await container.items.query({
     query: `SELECT TOP 5 c.HotelName, c.Description, c.Rating, 
-            VectorDistance(c.text_embedding_ada_002, @embedding) AS SimilarityScore 
+            VectorDistance(c.vector, @embedding) AS SimilarityScore 
             FROM c 
-            ORDER BY VectorDistance(c.text_embedding_ada_002, @embedding)`,
+            ORDER BY VectorDistance(c.vector, @embedding)`,
     parameters: [
         { name: "@embedding", value: queryEmbedding.data[0].embedding }
     ]
