@@ -25,8 +25,8 @@ COSMOS_CONTAINER_NAME="hotels"
 
 # Azure OpenAI configuration
 OPENAI_ACCOUNT_NAME="${RESOURCE_PREFIX}-openai-$(openssl rand -hex 4)"
-OPENAI_DEPLOYMENT_NAME="text-embedding-ada-002"
-OPENAI_MODEL="text-embedding-ada-002"
+OPENAI_DEPLOYMENT_NAME="text-embedding-3-small"
+OPENAI_MODEL="text-embedding-3-small"
 OPENAI_MODEL_VERSION="2"
 
 # Managed Identity configuration
@@ -331,7 +331,7 @@ echo "AZURE_CLIENT_ID=\"$IDENTITY_CLIENT_ID\""
 echo ""
 echo "# Data Configuration"
 echo "DATA_FILE_WITH_VECTORS=\"../data/HotelsData_toCosmosDB_Vector.json\""
-echo "EMBEDDED_FIELD=\"text_embedding_ada_002\""
+echo "EMBEDDED_FIELD=\"vector\""
 echo "EMBEDDING_DIMENSIONS=\"1536\""
 echo "LOAD_SIZE_BATCH=\"50\""
 echo ""
