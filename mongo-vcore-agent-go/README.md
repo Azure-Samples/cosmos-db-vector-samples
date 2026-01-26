@@ -60,7 +60,7 @@ flowchart TD
 
 ### Development Tools
 
-- [Go](https://golang.org/dl/) 1.21 or later
+- [Go](https://golang.org/dl/) 1.22 or later
 
 ## Project Structure
 
