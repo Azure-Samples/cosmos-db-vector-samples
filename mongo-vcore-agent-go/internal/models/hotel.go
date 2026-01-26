@@ -28,7 +28,7 @@ type Hotel struct {
 		Type        string    `json:"type" bson:"type"`
 		Coordinates []float64 `json:"coordinates" bson:"coordinates"`
 	} `json:"Location,omitempty" bson:"Location,omitempty"`
-	Rooms []interface{} `json:"Rooms,omitempty" bson:"Rooms,omitempty"`
+	Rooms []any `json:"Rooms,omitempty" bson:"Rooms,omitempty"`
 }
 
 // HotelForVectorStore represents hotel data stored in vector database (excludes certain fields)

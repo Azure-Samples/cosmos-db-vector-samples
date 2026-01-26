@@ -32,8 +32,8 @@ type OpenAIConfig struct {
 
 // OpenAIClients holds all Azure OpenAI clients
 type OpenAIClients struct {
-    Config *OpenAIConfig
-    Client *openai.Client
+	config *OpenAIConfig
+	client *openai.Client
 }
 
 // LoadConfigFromEnv loads OpenAI configuration from environment variables
@@ -62,7 +62,7 @@ func NewOpenAIClients(config *OpenAIConfig) (*OpenAIClients, error) {
 	}
 
 	endpoint := fmt.Sprintf("https://%s.openai.azure.com/", config.InstanceName)
-	
+
 	// Use the default API version if not specified
 	apiVersion := config.EmbeddingAPIVersion
 	if apiVersion == "" {
@@ -110,18 +110,18 @@ func NewOpenAIClients(config *OpenAIConfig) (*OpenAIClients, error) {
 	}
 
 	return &OpenAIClients{
-		Config: config,
-		Client: &client,
+		config: config,
+		client: &client,
 	}, nil
 }
 
 // GenerateEmbedding generates an embedding for the given text
 func (c *OpenAIClients) GenerateEmbedding(ctx context.Context, text string) ([]float32, error) {
-	resp, err := c.Client.Embeddings.New(ctx, openai.EmbeddingNewParams{
+	resp, err := c.client.Embeddings.New(ctx, openai.EmbeddingNewParams{
 		Input: openai.EmbeddingNewParamsInputUnion{
 			OfString: openai.String(text),
 		},
-		Model: openai.EmbeddingModel(c.Config.EmbeddingDeployment),
+		Model: openai.EmbeddingModel(c.config.EmbeddingDeployment),
 	})
 
 	if err != nil {
@@ -165,14 +165,14 @@ func (c *OpenAIClients) ChatCompletionWithTools(ctx context.Context, systemPromp
 		return nil, fmt.Errorf("no tools provided to ChatCompletionWithTools")
 	}
 
-	if c.Config.Debug {
+	if c.config.Debug {
 		fmt.Printf("[planner] Calling with temperature=0.0, tools enabled\n")
 		fmt.Printf("[planner] System prompt length: %d characters\n", len(systemPrompt))
 		fmt.Printf("[planner] User message length: %d characters\n", len(userMessage))
 	}
 
-	resp, err := c.Client.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
-		Model: openai.ChatModel(c.Config.PlannerDeployment),
+	resp, err := c.client.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
+		Model: openai.ChatModel(c.config.PlannerDeployment),
 		Messages: []openai.ChatCompletionMessageParamUnion{
 			{
 				OfSystem: &openai.ChatCompletionSystemMessageParam{
@@ -203,7 +203,7 @@ func (c *OpenAIClients) ChatCompletionWithTools(ctx context.Context, systemPromp
 		return nil, fmt.Errorf("planner returned nil response")
 	}
 
-	if c.Config.Debug {
+	if c.config.Debug {
 		fmt.Printf("[planner] Response received with %d choices\n", len(resp.Choices))
 		if len(resp.Choices) > 0 {
 			fmt.Printf("[planner] Finish reason: %s\n", resp.Choices[0].FinishReason)
@@ -219,8 +219,8 @@ func (c *OpenAIClients) ChatCompletionWithTools(ctx context.Context, systemPromp
 
 // ChatCompletion calls the synthesizer without tools
 func (c *OpenAIClients) ChatCompletion(ctx context.Context, systemPrompt, userMessage string) (string, error) {
-	resp, err := c.Client.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
-		Model: openai.ChatModel(c.Config.SynthDeployment),
+	resp, err := c.client.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
+		Model: openai.ChatModel(c.config.SynthDeployment),
 		Messages: []openai.ChatCompletionMessageParamUnion{
 			{
 				OfSystem: &openai.ChatCompletionSystemMessageParam{
@@ -250,53 +250,63 @@ func (c *OpenAIClients) ChatCompletion(ctx context.Context, systemPrompt, userMe
 
 	content := resp.Choices[0].Message.Content
 
-	if c.Config.Debug {
+	if c.config.Debug {
 		fmt.Printf("[synthesizer] Output: %d characters\n", len(content))
 	}
 
 	return content, nil
 }
 
-// ExtractToolCall extracts the tool call from a chat completion response
-func ExtractToolCall(resp *openai.ChatCompletion) (string, map[string]interface{}, error) {
+// extractToolCallRaw extracts the tool call from a chat completion response and returns raw JSON arguments
+func extractToolCallRaw(resp *openai.ChatCompletion) (string, string, error) {
 	if resp == nil {
-		return "", nil, fmt.Errorf("response is nil")
+		return "", "", fmt.Errorf("response is nil")
 	}
 
 	if len(resp.Choices) == 0 {
-		return "", nil, fmt.Errorf("no choices in response")
+		return "", "", fmt.Errorf("no choices in response")
 	}
 
 	choice := resp.Choices[0]
 
 	// Check finish reason to understand why the model stopped
 	if choice.FinishReason == "length" {
-		return "", nil, fmt.Errorf("response was cut off (length limit exceeded)")
+		return "", "", fmt.Errorf("response was cut off (length limit exceeded)")
 	}
 
 	if choice.FinishReason != "tool_calls" && choice.FinishReason != "stop" {
-		return "", nil, fmt.Errorf("unexpected finish reason: %s (expected 'tool_calls' or 'stop')", choice.FinishReason)
+		return "", "", fmt.Errorf("unexpected finish reason: %s (expected 'tool_calls' or 'stop')", choice.FinishReason)
 	}
 
 	if len(choice.Message.ToolCalls) == 0 {
 		// Model decided not to call a tool - return the text content if available
 		content := choice.Message.Content
 		if content != "" {
-			return "", nil, fmt.Errorf("no tool calls in response - model returned: %s", content)
+			return "", "", fmt.Errorf("no tool calls in response - model returned: %s", content)
 		}
-		return "", nil, fmt.Errorf("no tool calls in response and no text content - finish_reason: %s", choice.FinishReason)
+		return "", "", fmt.Errorf("no tool calls in response and no text content - finish_reason: %s", choice.FinishReason)
 	}
 
 	toolCall := choice.Message.ToolCalls[0]
 
 	if toolCall.Type != "function" {
-		return "", nil, fmt.Errorf("unexpected tool call type: %s (expected 'function')", toolCall.Type)
+		return "", "", fmt.Errorf("unexpected tool call type: %s (expected 'function')", toolCall.Type)
 	}
 
-	var args map[string]interface{}
-	if err := json.Unmarshal([]byte(toolCall.Function.Arguments), &args); err != nil {
-		return "", nil, fmt.Errorf("failed to parse tool arguments: %w (raw arguments: %s)", err, toolCall.Function.Arguments)
+	return toolCall.Function.Name, toolCall.Function.Arguments, nil
+}
+
+// ExtractToolCall extracts the tool call from a chat completion response
+func ExtractToolCall(resp *openai.ChatCompletion) (string, map[string]any, error) {
+	toolName, argsJSON, err := extractToolCallRaw(resp)
+	if err != nil {
+		return "", nil, err
 	}
 
-	return toolCall.Function.Name, args, nil
+	var args map[string]any
+	if err := json.Unmarshal([]byte(argsJSON), &args); err != nil {
+		return "", nil, fmt.Errorf("failed to parse tool arguments: %w (raw arguments: %s)", err, argsJSON)
+	}
+
+	return toolName, args, nil
 }

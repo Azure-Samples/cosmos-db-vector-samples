@@ -2,7 +2,6 @@ package agents
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -14,30 +13,30 @@ import (
 
 // VectorSearchTool implements the hotel search functionality
 type VectorSearchTool struct {
-	OpenAIClients *clients.OpenAIClients
-	VectorStore   *vectorstore.VectorStore
-	Debug         bool
+	openAIClients *clients.OpenAIClients
+	vectorStore   *vectorstore.VectorStore
+	debug         bool
 }
 
 // NewVectorSearchTool creates a new vector search tool
 func NewVectorSearchTool(openaiClients *clients.OpenAIClients, vectorStore *vectorstore.VectorStore, debug bool) *VectorSearchTool {
 	return &VectorSearchTool{
-		OpenAIClients: openaiClients,
-		VectorStore:   vectorStore,
-		Debug:         debug,
+		openAIClients: openaiClients,
+		vectorStore:   vectorStore,
+		debug:         debug,
 	}
 }
 
 // Execute performs the vector search
 func (t *VectorSearchTool) Execute(ctx context.Context, query string, nearestNeighbors int) (string, error) {
 	// Generate embedding for query
-	queryVector, err := t.OpenAIClients.GenerateEmbedding(ctx, query)
+	queryVector, err := t.openAIClients.GenerateEmbedding(ctx, query)
 	if err != nil {
 		return "", fmt.Errorf("failed to generate embedding: %w", err)
 	}
 
 	// Perform vector search
-	results, err := t.VectorStore.VectorSearch(ctx, queryVector, nearestNeighbors)
+	results, err := t.vectorStore.VectorSearch(ctx, queryVector, nearestNeighbors)
 	if err != nil {
 		return "", fmt.Errorf("vector search failed: %w", err)
 	}
@@ -54,14 +53,14 @@ func (t *VectorSearchTool) Execute(ctx context.Context, query string, nearestNei
 
 // GetToolDefinition returns the Azure OpenAI tool definition
 func (t *VectorSearchTool) GetToolDefinition() openai.ChatCompletionToolUnionParam {
-	paramSchema := map[string]interface{}{
+	paramSchema := map[string]any{
 		"type": "object",
-		"properties": map[string]interface{}{
-			"query": map[string]interface{}{
+		"properties": map[string]any{
+			"query": map[string]any{
 				"type":        "string",
 				"description": "Natural language search query describing desired hotel characteristics",
 			},
-			"nearestNeighbors": map[string]interface{}{
+			"nearestNeighbors": map[string]any{
 				"type":        "integer",
 				"description": "Number of results to return (1-20)",
 				"default":     5,
@@ -81,17 +80,25 @@ func (t *VectorSearchTool) GetToolDefinition() openai.ChatCompletionToolUnionPar
 	}
 }
 
-// ToolArguments represents the arguments for the search tool
-type ToolArguments struct {
+// toolArguments represents the arguments for the search tool
+type toolArguments struct {
 	Query            string `json:"query"`
 	NearestNeighbors int    `json:"nearestNeighbors"`
 }
 
-// ParseToolArguments parses tool arguments from JSON
-func ParseToolArguments(argsJSON string) (*ToolArguments, error) {
-	var args ToolArguments
-	if err := json.Unmarshal([]byte(argsJSON), &args); err != nil {
-		return nil, fmt.Errorf("failed to parse tool arguments: %w", err)
+// parseToolArgumentsFromMap parses tool arguments from a map
+func parseToolArgumentsFromMap(argsMap map[string]any) (*toolArguments, error) {
+	args := &toolArguments{}
+
+	if query, ok := argsMap["query"].(string); ok {
+		args.Query = query
+	} else {
+		return nil, fmt.Errorf("query argument missing or invalid")
 	}
-	return &args, nil
+
+	if nn, ok := argsMap["nearestNeighbors"].(float64); ok {
+		args.NearestNeighbors = int(nn)
+	}
+
+	return args, nil
 }

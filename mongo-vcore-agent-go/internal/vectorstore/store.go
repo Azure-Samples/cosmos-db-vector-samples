@@ -31,10 +31,10 @@ type VectorStoreConfig struct {
 
 // VectorStore manages MongoDB operations for vector search
 type VectorStore struct {
-	Config     *VectorStoreConfig
-	Client     *mongo.Client
-	Database   *mongo.Database
-	Collection *mongo.Collection
+	config     *VectorStoreConfig
+	client     *mongo.Client
+	database   *mongo.Database
+	collection *mongo.Collection
 }
 
 // LoadConfigFromEnv loads vector store configuration from environment
@@ -101,10 +101,10 @@ func NewVectorStore(ctx context.Context, config *VectorStoreConfig) (*VectorStor
 	}
 
 	return &VectorStore{
-		Config:     config,
-		Client:     client,
-		Database:   database,
-		Collection: collection,
+		config:     config,
+		client:     client,
+		database:   database,
+		collection: collection,
 	}, nil
 }
 
@@ -174,7 +174,7 @@ func connectWithOIDC(ctx context.Context, clusterName string, debug bool) (*mong
 
 // Close closes the MongoDB connection
 func (vs *VectorStore) Close(ctx context.Context) error {
-	return vs.Client.Disconnect(ctx)
+	return vs.client.Disconnect(ctx)
 }
 
 // LoadHotelsFromJSON loads hotels from a JSON file
@@ -205,17 +205,17 @@ func (vs *VectorStore) InsertHotelsWithEmbeddings(ctx context.Context, hotels []
 	}
 
 	// Convert to bson documents
-	docs := make([]interface{}, len(hotels))
+	docs := make([]any, len(hotels))
 	for i, hotel := range hotels {
 		docs[i] = hotel
 	}
 
-	result, err := vs.Collection.InsertMany(ctx, docs)
+	result, err := vs.collection.InsertMany(ctx, docs)
 	if err != nil {
 		return fmt.Errorf("failed to insert documents: %w", err)
 	}
 
-	if vs.Config.Debug {
+	if vs.config.Debug {
 		fmt.Printf("[vectorstore] Inserted %d documents\n", len(result.InsertedIDs))
 	}
 
@@ -307,22 +307,22 @@ func (vs *VectorStore) CreateVectorIndex(ctx context.Context) error {
 
 	// DocumentDB uses "cosmosSearch" as the index type
 	indexDef := bson.D{
-		{Key: "createIndexes", Value: vs.Config.CollectionName},
+		{Key: "createIndexes", Value: vs.config.CollectionName},
 		{Key: "indexes", Value: bson.A{
 			bson.D{
-				{Key: "name", Value: vs.Config.IndexName},
+				{Key: "name", Value: vs.config.IndexName},
 				{Key: "key", Value: bson.D{{Key: "contentVector", Value: "cosmosSearch"}}},
 				{Key: "cosmosSearchOptions", Value: cosmosSearchOptions},
 			},
 		}},
 	}
 
-	if err := vs.Database.RunCommand(ctx, indexDef).Err(); err != nil {
+	if err := vs.database.RunCommand(ctx, indexDef).Err(); err != nil {
 		return fmt.Errorf("failed to create vector index: %w", err)
 	}
 
-	if vs.Config.Debug {
-		fmt.Printf("[vectorstore] Created vector index: %s (algorithm: %s)\n", vs.Config.IndexName, algorithm)
+	if vs.config.Debug {
+		fmt.Printf("[vectorstore] Created vector index: %s (algorithm: %s)\n", vs.config.IndexName, algorithm)
 	}
 
 	return nil
@@ -330,8 +330,8 @@ func (vs *VectorStore) CreateVectorIndex(ctx context.Context) error {
 
 // VectorSearch performs a vector similarity search
 func (vs *VectorStore) VectorSearch(ctx context.Context, queryVector []float32, k int) ([]models.HotelSearchResult, error) {
-	// Convert float32 to interface{} for BSON
-	vectorInterface := make([]interface{}, len(queryVector))
+	// Convert float32 to any for BSON
+	vectorInterface := make([]any, len(queryVector))
 	for i, v := range queryVector {
 		vectorInterface[i] = v
 	}
@@ -350,7 +350,7 @@ func (vs *VectorStore) VectorSearch(ctx context.Context, queryVector []float32, 
 		}}},
 	}
 
-	cursor, err := vs.Collection.Aggregate(ctx, pipeline)
+	cursor, err := vs.collection.Aggregate(ctx, pipeline)
 	if err != nil {
 		return nil, fmt.Errorf("vector search failed: %w", err)
 	}
@@ -376,7 +376,7 @@ func (vs *VectorStore) VectorSearch(ctx context.Context, queryVector []float32, 
 		return nil, fmt.Errorf("cursor error: %w", err)
 	}
 
-	if vs.Config.Debug {
+	if vs.config.Debug {
 		fmt.Printf("[vectorstore] Found %d results from vector search\n", len(results))
 	}
 
@@ -413,12 +413,12 @@ func FormatHotelForSynthesizer(result models.HotelSearchResult) string {
 
 // DeleteDatabase drops the entire database
 func (vs *VectorStore) DeleteDatabase(ctx context.Context) error {
-	if err := vs.Database.Drop(ctx); err != nil {
+	if err := vs.database.Drop(ctx); err != nil {
 		return fmt.Errorf("failed to drop database: %w", err)
 	}
 
-	if vs.Config.Debug {
-		fmt.Printf("[vectorstore] Deleted database: %s\n", vs.Config.DatabaseName)
+	if vs.config.Debug {
+		fmt.Printf("[vectorstore] Deleted database: %s\n", vs.config.DatabaseName)
 	}
 
 	return nil

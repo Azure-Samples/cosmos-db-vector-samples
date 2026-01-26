@@ -11,17 +11,17 @@ import (
 
 // PlannerAgent orchestrates the tool calling
 type PlannerAgent struct {
-	OpenAIClients *clients.OpenAIClients
-	SearchTool    *VectorSearchTool
-	Debug         bool
+	openAIClients *clients.OpenAIClients
+	searchTool    *VectorSearchTool
+	debug         bool
 }
 
 // NewPlannerAgent creates a new planner agent
 func NewPlannerAgent(openaiClients *clients.OpenAIClients, searchTool *VectorSearchTool, debug bool) *PlannerAgent {
 	return &PlannerAgent{
-		OpenAIClients: openaiClients,
-		SearchTool:    searchTool,
-		Debug:         debug,
+		openAIClients: openaiClients,
+		searchTool:    searchTool,
+		debug:         debug,
 	}
 }
 
@@ -36,16 +36,16 @@ func (a *PlannerAgent) Run(ctx context.Context, userQuery string, nearestNeighbo
 	)
 
 	// Get tool definition
-	toolDef := a.SearchTool.GetToolDefinition()
+	toolDef := a.searchTool.GetToolDefinition()
 
 	// Call planner with tool definitions
-	resp, err := a.OpenAIClients.ChatCompletionWithTools(ctx, prompts.PlannerSystemPrompt, userMessage, []openai.ChatCompletionToolUnionParam{toolDef})
+	resp, err := a.openAIClients.ChatCompletionWithTools(ctx, prompts.PlannerSystemPrompt, userMessage, []openai.ChatCompletionToolUnionParam{toolDef})
 	if err != nil {
 		return "", fmt.Errorf("planner failed: %w", err)
 	}
 
 	// Extract tool call
-	toolName, args, err := clients.ExtractToolCall(resp)
+	toolName, argsMap, err := clients.ExtractToolCall(resp)
 	if err != nil {
 		return "", fmt.Errorf("failed to extract tool call: %w", err)
 	}
@@ -54,23 +54,23 @@ func (a *PlannerAgent) Run(ctx context.Context, userQuery string, nearestNeighbo
 		return "", fmt.Errorf("unexpected tool called: %s", toolName)
 	}
 
-	// Extract arguments
-	query, ok := args["query"].(string)
-	if !ok {
-		return "", fmt.Errorf("query argument missing or invalid")
+	// Parse arguments using typed struct
+	args, err := parseToolArgumentsFromMap(argsMap)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse tool arguments: %w", err)
 	}
 
-	k := nearestNeighbors
-	if kVal, ok := args["nearestNeighbors"].(float64); ok {
-		k = int(kVal)
+	// Use default if nearestNeighbors not provided
+	if args.NearestNeighbors == 0 {
+		args.NearestNeighbors = nearestNeighbors
 	}
 
 	fmt.Printf("Tool: %s\n", toolName)
-	fmt.Printf("Query: %s\n", query)
-	fmt.Printf("K: %d\n", k)
+	fmt.Printf("Query: %s\n", args.Query)
+	fmt.Printf("K: %d\n", args.NearestNeighbors)
 
 	// Execute the tool
-	searchResults, err := a.SearchTool.Execute(ctx, query, k)
+	searchResults, err := a.searchTool.Execute(ctx, args.Query, args.NearestNeighbors)
 	if err != nil {
 		return "", fmt.Errorf("search tool execution failed: %w", err)
 	}
@@ -80,15 +80,15 @@ func (a *PlannerAgent) Run(ctx context.Context, userQuery string, nearestNeighbo
 
 // SynthesizerAgent generates final recommendations
 type SynthesizerAgent struct {
-	OpenAIClients *clients.OpenAIClients
-	Debug         bool
+	openAIClients *clients.OpenAIClients
+	debug         bool
 }
 
 // NewSynthesizerAgent creates a new synthesizer agent
 func NewSynthesizerAgent(openaiClients *clients.OpenAIClients, debug bool) *SynthesizerAgent {
 	return &SynthesizerAgent{
-		OpenAIClients: openaiClients,
-		Debug:         debug,
+		openAIClients: openaiClients,
+		debug:         debug,
 	}
 }
 
@@ -100,7 +100,7 @@ func (a *SynthesizerAgent) Run(ctx context.Context, userQuery, hotelContext stri
 	userMessage := prompts.CreateSynthesizerUserPrompt(userQuery, hotelContext)
 
 	// Call synthesizer (no tools)
-	finalAnswer, err := a.OpenAIClients.ChatCompletion(ctx, prompts.SynthesizerSystemPrompt, userMessage)
+	finalAnswer, err := a.openAIClients.ChatCompletion(ctx, prompts.SynthesizerSystemPrompt, userMessage)
 	if err != nil {
 		return "", fmt.Errorf("synthesizer failed: %w", err)
 	}
