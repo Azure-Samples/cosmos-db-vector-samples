@@ -591,6 +591,52 @@ A vector search query returns:
 - [MongoDB vCore Vector Search (TypeScript)](../mongo-vcore-vector-search-typescript/)
 - [Cosmos DB Vector Samples (All Languages)](https://github.com/Azure-Samples/cosmos-db-vector-samples)
 
+## 🚀 Using Azure Developer CLI (azd)
+
+The Azure Developer CLI (`azd`) provides a streamlined way to provision and deploy Azure resources with a single command.
+
+### Prerequisites
+
+- [Azure Developer CLI (azd)](https://learn.microsoft.com/azure/developer/azure-developer-cli/install-azd) installed
+
+### Provision with azd
+
+1. **Authenticate with Azure:**
+
+    ```bash
+    azd auth login
+    ```
+
+2. **Provision all Azure resources:**
+
+    ```bash
+    azd up
+    ```
+
+    This command will:
+    - Provision Azure Cosmos DB account with database and container
+    - Provision Azure OpenAI account with embedding model deployed
+    - Configure RBAC roles automatically
+    - Set up all required Azure resources
+
+3. **Generate your `.env` file:**
+
+    ```bash
+    azd env get-values > .env
+    ```
+
+    This exports all environment variables from the azd environment directly to your `.env` file, ready to use with the sample applications.
+
+4. **Run the samples:**
+
+    ```bash
+    npm install
+    npm run build
+    npm run start:diskann
+    ```
+
+The `azd` workflow is the fastest way to get started, handling all infrastructure provisioning and configuration automatically.
+
 ## 🤝 Contributing
 
 This project welcomes contributions and suggestions. See [CONTRIBUTING.md](../CONTRIBUTING.md) for details.

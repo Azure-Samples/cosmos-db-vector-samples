@@ -13,11 +13,15 @@ Find the sample code with resource provisioning on [GitHub](https://github.com/A
 
 - An existing Cosmos DB resource
   - If you don't have a resource, create a [new resource](https://docs.azure.cn/en-us/cosmos-db/nosql/quickstart-portal)
-  - [Role Based Access Control (RBAC) enabled]()
+  - Role Based Access Control (RBAC) roles assigned:
+    - **Cosmos DB Built-in Data Contributor** (data plane) - Role ID: `00000000-0000-0000-0000-000000000002`
+    - **DocumentDB Account Contributor** (control plane)
   - [Firewall configured to allow access to your client IP address]()
 
-- [Azure OpenAI resource](/azure/ai-foundry/openai)
-  - [Role Based Access Control (RBAC) enabled](/azure/developer/ai/keyless-connections)
+- [Azure OpenAI resource](/azure/ai-foundry/openai/how-to/create-resource?view=foundry-classic&pivots=cli#create-a-resource)
+  - Custom domain configured
+  - Role Based Access Control (RBAC) role assigned:
+    - **Cognitive Services OpenAI User**
   - `text-embedding-3-small` model deployed
 
 - [Visual Studio Code](https://code.visualstudio.com/download)
@@ -63,13 +67,6 @@ Find the sample code with resource provisioning on [GitHub](https://github.com/A
 1. Create a `.env` file in your project root for the environment variables:
 
     ```bash
-    # Azure Subscription and Resource Group
-    AZURE_SUBSCRIPTION_ID="YOUR_SUBSCRIPTION_ID"
-    AZURE_TENANT_ID="YOUR_TENANT_ID"
-    AZURE_RESOURCE_GROUP="YOUR_RESOURCE_GROUP_NAME"
-    AZURE_ENV_NAME="YOUR_ENVIRONMENT_NAME"
-    AZURE_LOCATION="YOUR_AZURE_LOCATION"
-
     # Azure Cosmos DB
     AZURE_COSMOSDB_ENDPOINT="YOUR_COSMOS_DB_ENDPOINT"
     AZURE_COSMOSDB_DATABASENAME="Hotels"
@@ -167,9 +164,9 @@ For more information on vector policies and indexing, see [Vector search in Azur
 
 Edit the `package.json` file and add these scripts:
 
-TABs for flat, quantizedflat, diskann (ALGO)
+TABs for flat, quantizedflat, diskann (ALGO) - order is diskann, quantizedflat, flat with not about flat as for prototyping only
 
-Use these scripts to compile TypeScript files and run the IVF index implementation.
+Use these scripts to compile TypeScript files and run the Flat index implementation.
 
 ```json
 "scripts": { 
@@ -289,24 +286,7 @@ The app logging and output show:
 - Vector index creation 
 - Search results with hotel names and similarity scores
 
-```output
-Database ready: Hotels
-Created container: hotels_flat
-Reading JSON file from C:\Users\diberry\repos\samples\cosmos-db-vector-samples\data\HotelsData_toCosmosDB_Vector.json
-Processing in batches of 50...
-
---- Insert Summary ---
-Total: 50, Inserted: 50, Failed: 0
-
---- Search Results ---
-1. Royal Cottage Resort, Score: 0.4991
-2. Country Comfort Inn, Score: 0.4786
-3. Nordick's Valley Motel, Score: 0.4635
-4. Economy Universe Motel, Score: 0.4461
-5. Roach Motel, Score: 0.4388
-
-Request Charge: 5.37 RUs
-```
+TBD add [output](./output/ALGO.txt) - all 3 outputs are in repo
 
 ## Understand distance metrics and similarity scores
 
@@ -316,9 +296,9 @@ Azure Cosmos DB for NoSQL supports three distance functions for vector similarit
 
 | Distance Function | Score Range | Interpretation | Best For |
 |------------------|-------------|----------------|----------|
-| **Cosine** (default) | -1 to +1 | +1 = most similar<br>-1 = least similar | General text similarity, Azure OpenAI embeddings (used in this quickstart) |
-| **Euclidean** (L2) | 0 to +∞ | 0 = most similar<br>Higher = less similar | Spatial data, when magnitude matters |
-| **Dot Product** | -∞ to +∞ | Higher positive = more similar<br>Lower/negative = less similar | When vector magnitudes are normalized |
+| **Cosine** (default) | 0.0 to 1.0 | Higher scores (closer to 1.0) indicate greater similarity | General text similarity, Azure OpenAI embeddings (used in this quickstart) |
+| **Euclidean** (L2) | 0.0 to ∞ | Lower = more similar | Spatial data, when magnitude matters |
+| **Dot Product** | -∞ to +∞ | Higher = more similar | When vector magnitudes are normalized |
 
 The distance function is set in the **vector embedding policy** when creating the container:
 
