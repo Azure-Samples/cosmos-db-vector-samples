@@ -295,18 +295,16 @@ vectorIndexes: [
 
 **Characteristics:**
 - 🚀 Faster brute-force search on quantized vectors
-- 📊 Say high recall, not ~100%.
+- 📊 High recall, not ~100%.
 - 📐 Supports up to 4096 dimensions
-- ⚖️ Best balance of speed, accuracy, and cost
+- ⚖️ Balance of speed, accuracy, and cost for smaller datasets
 - ✅ **Recommended for most use cases**
 
 ### 3. **Flat** (Not Recommended for General Use)
 
-**⚠️ Important:** Flat index should **NOT** be used in general. We strongly recommend using **QuantizedFlat or DiskANN** instead.
+**⚠️ Important:** Flat index should generally be avoided for most use cases. We strongly recommend using QuantizedFlat or DiskANN indexes instead.
 
-**Only use Flat for:** Testing purposes, very small datasets (hundreds of vectors), and small dimensional vectors (<100 dimensions)
-
-**Why you should avoid Flat:** It has severe performance limitations, poor scalability, and is restricted to only 505 dimensions, making it unsuitable for most modern embedding models and production scenarios.
+**Only use Flat for:** Testing purposes, very small datasets (hundreds of vectors), and small dimensional vectors ( <505 dimensions )
 
 ```typescript
 vectorIndexes: [
@@ -317,13 +315,13 @@ vectorIndexes: [
 **Characteristics:**
 - ✅ 100% recall (exact k-NN search using brute-force)
 - 🐌 Very slow for any significant dataset size
-- ⚠️ Severe performance degradation as data grows
+- ⚠️ Scales linearly as the number of vectors increases.
 - 📏 Limited to only 505 dimensions
 - 🧪 Only suitable for testing or tiny datasets
 - ❌ **Not recommended for production use**
 
 **Why avoid Flat?**
-- Poor scalability and query performance
+- Scales linearly, not optimized for larger scales
 - Dimension limitations prevent use with many modern embedding models
 - QuantizedFlat provides nearly identical accuracy with far better performance
 - No production benefits over QuantizedFlat or DiskANN
@@ -340,7 +338,7 @@ vectorIndexes: [
 
 Cosmos DB supports three distance functions for measuring vector similarity:
 
-### 1. **Cosine Similarity** (Recommended)
+### 1. **Cosine Similarity** (Recommended for most models)
 
 Measures the angle between vectors, independent of magnitude.
 
@@ -503,7 +501,8 @@ Demonstrates balanced vector search with QuantizedFlat index - recommended for g
 npm run start:flat
 ```
 
-Demonstrates exact vector search with Flat index. **Note:** This is provided for testing purposes only and is not recommended for production use. Use QuantizedFlat or DiskANN instead.
+Demonstrates exact vector search with Flat index. **Note:** This is provided for testing purposes only and is generally not recommended for production use due to performance at scale. Use QuantizedFlat or DiskANN instead.
+
 
 ### All-in-One Demo
 
