@@ -102,12 +102,20 @@ module openAi 'br/public:avm/res/cognitive-services/account:0.7.1' = {
         }
       }
     ]
-    roleAssignments: [
-      {
-        principalId: deploymentUserPrincipalId
-        roleDefinitionIdOrName: 'Cognitive Services OpenAI User'
-      }
-    ]
+    roleAssignments: concat(
+      [
+        {
+          principalId: managedIdentity.outputs.principalId
+          roleDefinitionIdOrName: 'Cognitive Services OpenAI User'
+        }
+      ],
+      !empty(deploymentUserPrincipalId) ? [
+        {
+          principalId: deploymentUserPrincipalId
+          roleDefinitionIdOrName: 'Cognitive Services OpenAI User'
+        }
+      ] : []
+    )
   }
 }
 
@@ -147,7 +155,7 @@ module cosmosDbAccount 'br/public:avm/res/document-db/database-account:0.8.1' = 
         ]
       }
     ]
-    sqlRoleAssignmentsPrincipalIds: union(
+    sqlRoleAssignmentsPrincipalIds: concat(
       [
         managedIdentity.outputs.principalId
       ],
