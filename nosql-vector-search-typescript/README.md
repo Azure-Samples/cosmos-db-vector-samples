@@ -1,19 +1,44 @@
 # No-sql Vector Search Samples
 
-https://learn.microsoft.com/en-us/azure/cosmos-db/nosql/vector-search
+This sample demonstrates vector search capabilities in Azure Cosmos DB for NoSQL using TypeScript with Microsoft Entra ID authentication.
 
-https://learn.microsoft.com/en-us/azure/cosmos-db/nosql/how-to-dotnet-vector-index-query
+## Important: Authentication and Resource Management
 
-Example output: 
+### Prerequisites
+
+1. **Azure Resources**: The database and container must be created **before** running the sample code. These samples use **data plane RBAC only** and cannot create resources programmatically.
+
+2. **Resource Creation**: Use one of the following methods to create your Azure Cosmos DB database and container:
+   - **Azure Developer CLI (`azd`)**: Provisions resources with your local developer's identity
+   - **Azure Portal**: [Create resources manually](https://portal.azure.com)
+   - **Azure CLI**: Use `az cosmosdb sql database create` and `az cosmosdb sql container create` commands
+
+3. **Authentication**: This sample uses **Microsoft Entra ID (formerly Azure AD)** authentication with the data plane SDK. The assigned RBAC roles support data plane operations (reading/writing documents) only, not management plane operations (creating/deleting databases or containers).
+
+### Management Plane vs. Data Plane
+
+Understanding the difference between management plane and data plane access is crucial:
+
+- **Management Plane**: Creating, deleting, or modifying databases and containers. Requires Azure Resource Manager (ARM) permissions or account keys.
+- **Data Plane**: Reading, writing, querying, and managing documents within existing containers. Supported via Entra ID RBAC roles.
+
+**This sample uses data plane access only.** All code assumes that databases and containers already exist.
+
+For more information, see:
+- [Azure Cosmos DB role-based access control](https://learn.microsoft.com/azure/cosmos-db/role-based-access-control)
+- [Configure role-based access control with Microsoft Entra ID](https://learn.microsoft.com/azure/cosmos-db/how-to-setup-rbac)
+- [Azure Cosmos DB security overview](https://learn.microsoft.com/azure/cosmos-db/security)
+
+## Reference Documentation
+
+- [Azure Cosmos DB NoSQL Vector Search](https://learn.microsoft.com/azure/cosmos-db/nosql/vector-search)
+- [How to use vector search in Azure Cosmos DB for NoSQL](https://learn.microsoft.com/azure/cosmos-db/nosql/how-to-dotnet-vector-index-query)
+
+## Example output:
 
 ```console
 Using database Hotels and container hotels-at-scale-2...
 Using ID field: HotelId and partition key path: /HotelId
-Ensuring database Hotels exists...
-Database Hotels ensured.
-Ensuring container hotels-at-scale-2 exists with partition key /HotelId...
-Container hotels-at-scale-2 ensured.
-Reading JSON file from ../data/HotelsData_toCosmosDB_Vector.json
 Reading JSON file from ../data/HotelsData_toCosmosDB_Vector.json
 {"timestamp":"2025-09-08T21:34:33.340Z","level":"INFO","correlationId":"d285ee6f-c04c-4ab7-b524-4fd4bad77a46","message":"Starting resilient insert operation","data":{"documentCount":50,"batchSize":50}}
 {"timestamp":"2025-09-08T21:34:33.341Z","level":"INFO","correlationId":"d285ee6f-c04c-4ab7-b524-4fd4bad77a46","message":"Processing batch 1/1","data":{"batchSize":50,"totalProcessed":0}}
