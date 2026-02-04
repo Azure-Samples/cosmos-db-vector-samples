@@ -32,50 +32,15 @@ async function main() {
             throw new Error('Database client is not configured. Please check your environment variables.');
         }
 
-        const { database } = await dbClient.databases.createIfNotExists({ id: config.dbName });
-        console.log('Database ready:', config.dbName);
+        try {
+            const database = dbClient.database(config.dbName);
+            console.log('Connected to database:', config.dbName);
 
-        const vectorEmbeddingPolicy: VectorEmbeddingPolicy = {
-            vectorEmbeddings: [
-                {
-                    path: `/${config.embeddedField}`,
-                    dataType: VectorEmbeddingDataType.Float32,
-                    dimensions: config.embeddingDimensions,
-                    distanceFunction: VectorEmbeddingDistanceFunction.Cosine,
-                }
-            ],
-        };
+            const container = database.container(config.collectionName);
+            console.log('Connected to container:', config.collectionName);
 
-        const indexingPolicy: IndexingPolicy = {
-            vectorIndexes: [
-                { 
-                    path: `/${config.embeddedField}`, 
-                    type: VectorIndexType.QuantizedFlat 
-                },
-            ],
-            includedPaths: [
-                {
-                    path: "/*",
-                },
-            ],
-            excludedPaths: [
-                {
-                    path: `/${config.embeddedField}/*`,
-                }
-            ]
-        };
-
-        await database.containers.createIfNotExists({
-            id: config.collectionName,
-            vectorEmbeddingPolicy: vectorEmbeddingPolicy,
-            indexingPolicy: indexingPolicy,
-            partitionKey: {
-                paths: ['/HotelId']
-            }
-        });
-        console.log('Created container:', config.collectionName);
-
-        const container = database.container(config.collectionName);
+            // Verify container exists by attempting a read
+            await container.read();
         const data = await readFileReturnJson(path.join(__dirname, "..", config.dataFile));
         const insertSummary = await insertData(config, container, data.slice(0, config.batchSize));
 
@@ -94,8 +59,13 @@ async function main() {
             })
             .fetchAll();
 
-        printSearchResults(insertSummary, resources, requestCharge);
-
+            printSearchResults(insertSummary, resources, requestCharge);
+        } catch (error) {
+            if (error.code === 404) {
+                throw new Error(`Container or database not found. Ensure database '${config.dbName}' and container '${config.collectionName}' exist before running this script.`);
+            }
+            throw error;
+        }
     } catch (error) {
         console.error('App failed:', error);
         process.exitCode = 1;
