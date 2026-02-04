@@ -1,5 +1,6 @@
 import path from 'path';
 import { readFileReturnJson, getClientsPasswordless, insertData } from './utils.js';
+import {  VectorEmbeddingPolicy, VectorEmbeddingDataType, VectorEmbeddingDistanceFunction, IndexingPolicy, VectorIndexType } from '@azure/cosmos';
 // ESM specific features - create __dirname equivalent
 import { fileURLToPath } from "node:url";
 import { dirname } from "node:path";
@@ -33,14 +34,46 @@ async function main() {
         throw new Error('Cosmos DB client is not configured properly. Please check your environment variables.');
     }
 
-        // Get database and container references (assumes they already exist)
-        const database = dbClient.database(config.dbName);
+        // Get database reference
+        const { database } = await dbClient.databases.createIfNotExists({ id: config.dbName });
+
+        // Create the vector index
+        const vectorEmbeddingPolicy: VectorEmbeddingPolicy = {
+            vectorEmbeddings: [
+                {
+                    path: "/text_embedding_ada_002",
+                    dataType: VectorEmbeddingDataType.Float32,
+                    dimensions: config.embeddingDimensions,
+                    distanceFunction: VectorEmbeddingDistanceFunction.Cosine,
+                }
+            ],
+        };
+
+        const indexingPolicy: IndexingPolicy = {
+            vectorIndexes: [
+                { path: "/text_embedding_ada_002", type: VectorIndexType.DiskANN },
+            ],
+            includedPaths: [
+                {
+                    path: "/*",
+                },
+            ],
+            excludedPaths: [
+                {
+                    path: "/text_embedding_ada_002/*",
+                }
+            ]
+        };
+        // create container
+        const { resource: containerdef } = await database.containers.createIfNotExists({
+            id: config.collectionName,
+            vectorEmbeddingPolicy: vectorEmbeddingPolicy,
+            indexingPolicy: indexingPolicy,
+        });
+        // get container reference
         const container = database.container(config.collectionName);
 
-        console.log(`Using database '${config.dbName}' and container '${config.collectionName}'`);
-        console.log('Note: Database and container must exist before running this sample.');
-        console.log('Create them via Azure Portal, Azure CLI, or Azure Developer CLI (azd).\n');
-
+        console.log('Created collection:', config.collectionName);
         const data = await readFileReturnJson(path.join(__dirname, "..", config.dataFile));
         const insertSummary = await insertData(config, container, data);
 
@@ -64,28 +97,11 @@ async function main() {
             console.log(`${item.HotelName} with score ${item.SimilarityScore} `);
         }
 
+
     } catch (error) {
         console.error('App failed:', error);
-        
-        // Provide helpful error message if resources don't exist
-        if (error instanceof Error || (typeof error === 'object' && error !== null)) {
-            const err = error as any;
-            if (err?.message?.includes('NotFound') || err?.message?.includes('does not exist') || 
-                err?.message?.includes('ResourceNotFound') || err?.code === 404 || err?.statusCode === 404) {
-                console.error('\n=== RESOURCE NOT FOUND ===');
-                console.error(`The database '${config.dbName}' or container '${config.collectionName}' does not exist.`);
-                console.error('\nPlease create these resources before running this sample:');
-                console.error('1. Via Azure Portal: https://portal.azure.com');
-                console.error('2. Via Azure CLI:');
-                console.error(`   az cosmosdb sql database create --account-name <account> --name ${config.dbName} --resource-group <rg>`);
-                console.error(`   az cosmosdb sql container create --account-name <account> --database-name ${config.dbName} --name ${config.collectionName} --partition-key-path /id --resource-group <rg>`);
-                console.error('3. Via Azure Developer CLI: azd up');
-                console.error('\nNote: This sample uses data plane RBAC which does not support creating resources programmatically.');
-            }
-        }
-        
         process.exitCode = 1;
-    }
+    } 
 }
 
 // Execute the main function

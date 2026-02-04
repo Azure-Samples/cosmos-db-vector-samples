@@ -771,6 +771,46 @@ export async function resilientInsert(
   return result;
 }
 
+/**
+ * Ensure database and container exist
+ */
+async function ensureDatabaseAndContainer(
+  client: any, 
+  databaseName: string, 
+  containerName: string, 
+  partitionKeyPath: string
+): Promise<{ database: any, container: any }> {
+  try {
+    console.log(`Ensuring database ${databaseName} exists...`);
+    const { database } = await client.databases.createIfNotExists({ id: databaseName });
+    console.log(`Database ${databaseName} ensured.`);
+
+    console.log(`Ensuring container ${containerName} exists with partition key ${partitionKeyPath}...`);
+    const { container } = await database.containers.createIfNotExists({ 
+      id: containerName,
+      partitionKey: { paths: [partitionKeyPath] }
+    });
+    console.log(`Container ${containerName} ensured.`);
+
+    return { database, container };
+  } catch (error: any) {
+    console.error(`\nERROR: Cannot access database or container. Please ensure they exist.`);
+    console.error(`Error details: ${error.message}\n`);
+    console.error(`IMPORTANT: You need to create the database and container manually before running this script:\n`);
+    console.error(`1. Database name: ${databaseName}`);
+    console.error(`2. Container name: ${containerName} `);
+    console.error(`3. Partition key: ${partitionKeyPath}\n`);
+    console.error(`You can create these resources through:`);
+    console.error(`- Azure Portal: https://portal.azure.com`);
+    console.error(`- Azure CLI: `);
+    console.error(`  az cosmosdb sql database create --account-name <your-account> --name ${databaseName} --resource-group <your-resource-group>`);
+    console.error(`  az cosmosdb sql container create --account-name <your-account> --database-name ${databaseName} --name ${containerName} --partition-key-path ${partitionKeyPath} --resource-group <your-resource-group>\n`);
+    console.error(`The account you're using doesn't have permission to create these resources programmatically.`);
+    
+    throw error;
+  }
+}
+
 async function main() {
 
   // Create Cosmos client
@@ -791,13 +831,15 @@ async function main() {
 
   console.log(`Using database ${databaseName} and container ${containerName}...`);
   console.log(`Using ID field: ${config.idField} and partition key path: ${config.partitionKeyPath}`);
-  console.log('Note: Database and container must exist before running this sample.');
-  console.log('Create them via Azure Portal, Azure CLI, or Azure Developer CLI (azd).\n');
   
   try {
-    // Get database and container references (assumes they already exist)
-    const database = client.database(databaseName);
-    const container = database.container(containerName);
+    // Ensure database and container exist
+    const { container } = await ensureDatabaseAndContainer(
+      client, 
+      databaseName, 
+      containerName, 
+      config.partitionKeyPath
+    );
 
     // Load data
     const dataPath = process.env.DATA_FILE_WITH_VECTORS || '../../data/HotelsData_toCosmosDB_Vector.json';
@@ -830,19 +872,7 @@ async function main() {
     console.log(`which would result in approximately ${(monthlyEstimate.projectedMonthlyRUs / 1_000_000).toFixed(2)} million RUs per month.`);
     console.log(`The calculation extrapolates your current usage pattern over a 30-day period.`);
   } catch (err: any) {
-    // Provide helpful error message if resources don't exist
-    if (err && (err?.message?.includes('NotFound') || err?.message?.includes('does not exist') || 
-        err?.message?.includes('ResourceNotFound') || err?.code === 404 || err?.statusCode === 404)) {
-      console.error('\n=== RESOURCE NOT FOUND ===');
-      console.error(`The database '${databaseName}' or container '${containerName}' does not exist.`);
-      console.error('\nPlease create these resources before running this sample:');
-      console.error('1. Via Azure Portal: https://portal.azure.com');
-      console.error('2. Via Azure CLI:');
-      console.error(`   az cosmosdb sql database create --account-name <account> --name ${databaseName} --resource-group <rg>`);
-      console.error(`   az cosmosdb sql container create --account-name <account> --database-name ${databaseName} --name ${containerName} --partition-key-path ${config.partitionKeyPath} --resource-group <rg>`);
-      console.error('3. Via Azure Developer CLI: azd up');
-      console.error('\nNote: This sample uses data plane RBAC which does not support creating resources programmatically.');
-    }
+    // The detailed error message is already handled in ensureDatabaseAndContainer
     throw err;
   }
 }
