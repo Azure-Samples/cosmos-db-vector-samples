@@ -68,9 +68,10 @@ async function main() {
         console.error('App failed:', error);
         
         // Provide helpful error message if resources don't exist
-        if (error instanceof Error) {
-            if (error.message.includes('NotFound') || error.message.includes('does not exist') || 
-                error.message.includes('ResourceNotFound') || error.message.includes('404')) {
+        if (error instanceof Error || (typeof error === 'object' && error !== null)) {
+            const err = error as any;
+            if (err?.message?.includes('NotFound') || err?.message?.includes('does not exist') || 
+                err?.message?.includes('ResourceNotFound') || err?.code === 404 || err?.statusCode === 404) {
                 console.error('\n=== RESOURCE NOT FOUND ===');
                 console.error(`The database '${config.dbName}' or container '${config.collectionName}' does not exist.`);
                 console.error('\nPlease create these resources before running this sample:');
@@ -84,7 +85,7 @@ async function main() {
         }
         
         process.exitCode = 1;
-    } 
+    }
 }
 
 // Execute the main function

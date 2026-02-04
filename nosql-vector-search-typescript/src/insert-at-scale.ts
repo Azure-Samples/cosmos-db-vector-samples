@@ -831,8 +831,8 @@ async function main() {
     console.log(`The calculation extrapolates your current usage pattern over a 30-day period.`);
   } catch (err: any) {
     // Provide helpful error message if resources don't exist
-    if (err.message && (err.message.includes('NotFound') || err.message.includes('does not exist') || 
-        err.message.includes('ResourceNotFound') || err.code === 404 || err.statusCode === 404)) {
+    if (err && (err?.message?.includes('NotFound') || err?.message?.includes('does not exist') || 
+        err?.message?.includes('ResourceNotFound') || err?.code === 404 || err?.statusCode === 404)) {
       console.error('\n=== RESOURCE NOT FOUND ===');
       console.error(`The database '${databaseName}' or container '${containerName}' does not exist.`);
       console.error('\nPlease create these resources before running this sample:');
