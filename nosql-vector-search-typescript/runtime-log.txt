@@ -1,0 +1,75 @@
+PS C:\Users\diberry\repos\samples\cosmos-db-vector-samples\nosql-vector-search-typescript> npm run create-env
+
+> ts-cosmos-nodejs-nosql-vector-samples@1.0.0 create-env
+> azd env get-values > .env
+
+PS C:\Users\diberry\repos\samples\cosmos-db-vector-samples\nosql-vector-search-typescript> npm run build
+
+> ts-cosmos-nodejs-nosql-vector-samples@1.0.0 build
+> tsc
+
+PS C:\Users\diberry\repos\samples\cosmos-db-vector-samples\nosql-vector-search-typescript> npm run start:flat
+
+> ts-cosmos-nodejs-nosql-vector-samples@1.0.0 start:flat
+> node --env-file .env dist/flat.js
+
+Database ready: Hotels
+Created container: hotels_flat
+Reading JSON file from C:\Users\diberry\repos\samples\cosmos-db-vector-samples\data\HotelsData_toCosmosDB_Vector.json
+Processing in batches of 50...
+
+--- Insert Summary ---
+Total: 50, Inserted: 50, Failed: 0
+
+--- Search Results ---
+1. Royal Cottage Resort, Score: 0.4991
+2. Country Comfort Inn, Score: 0.4786
+3. Nordick's Valley Motel, Score: 0.4635
+4. Economy Universe Motel, Score: 0.4461
+5. Roach Motel, Score: 0.4388
+
+Request Charge: 5.37 RUs
+
+PS C:\Users\diberry\repos\samples\cosmos-db-vector-samples\nosql-vector-search-typescript> npm run start:quantizedflat
+
+> ts-cosmos-nodejs-nosql-vector-samples@1.0.0 start:quantizedflat
+> node --env-file .env dist/quantizedFlat.js
+
+Database ready: Hotels
+Created container: hotels_quantizedflat
+Reading JSON file from C:\Users\diberry\repos\samples\cosmos-db-vector-samples\data\HotelsData_toCosmosDB_Vector.json
+Processing in batches of 50...
+
+--- Insert Summary ---
+Total: 50, Inserted: 50, Failed: 0
+
+--- Search Results ---
+1. Royal Cottage Resort, Score: 0.4991
+2. Country Comfort Inn, Score: 0.4786
+3. Nordick's Valley Motel, Score: 0.4635
+4. Economy Universe Motel, Score: 0.4461
+5. Roach Motel, Score: 0.4388
+
+Request Charge: 5.37 RUs
+
+PS C:\Users\diberry\repos\samples\cosmos-db-vector-samples\nosql-vector-search-typescript> npm run start:diskann
+
+> ts-cosmos-nodejs-nosql-vector-samples@1.0.0 start:diskann
+> node --env-file .env dist/diskann.js
+
+Database ready: Hotels
+Created container: hotels_diskann
+Reading JSON file from C:\Users\diberry\repos\samples\cosmos-db-vector-samples\data\HotelsData_toCosmosDB_Vector.json
+Processing in batches of 50...
+
+--- Insert Summary ---
+Total: 50, Inserted: 50, Failed: 0
+
+--- Search Results ---
+1. Royal Cottage Resort, Score: 0.4991
+2. Country Comfort Inn, Score: 0.4786
+3. Nordick's Valley Motel, Score: 0.4635
+4. Economy Universe Motel, Score: 0.4461
+5. Roach Motel, Score: 0.4388
+
+Request Charge: 5.37 RUs

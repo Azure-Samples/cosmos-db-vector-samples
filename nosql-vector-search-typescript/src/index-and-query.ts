@@ -41,7 +41,7 @@ async function main() {
         const vectorEmbeddingPolicy: VectorEmbeddingPolicy = {
             vectorEmbeddings: [
                 {
-                    path: "/text_embedding_ada_002",
+                    path: "/vector",
                     dataType: VectorEmbeddingDataType.Float32,
                     dimensions: config.embeddingDimensions,
                     distanceFunction: VectorEmbeddingDistanceFunction.Cosine,
@@ -51,7 +51,7 @@ async function main() {
 
         const indexingPolicy: IndexingPolicy = {
             vectorIndexes: [
-                { path: "/text_embedding_ada_002", type: VectorIndexType.DiskANN },
+                { path: "/vector", type: VectorIndexType.DiskANN },
             ],
             includedPaths: [
                 {
@@ -60,7 +60,7 @@ async function main() {
             ],
             excludedPaths: [
                 {
-                    path: "/text_embedding_ada_002/*",
+                    path: "/vector/*",
                 }
             ]
         };

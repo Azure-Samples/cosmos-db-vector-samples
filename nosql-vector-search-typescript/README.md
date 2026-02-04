@@ -1,86 +1,645 @@
-# No-sql Vector Search Samples
+# Azure Cosmos DB NoSQL Vector Search with TypeScript
 
-https://learn.microsoft.com/en-us/azure/cosmos-db/nosql/vector-search
+This project demonstrates how to use **Azure Cosmos DB for NoSQL** as a vector store for AI-powered semantic search applications. It shows how to generate embeddings with Azure OpenAI, store vectors in JSON documents, and query with `VectorDistance` for nearest neighbors.
 
-https://learn.microsoft.com/en-us/azure/cosmos-db/nosql/how-to-dotnet-vector-index-query
+## 📚 Table of Contents
 
-Example output: 
+- [Architecture Overview](#architecture-overview)
+- [Features](#features)
+- [Prerequisites](#prerequisites)
+- [Getting Started](#getting-started)
+- [Understanding Vector Search](#understanding-vector-search)
+- [Vector Index Types](#vector-index-types)
+- [Distance Metrics](#distance-metrics)
+- [Code Examples](#code-examples)
+- [Running the Samples](#running-the-samples)
+- [Understanding Query Results](#understanding-query-results)
+- [Resources](#resources)
 
-```console
-Using database Hotels and container hotels-at-scale-2...
-Using ID field: HotelId and partition key path: /HotelId
-Ensuring database Hotels exists...
-Database Hotels ensured.
-Ensuring container hotels-at-scale-2 exists with partition key /HotelId...
-Container hotels-at-scale-2 ensured.
-Reading JSON file from ../data/HotelsData_toCosmosDB_Vector.json
-Reading JSON file from ../data/HotelsData_toCosmosDB_Vector.json
-{"timestamp":"2025-09-08T21:34:33.340Z","level":"INFO","correlationId":"d285ee6f-c04c-4ab7-b524-4fd4bad77a46","message":"Starting resilient insert operation","data":{"documentCount":50,"batchSize":50}}
-{"timestamp":"2025-09-08T21:34:33.341Z","level":"INFO","correlationId":"d285ee6f-c04c-4ab7-b524-4fd4bad77a46","message":"Processing batch 1/1","data":{"batchSize":50,"totalProcessed":0}}
-{"timestamp":"2025-09-08T21:34:33.740Z","level":"DEBUG","correlationId":"d285ee6f-c04c-4ab7-b524-4fd4bad77a46","message":"Document inserted successfully","data":{"docId":"1","requestCharge":308.05}}
-{"timestamp":"2025-09-08T21:34:34.010Z","level":"DEBUG","correlationId":"d285ee6f-c04c-4ab7-b524-4fd4bad77a46","message":"Document inserted successfully","data":{"docId":"10","requestCharge":311.67}}
-{"timestamp":"2025-09-08T21:34:34.248Z","level":"DEBUG","correlationId":"d285ee6f-c04c-4ab7-b524-4fd4bad77a46","message":"Document inserted successfully","data":{"docId":"11","requestCharge":309.57}}
-{"timestamp":"2025-09-08T21:34:34.453Z","level":"DEBUG","correlationId":"d285ee6f-c04c-4ab7-b524-4fd4bad77a46","message":"Document inserted successfully","data":{"docId":"12","requestCharge":313.95}}
-{"timestamp":"2025-09-08T21:34:34.662Z","level":"DEBUG","correlationId":"d285ee6f-c04c-4ab7-b524-4fd4bad77a46","message":"Document inserted successfully","data":{"docId":"13","requestCharge":312.62}}
-{"timestamp":"2025-09-08T21:34:34.877Z","level":"DEBUG","correlationId":"d285ee6f-c04c-4ab7-b524-4fd4bad77a46","message":"Document inserted successfully","data":{"docId":"14","requestCharge":315.67}}
-{"timestamp":"2025-09-08T21:34:35.083Z","level":"DEBUG","correlationId":"d285ee6f-c04c-4ab7-b524-4fd4bad77a46","message":"Document inserted successfully","data":{"docId":"15","requestCharge":314.71}}
-{"timestamp":"2025-09-08T21:34:35.290Z","level":"DEBUG","correlationId":"d285ee6f-c04c-4ab7-b524-4fd4bad77a46","message":"Document inserted successfully","data":{"docId":"16","requestCharge":311.1}}
-{"timestamp":"2025-09-08T21:34:35.541Z","level":"DEBUG","correlationId":"d285ee6f-c04c-4ab7-b524-4fd4bad77a46","message":"Document inserted successfully","data":{"docId":"17","requestCharge":313.76}}
-{"timestamp":"2025-09-08T21:34:35.750Z","level":"DEBUG","correlationId":"d285ee6f-c04c-4ab7-b524-4fd4bad77a46","message":"Document inserted successfully","data":{"docId":"18","requestCharge":309.38}}
-{"timestamp":"2025-09-08T21:34:35.959Z","level":"DEBUG","correlationId":"d285ee6f-c04c-4ab7-b524-4fd4bad77a46","message":"Document inserted successfully","data":{"docId":"19","requestCharge":313.57}}
-{"timestamp":"2025-09-08T21:34:36.164Z","level":"DEBUG","correlationId":"d285ee6f-c04c-4ab7-b524-4fd4bad77a46","message":"Document inserted successfully","data":{"docId":"2","requestCharge":303.48}}
-{"timestamp":"2025-09-08T21:34:36.390Z","level":"DEBUG","correlationId":"d285ee6f-c04c-4ab7-b524-4fd4bad77a46","message":"Document inserted successfully","data":{"docId":"20","requestCharge":311.67}}
-{"timestamp":"2025-09-08T21:34:36.595Z","level":"DEBUG","correlationId":"d285ee6f-c04c-4ab7-b524-4fd4bad77a46","message":"Document inserted successfully","data":{"docId":"21","requestCharge":311.29}}
-{"timestamp":"2025-09-08T21:34:36.803Z","level":"DEBUG","correlationId":"d285ee6f-c04c-4ab7-b524-4fd4bad77a46","message":"Document inserted successfully","data":{"docId":"22","requestCharge":309}}
-{"timestamp":"2025-09-08T21:34:37.006Z","level":"DEBUG","correlationId":"d285ee6f-c04c-4ab7-b524-4fd4bad77a46","message":"Document inserted successfully","data":{"docId":"23","requestCharge":312.62}}
-{"timestamp":"2025-09-08T21:34:37.251Z","level":"DEBUG","correlationId":"d285ee6f-c04c-4ab7-b524-4fd4bad77a46","message":"Document inserted successfully","data":{"docId":"24","requestCharge":305.38}}
-{"timestamp":"2025-09-08T21:34:37.462Z","level":"DEBUG","correlationId":"d285ee6f-c04c-4ab7-b524-4fd4bad77a46","message":"Document inserted successfully","data":{"docId":"25","requestCharge":313.95}}
-{"timestamp":"2025-09-08T21:34:37.669Z","level":"DEBUG","correlationId":"d285ee6f-c04c-4ab7-b524-4fd4bad77a46","message":"Document inserted successfully","data":{"docId":"26","requestCharge":305.95}}
-{"timestamp":"2025-09-08T21:34:37.875Z","level":"DEBUG","correlationId":"d285ee6f-c04c-4ab7-b524-4fd4bad77a46","message":"Document inserted successfully","data":{"docId":"27","requestCharge":302.71}}
-{"timestamp":"2025-09-08T21:34:38.081Z","level":"DEBUG","correlationId":"d285ee6f-c04c-4ab7-b524-4fd4bad77a46","message":"Document inserted successfully","data":{"docId":"28","requestCharge":313.95}}
-{"timestamp":"2025-09-08T21:34:38.279Z","level":"DEBUG","correlationId":"d285ee6f-c04c-4ab7-b524-4fd4bad77a46","message":"Document inserted successfully","data":{"docId":"29","requestCharge":305}}
-{"timestamp":"2025-09-08T21:34:38.489Z","level":"DEBUG","correlationId":"d285ee6f-c04c-4ab7-b524-4fd4bad77a46","message":"Document inserted successfully","data":{"docId":"3","requestCharge":314.71}}
-{"timestamp":"2025-09-08T21:34:38.709Z","level":"DEBUG","correlationId":"d285ee6f-c04c-4ab7-b524-4fd4bad77a46","message":"Document inserted successfully","data":{"docId":"30","requestCharge":305.95}}
-{"timestamp":"2025-09-08T21:34:38.919Z","level":"DEBUG","correlationId":"d285ee6f-c04c-4ab7-b524-4fd4bad77a46","message":"Document inserted successfully","data":{"docId":"31","requestCharge":315.48}}
-{"timestamp":"2025-09-08T21:34:39.125Z","level":"DEBUG","correlationId":"d285ee6f-c04c-4ab7-b524-4fd4bad77a46","message":"Document inserted successfully","data":{"docId":"32","requestCharge":303.48}}
-{"timestamp":"2025-09-08T21:34:39.334Z","level":"DEBUG","correlationId":"d285ee6f-c04c-4ab7-b524-4fd4bad77a46","message":"Document inserted successfully","data":{"docId":"33","requestCharge":314.71}}
-{"timestamp":"2025-09-08T21:34:39.541Z","level":"DEBUG","correlationId":"d285ee6f-c04c-4ab7-b524-4fd4bad77a46","message":"Document inserted successfully","data":{"docId":"34","requestCharge":313.57}}
-{"timestamp":"2025-09-08T21:34:39.747Z","level":"DEBUG","correlationId":"d285ee6f-c04c-4ab7-b524-4fd4bad77a46","message":"Document inserted successfully","data":{"docId":"35","requestCharge":310.9}}
-{"timestamp":"2025-09-08T21:34:40.004Z","level":"DEBUG","correlationId":"d285ee6f-c04c-4ab7-b524-4fd4bad77a46","message":"Document inserted successfully","data":{"docId":"36","requestCharge":310.52}}
-{"timestamp":"2025-09-08T21:34:40.210Z","level":"DEBUG","correlationId":"d285ee6f-c04c-4ab7-b524-4fd4bad77a46","message":"Document inserted successfully","data":{"docId":"37","requestCharge":316.62}}
-{"timestamp":"2025-09-08T21:34:40.422Z","level":"DEBUG","correlationId":"d285ee6f-c04c-4ab7-b524-4fd4bad77a46","message":"Document inserted successfully","data":{"docId":"38","requestCharge":309.95}}
-{"timestamp":"2025-09-08T21:34:40.639Z","level":"DEBUG","correlationId":"d285ee6f-c04c-4ab7-b524-4fd4bad77a46","message":"Document inserted successfully","data":{"docId":"39","requestCharge":315.67}}
-{"timestamp":"2025-09-08T21:34:40.852Z","level":"DEBUG","correlationId":"d285ee6f-c04c-4ab7-b524-4fd4bad77a46","message":"Document inserted successfully","data":{"docId":"4","requestCharge":312.62}}
-{"timestamp":"2025-09-08T21:34:41.149Z","level":"DEBUG","correlationId":"d285ee6f-c04c-4ab7-b524-4fd4bad77a46","message":"Document inserted successfully","data":{"docId":"40","requestCharge":309.19}}
-{"timestamp":"2025-09-08T21:34:41.356Z","level":"DEBUG","correlationId":"d285ee6f-c04c-4ab7-b524-4fd4bad77a46","message":"Document inserted successfully","data":{"docId":"41","requestCharge":312.43}}
-{"timestamp":"2025-09-08T21:34:41.560Z","level":"DEBUG","correlationId":"d285ee6f-c04c-4ab7-b524-4fd4bad77a46","message":"Document inserted successfully","data":{"docId":"42","requestCharge":310.9}}
-{"timestamp":"2025-09-08T21:34:41.771Z","level":"DEBUG","correlationId":"d285ee6f-c04c-4ab7-b524-4fd4bad77a46","message":"Document inserted successfully","data":{"docId":"43","requestCharge":317.14}}
-{"timestamp":"2025-09-08T21:34:41.980Z","level":"DEBUG","correlationId":"d285ee6f-c04c-4ab7-b524-4fd4bad77a46","message":"Document inserted successfully","data":{"docId":"44","requestCharge":311.1}}
-{"timestamp":"2025-09-08T21:34:42.188Z","level":"DEBUG","correlationId":"d285ee6f-c04c-4ab7-b524-4fd4bad77a46","message":"Document inserted successfully","data":{"docId":"45","requestCharge":306.14}}
-{"timestamp":"2025-09-08T21:34:42.394Z","level":"DEBUG","correlationId":"d285ee6f-c04c-4ab7-b524-4fd4bad77a46","message":"Document inserted successfully","data":{"docId":"46","requestCharge":315.1}}
-{"timestamp":"2025-09-08T21:34:42.599Z","level":"DEBUG","correlationId":"d285ee6f-c04c-4ab7-b524-4fd4bad77a46","message":"Document inserted successfully","data":{"docId":"47","requestCharge":308.62}}
-{"timestamp":"2025-09-08T21:34:42.858Z","level":"DEBUG","correlationId":"d285ee6f-c04c-4ab7-b524-4fd4bad77a46","message":"Document inserted successfully","data":{"docId":"48","requestCharge":304.24}}
-{"timestamp":"2025-09-08T21:34:43.068Z","level":"DEBUG","correlationId":"d285ee6f-c04c-4ab7-b524-4fd4bad77a46","message":"Document inserted successfully","data":{"docId":"49","requestCharge":316.43}}
-{"timestamp":"2025-09-08T21:34:43.274Z","level":"DEBUG","correlationId":"d285ee6f-c04c-4ab7-b524-4fd4bad77a46","message":"Document inserted successfully","data":{"docId":"5","requestCharge":308.05}}
-{"timestamp":"2025-09-08T21:34:43.485Z","level":"DEBUG","correlationId":"d285ee6f-c04c-4ab7-b524-4fd4bad77a46","message":"Document inserted successfully","data":{"docId":"50","requestCharge":314.9}}
-{"timestamp":"2025-09-08T21:34:43.731Z","level":"DEBUG","correlationId":"d285ee6f-c04c-4ab7-b524-4fd4bad77a46","message":"Document inserted successfully","data":{"docId":"6","requestCharge":308.43}}
-{"timestamp":"2025-09-08T21:34:43.942Z","level":"DEBUG","correlationId":"d285ee6f-c04c-4ab7-b524-4fd4bad77a46","message":"Document inserted successfully","data":{"docId":"7","requestCharge":315.48}}
-{"timestamp":"2025-09-08T21:34:44.149Z","level":"DEBUG","correlationId":"d285ee6f-c04c-4ab7-b524-4fd4bad77a46","message":"Document inserted successfully","data":{"docId":"8","requestCharge":310.14}}
-{"timestamp":"2025-09-08T21:34:44.357Z","level":"DEBUG","correlationId":"d285ee6f-c04c-4ab7-b524-4fd4bad77a46","message":"Document inserted successfully","data":{"docId":"9","requestCharge":313.57}}
-{"timestamp":"2025-09-08T21:34:44.357Z","level":"INFO","correlationId":"d285ee6f-c04c-4ab7-b524-4fd4bad77a46","message":"Resilient insert operation completed","data":{"inserted":50,"failed":0,"retried":0,"totalRUs":15555.09,"durationMs":11017}}
+## 🏗️ Architecture Overview
 
--------- OPERATION RESULTS --------
-Inserted 50 of 50 documents
-Total RUs consumed: 15,555.09
-Average RU per document: 311.10
+This application demonstrates the following workflow:
 
--------- CURRENT OPERATION COST --------
-COST OF THIS OPERATION: $0.000124
-This is calculated as: 15,555.09 RUs ÷ 1,000,000 × $0.008 per million RUs
-
--------- PROJECTED MONTHLY COST --------
-ESTIMATED MONTHLY COST: $29.21
-This estimate is based on your current consumption rate of 1408.47 RU/s
-which would result in approximately 3650.74 million RUs per month.
-The calculation extrapolates your current usage pattern over a 30-day period.
 ```
+┌──────────┐      Request embeddings      ┌───────────────┐
+│   App    │ ─────────────────────────────> │ Azure OpenAI  │
+└──────────┘                                └───────────────┘
+     │                                              │
+     │ Request AAD token                       Return vector
+     │                                              │
+     ▼                                              ▼
+┌──────────────┐  Role assignment    ┌─────────────────────┐
+│   Managed    │ ◄──────────────────>│   Cosmos DB NoSQL   │
+│   Identity   │                      │   (Vector Store)    │
+└──────────────┘                      └─────────────────────┘
+     │                                        ▲
+     │ AAD token                              │
+     └────────────────────────────────────────┘
+              Upsert doc with vector
+              VectorDistance top-k query
+              Matches + scores
+```
+
+## ✨ Features
+
+This project demonstrates:
+
+✅ **Embedding Generation** - Generate vector embeddings using Azure OpenAI  
+✅ **Vector Storage** - Store embeddings in JSON documents in Cosmos DB  
+✅ **Vector Indexing** - Multiple indexing algorithms (DiskANN and QuantizedFlat are recommended)  
+✅ **Similarity Search** - Query with `VectorDistance` for nearest neighbors  
+✅ **Managed Identity** - Passwordless authentication with Azure AD  
+✅ **Distance Metrics** - Support for Cosine, Euclidean (L2), and DotProduct  
+✅ **Score Interpretation** - Understand and interpret similarity scores  
+
+## 📋 Prerequisites
+
+Before you begin, ensure you have:
+
+- **Azure Subscription** - [Create a free account](https://azure.microsoft.com/free/)
+- **Node.js** - Version 18.x or higher ([Download](https://nodejs.org/))
+- **TypeScript** - Installed globally (`npm install -g typescript`)
+- **Azure Cosmos DB Account** - NoSQL API account ([Create via Portal](https://learn.microsoft.com/azure/cosmos-db/quickstart-template-bicep))
+- **Azure OpenAI Service** - With `text-embedding-3-small` model deployed ([Setup Guide](https://learn.microsoft.com/azure/ai-services/openai/how-to/create-resource))
+- **Azure CLI** - For authentication ([Install Guide](https://learn.microsoft.com/cli/azure/install-azure-cli))
+
+## 🚀 Getting Started
+
+### Option A: Automated Provisioning (Recommended)
+
+Use the provided Azure CLI script to automatically create all required resources with proper RBAC roles:
+
+```bash
+# Set your Azure AD user principal
+export USER_PRINCIPAL="your-email@domain.com"
+
+# Run the provisioning script
+./provision-azure-resources.sh
+```
+
+The script will:
+- Create a resource group
+- Create a user-assigned managed identity
+- Create an Azure Cosmos DB account (NoSQL API) with database and container
+- Create an Azure OpenAI account with text-embedding-3-small model deployed
+- Assign proper RBAC roles for both control plane and data plane access:
+  - **Cosmos DB**: Built-in Data Contributor (data plane) + DocumentDB Account Contributor (control plane)
+  - **Azure OpenAI**: Cognitive Services OpenAI User
+- Output environment configuration ready to copy to your `.env` file
+
+**Customization Options:**
+
+```bash
+# Customize resource names and location
+export USER_PRINCIPAL="your-email@domain.com"
+export RESOURCE_PREFIX="my-vector-demo"
+export LOCATION="eastus2"
+./provision-azure-resources.sh
+```
+
+After the script completes, copy the environment configuration output to your `.env` file.
+
+### Option B: Manual Setup
+
+#### 1. Clone the Repository
+
+```bash
+git clone https://github.com/Azure-Samples/cosmos-db-vector-samples.git
+cd cosmos-db-vector-samples/nosql-vector-search-typescript
+```
+
+#### 2. Install Dependencies
+
+```bash
+npm install
+```
+
+#### 3. Configure Environment Variables
+
+Create a `.env` file from the example:
+
+```bash
+cp .env.example .env
+```
+
+Edit `.env` with your Azure resource information:
+
+```env
+# Azure OpenAI Configuration
+AZURE_OPENAI_EMBEDDING_MODEL=text-embedding-3-small
+AZURE_OPENAI_EMBEDDING_API_VERSION=2023-05-15
+AZURE_OPENAI_EMBEDDING_ENDPOINT=https://<your-resource>.openai.azure.com
+
+# Cosmos DB Configuration
+COSMOS_ENDPOINT=https://<your-account>.documents.azure.com:443/
+
+# Data Configuration
+DATA_FILE_WITHOUT_VECTORS=../data/HotelsData_toCosmosDB.JSON
+DATA_FILE_WITH_VECTORS=../data/HotelsData_toCosmosDB_Vector.json
+FIELD_TO_EMBED=Description
+EMBEDDED_FIELD=vector
+EMBEDDING_DIMENSIONS=1536
+LOAD_SIZE_BATCH=50
+```
+
+#### 4. Set Up Azure Resources and RBAC
+
+**Create Cosmos DB Account:**
+
+```bash
+# Create Cosmos DB account
+az cosmosdb create \
+    --name <your-cosmos-account> \
+    --resource-group <your-rg> \
+    --location eastus \
+    --kind GlobalDocumentDB
+```
+
+**Assign Cosmos DB RBAC Roles:**
+
+Cosmos DB has custom RBAC roles for data plane access:
+
+```bash
+# Get your user object ID
+USER_ID=$(az ad user show --id your-email@domain.com --query id -o tsv)
+
+# Get Cosmos DB resource ID
+COSMOS_ID=$(az cosmosdb show --name <your-cosmos-account> --resource-group <your-rg> --query id -o tsv)
+
+# Assign data plane access (Cosmos DB Built-in Data Contributor)
+az cosmosdb sql role assignment create \
+    --account-name <your-cosmos-account> \
+    --resource-group <your-rg> \
+    --role-definition-id "00000000-0000-0000-0000-000000000002" \
+    --principal-id $USER_ID \
+    --scope $COSMOS_ID
+
+# Assign control plane access (DocumentDB Account Contributor)
+az role assignment create \
+    --assignee $USER_ID \
+    --role "DocumentDB Account Contributor" \
+    --scope $COSMOS_ID
+```
+
+**Create Azure OpenAI and Assign Roles:**
+
+```bash
+# Create Azure OpenAI account
+az cognitiveservices account create \
+    --name <your-openai-account> \
+    --resource-group <your-rg> \
+    --kind OpenAI \
+    --sku S0 \
+    --location eastus
+
+# Get OpenAI resource ID
+OPENAI_ID=$(az cognitiveservices account show --name <your-openai-account> --resource-group <your-rg> --query id -o tsv)
+
+# Assign OpenAI User role
+az role assignment create \
+    --assignee $USER_ID \
+    --role "Cognitive Services OpenAI User" \
+    --scope $OPENAI_ID
+
+# Deploy embedding model
+az cognitiveservices account deployment create \
+    --name <your-openai-account> \
+    --resource-group <your-rg> \
+    --deployment-name text-embedding-3-small \
+    --model-name text-embedding-3-small \
+    --model-version "2" \
+    --model-format OpenAI \
+    --sku-name "Standard" \
+    --sku-capacity 10
+```
+
+#### 5. Authenticate with Azure
+
+The samples use **managed identity** for passwordless authentication:
+
+```bash
+az login
+```
+
+#### 6. Generate Embeddings (Optional)
+
+If you need to generate embeddings for your data:
+
+```bash
+npm run build
+npm run start:embed
+```
+
+This reads hotel data from `DATA_FILE_WITHOUT_VECTORS`, generates embeddings using Azure OpenAI, and saves the result to `DATA_FILE_WITH_VECTORS`.
+
+## 🔍 Understanding Vector Search
+
+### What are Vector Embeddings?
+
+Vector embeddings are numerical representations of text, images, or other data in a high-dimensional space. Similar items have similar vector representations, allowing for semantic search rather than just keyword matching.
+
+**Example:**
+- Text: `"hotel by the lake"`
+- Vector: `[0.021, -0.045, 0.123, ..., 0.089]` (1536 dimensions)
+
+### How Does Vector Search Work?
+
+1. **Generate embeddings** for your documents using an embedding model
+2. **Store vectors** in Cosmos DB alongside your JSON documents
+3. **Create vector indexes** for efficient similarity search
+4. **Query** by generating an embedding for your search text
+5. **Find similar items** using distance functions (e.g., cosine similarity)
+
+### Storing Embeddings in Cosmos DB
+
+Embeddings are stored as arrays within your JSON documents:
+
+```json
+{
+  "HotelId": "1",
+  "HotelName": "Stay-Kay City Hotel",
+  "Description": "This classic hotel is fully-refurbished...",
+  "Rating": 3.6,
+  "vector": [0.021, -0.045, 0.123, ..., 0.089]
+}
+```
+
+## 🎯 Vector Index Types
+
+Cosmos DB for NoSQL supports three vector indexing algorithms. **For production workloads, we strongly recommend using QuantizedFlat or DiskANN** instead of Flat.
+
+### 1. **DiskANN** (Recommended for Production at Scale)
+
+```typescript
+vectorIndexes: [
+    { path: "/vector", type: VectorIndexType.DiskANN }
+]
+```
+
+**Characteristics:**
+- ⚡ Optimized for low latency, highly scalable workloads
+- 📊 High recall with configurable trade-offs
+- 💾 Efficient RU consumption at scale
+- 📐 Supports up to 4096 dimensions
+- 🎯 Ideal for RAG, semantic search, recommendations
+- ✅ **Recommended for most production scenarios**
+
+### 2. **QuantizedFlat** (Recommended for General Use)
+
+
+```typescript
+vectorIndexes: [
+    { path: "/vector", type: VectorIndexType.QuantizedFlat }
+]
+```
+
+**Characteristics:**
+- 🚀 Faster brute-force search on quantized vectors
+- 📊 High recall.
+- 📐 Supports up to 4096 dimensions
+- ⚖️ Balance of speed, accuracy, and cost for smaller datasets
+- ✅ **Recommended for most use cases**
+
+### 3. **Flat** (Not Recommended for General Use)
+
+**⚠️ Important:** Flat index should generally be avoided for most use cases. We strongly recommend using QuantizedFlat or DiskANN indexes instead.
+
+**Only use Flat for:** Testing purposes, very small datasets (hundreds of vectors), and small dimensional vectors ( <505 dimensions )
+
+```typescript
+vectorIndexes: [
+    { path: "/vector", type: VectorIndexType.Flat }
+]
+```
+
+**Characteristics:**
+- ✅ 100% recall (exact k-NN search using brute-force)
+- 🐌 Very slow for any significant dataset size
+- ⚠️ Scales linearly as the number of vectors increases.
+- 📏 Limited to only 505 dimensions
+- 🧪 Only suitable for testing or tiny datasets
+- ❌ **Not recommended for production use**
+
+**Why avoid Flat?**
+- Scales linearly, not optimized for larger scales
+- Dimension limitations prevent use with many modern embedding models
+- QuantizedFlat provides nearly identical accuracy with far better performance
+- No production benefits over QuantizedFlat or DiskANN
+
+### Comparison Table
+
+| Index Type      | Accuracy  | Performance | Scale                  | Dimensions | Use Case                                                                                  |
+|----------------|-----------|-------------|------------------------|-----------|---------------------------------------------------------------------------------------------|
+| **DiskANN**    | High      | Very Fast   | 50k+ vectors           | ≤ 4096     | Production, medium-to-large scale and when cost-efficiency/latency at scale are important |
+| **QuantizedFlat** | ~100%  | Fast        | Up to 50k+ vectors     | ≤ 4096     | Production or when searches isolated to small number of vectors with partition key filter |
+| **Flat**       | 100%      | Very Slow   | Thousands of vectors   | ≤ 505      | Dev/test on small dimensional vectors                                                      |
+
+## 📏 Distance Metrics
+
+Cosmos DB supports three distance functions for measuring vector similarity:
+
+### 1. **Cosine Similarity** (Recommended for most models)
+
+Measures the angle between vectors, independent of magnitude.
+
+```typescript
+distanceFunction: VectorEmbeddingDistanceFunction.Cosine
+```
+
+**Score Range:** 0.0 to 1.0 - Higher scores (closer to 1.0) indicate greater similarity, while lower scores indicate less similarity  
+**Example:** `"hotel by lake"` vs `"lakeside accommodation"` → Score: 0.92
+
+### 2. **Euclidean Distance (L2)**
+
+Measures the straight-line distance between vectors in n-dimensional space.
+
+```typescript
+distanceFunction: VectorEmbeddingDistanceFunction.Euclidean
+```
+
+**Score Range:** 0.0 to ∞ (lower = more similar)  
+**Example:** Two similar images → Distance: 1.23
+
+### 3. **Dot Product**
+
+Measures the projection of one vector onto another.
+
+```typescript
+distanceFunction: VectorEmbeddingDistanceFunction.DotProduct
+```
+
+**Score Range:** -∞ to +∞ (higher = more similar)  
+**Example:** User preferences vs item features → Score: 0.87
+
+## 💻 Code Examples
+
+### Creating a Vector-Enabled Container
+
+```typescript
+import { CosmosClient, VectorEmbeddingPolicy, VectorEmbeddingDataType, 
+         VectorEmbeddingDistanceFunction, IndexingPolicy, VectorIndexType } from '@azure/cosmos';
+import { DefaultAzureCredential } from '@azure/identity';
+
+// Create Cosmos DB client with managed identity
+const credential = new DefaultAzureCredential();
+const client = new CosmosClient({ 
+    endpoint: process.env.COSMOS_ENDPOINT!,
+    aadCredentials: credential
+});
+
+// Define vector embedding policy
+const vectorEmbeddingPolicy: VectorEmbeddingPolicy = {
+    vectorEmbeddings: [{
+        path: "/vector",
+        dataType: VectorEmbeddingDataType.Float32,
+        dimensions: 1536,
+        distanceFunction: VectorEmbeddingDistanceFunction.Cosine,
+    }]
+};
+
+// Define indexing policy with vector index
+const indexingPolicy: IndexingPolicy = {
+    vectorIndexes: [
+        { path: "/vector", type: VectorIndexType.DiskANN }
+    ],
+    includedPaths: [{ path: "/*" }],
+    excludedPaths: [{ path: "/vector/*" }]
+};
+
+// Create container
+const { database } = await client.databases.createIfNotExists({ id: "Hotels" });
+await database.containers.createIfNotExists({
+    id: "hotels",
+    vectorEmbeddingPolicy: vectorEmbeddingPolicy,
+    indexingPolicy: indexingPolicy,
+    partitionKey: { paths: ['/HotelId'] }
+});
+```
+
+### Inserting Documents with Vectors
+
+```typescript
+// Generate embedding using Azure OpenAI
+const embedding = await aiClient.embeddings.create({
+    model: "text-embedding-3-small",
+    input: ["This classic hotel is fully-refurbished..."]
+});
+
+// Insert document with vector
+const hotel = {
+    HotelId: "1",
+    HotelName: "Stay-Kay City Hotel",
+    Description: "This classic hotel is fully-refurbished...",
+    Rating: 3.6,
+    vector: embedding.data[0].embedding
+};
+
+await container.items.create(hotel);
+```
+
+### Querying with VectorDistance
+
+```typescript
+// Generate embedding for search query
+const queryEmbedding = await aiClient.embeddings.create({
+    model: "text-embedding-3-small",
+    input: ["find a hotel by a lake"]
+});
+
+// Perform vector similarity search
+const { resources } = await container.items.query({
+    query: `SELECT TOP 5 c.HotelName, c.Description, c.Rating, 
+            VectorDistance(c.vector, @embedding) AS SimilarityScore 
+            FROM c 
+            ORDER BY VectorDistance(c.vector, @embedding)`,
+    parameters: [
+        { name: "@embedding", value: queryEmbedding.data[0].embedding }
+    ]
+}).fetchAll();
+
+// Display results
+resources.forEach(item => {
+    console.log(`${item.HotelName} - Score: ${item.SimilarityScore.toFixed(4)}`);
+});
+```
+
+## 🏃 Running the Samples
+
+Build the TypeScript code:
+
+```bash
+npm run build
+```
+
+### Generate Embeddings
+
+```bash
+npm run start:embed
+```
+
+Reads hotel data, generates embeddings via Azure OpenAI, and saves to file.
+
+### Run DiskANN Demo (Recommended)
+
+```bash
+npm run start:diskann
+```
+
+Demonstrates vector search with DiskANN index - recommended for production at scale.
+
+### Run QuantizedFlat Demo (Recommended)
+
+```bash
+npm run start:quantizedflat
+```
+
+Demonstrates balanced vector search with QuantizedFlat index - recommended for general use.
+
+### Run Flat Index Demo (Testing Only)
+
+```bash
+npm run start:flat
+```
+
+Demonstrates exact vector search with Flat index. **Note:** This is provided for testing purposes only and is generally not recommended for production use due to performance at scale. Use QuantizedFlat or DiskANN instead.
+
+
+### All-in-One Demo
+
+```bash
+npm run start:index-and-query
+```
+
+Complete demo: creates index, inserts data, and performs search.
+
+### Enterprise-Grade Insert
+
+```bash
+npm run start:insert-at-scale
+```
+
+Demonstrates resilient, production-ready document insertion with retry logic.
+
+## 📊 Understanding Query Results
+
+### Sample Output
+
+```
+========================================
+Top 5 Results (DiskANN Index)
+========================================
+
+1. Lakeside Resort Hotel
+   Similarity Score: 0.9234
+   Rating: 4.5/5.0
+   Description: Beautiful lakeside hotel with stunning mountain views...
+
+2. Mountain View Lodge
+   Similarity Score: 0.8876
+   Rating: 4.2/5.0
+   Description: Cozy lodge overlooking pristine alpine lake...
+
+3. Harbor Inn
+   Similarity Score: 0.8543
+   Rating: 4.0/5.0
+   Description: Waterfront hotel with scenic harbor views...
+```
+
+### What Does a Query Return?
+
+A vector search query returns:
+
+1. **Selected Fields** - Any fields you specify in the SELECT clause
+2. **SimilarityScore** - The computed distance/similarity score
+3. **RequestCharge** - RU cost for the query
+4. **Results** - Ordered by similarity (most similar first)
+
+**Example Result Object:**
+```json
+{
+  "HotelName": "Lakeside Resort Hotel",
+  "Description": "Beautiful lakeside hotel...",
+  "Rating": 4.5,
+  "SimilarityScore": 0.9234
+}
+```
+
+## 📖 Resources
+
+### Official Documentation
+
+- [Azure Cosmos DB Vector Search Overview](https://learn.microsoft.com/azure/cosmos-db/vector-search)
+- [Vector Search for NoSQL API](https://learn.microsoft.com/azure/cosmos-db/nosql/vector-search)
+- [Integrated Vector Store](https://learn.microsoft.com/azure/cosmos-db/vector-search)
+- [DiskANN in Cosmos DB](https://learn.microsoft.com/azure/cosmos-db/gen-ai/sharded-diskann)
+
+### Getting Started Guides
+
+- [Cosmos DB Introduction](https://learn.microsoft.com/azure/cosmos-db/introduction)
+- [Quickstart: Bicep Template](https://learn.microsoft.com/azure/cosmos-db/quickstart-template-bicep)
+- [Azure OpenAI Embeddings](https://learn.microsoft.com/azure/ai-services/openai/how-to/embeddings)
+
+### SDK References
+
+- [@azure/cosmos npm package](https://www.npmjs.com/package/@azure/cosmos)
+- [@azure/identity npm package](https://www.npmjs.com/package/@azure/identity)
+- [openai npm package](https://www.npmjs.com/package/openai)
+
+### Related Samples
+
+- [MongoDB vCore Vector Search (TypeScript)](../mongo-vcore-vector-search-typescript/)
+- [Cosmos DB Vector Samples (All Languages)](https://github.com/Azure-Samples/cosmos-db-vector-samples)
+
+## 🚀 Using Azure Developer CLI (azd)
+
+The Azure Developer CLI (`azd`) provides a streamlined way to provision and deploy Azure resources with a single command.
+
+### Prerequisites
+
+- [Azure Developer CLI (azd)](https://learn.microsoft.com/azure/developer/azure-developer-cli/install-azd) installed
+
+### Provision with azd
+
+1. **Authenticate with Azure:**
+
+    ```bash
+    azd auth login
+    ```
+
+2. **Provision all Azure resources:**
+
+    ```bash
+    azd up
+    ```
+
+    This command will:
+    - Provision Azure Cosmos DB account with database and container
+    - Provision Azure OpenAI account with embedding model deployed
+    - Configure RBAC roles automatically
+    - Set up all required Azure resources
+
+3. **Generate your `.env` file:**
+
+    ```bash
+    azd env get-values > .env
+    ```
+
+    This exports all environment variables from the azd environment directly to your `.env` file, ready to use with the sample applications.
+
+4. **Run the samples:**
+
+    ```bash
+    npm install
+    npm run build
+    npm run start:diskann
+    ```
+
+The `azd` workflow is the fastest way to get started, handling all infrastructure provisioning and configuration automatically.
+
+## 🤝 Contributing
+
+This project welcomes contributions and suggestions. See [CONTRIBUTING.md](../CONTRIBUTING.md) for details.
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE.md](../LICENSE.md) file for details.
