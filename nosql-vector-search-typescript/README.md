@@ -295,7 +295,7 @@ vectorIndexes: [
 
 **Characteristics:**
 - 🚀 Faster brute-force search on quantized vectors
-- 📊 High recall, not ~100%.
+- 📊 High recall.
 - 📐 Supports up to 4096 dimensions
 - ⚖️ Balance of speed, accuracy, and cost for smaller datasets
 - ✅ **Recommended for most use cases**
