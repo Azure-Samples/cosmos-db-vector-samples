@@ -61,7 +61,7 @@ async function main() {
 
             printSearchResults(insertSummary, resources, requestCharge);
         } catch (error) {
-            if (error.code === 404) {
+            if ((error as any).code === 404) {
                 throw new Error(`Container or database not found. Ensure database '${config.dbName}' and container '${config.collectionName}' exist before running this script.`);
             }
             throw error;
