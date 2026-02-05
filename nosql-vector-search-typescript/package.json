@@ -11,7 +11,10 @@
     "start:insert-at-scale": "node --env-file .env dist/insert-at-scale.js",
     "start:diskann": "node --env-file .env dist/diskann.js",
     "start:flat": "node --env-file .env dist/flat.js",
-    "start:quantizedflat": "node --env-file .env dist/quantizedFlat.js"
+    "start:quantizedflat": "node --env-file .env dist/quantizedFlat.js",
+    "delete:all": "node --env-file .env dist/delete-all-documents.js",
+    "diagnose:vectors": "node --env-file .env dist/diagnose-vectors.js",
+    "test:vector-query": "node --env-file .env dist/test-vector-query.js"
   },
   "dependencies": {
     "@azure/cosmos": "^4.5.1",

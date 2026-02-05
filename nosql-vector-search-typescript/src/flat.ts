@@ -50,9 +50,16 @@ async function main() {
         });
 
         const safeEmbeddedField = validateFieldName(config.embeddedField);
+        const queryText = `SELECT TOP 5 c.HotelName, c.Description, c.Rating, VectorDistance(c.${safeEmbeddedField}, @embedding) AS SimilarityScore FROM c ORDER BY VectorDistance(c.${safeEmbeddedField}, @embedding)`;
+        
+        console.log('\n--- Executing Vector Search Query ---');
+        console.log('Query:', queryText);
+        console.log('Parameters: @embedding (vector with', createEmbeddedForQueryResponse.data[0].embedding.length, 'dimensions)');
+        console.log('--------------------------------------\n');
+        
         const { resources, requestCharge } = await container.items
             .query({
-                query: `SELECT TOP 5 c.HotelName, c.Description, c.Rating, VectorDistance(c.${safeEmbeddedField}, @embedding) AS SimilarityScore FROM c ORDER BY VectorDistance(c.${safeEmbeddedField}, @embedding)`,
+                query: queryText,
                 parameters: [
                     { name: "@embedding", value: createEmbeddedForQueryResponse.data[0].embedding }
                 ]
