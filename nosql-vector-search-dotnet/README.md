@@ -14,6 +14,31 @@ This console application demonstrates vector search capabilities in Azure Cosmos
 *   **Permissions**: Your identity must have **Cosmos DB Built-in Data Contributor** role.
 *   **Infrastructure**: The Hotels database and required containers must be pre-created.
 
+
+## Provisioning Resources
+
+This project is configured to run with the Azure Developer CLI (azd), which provisions the required Azure resources and generates the \ppsettings.json\ file for you.
+
+To provision resources:
+
+1.  Open a terminal in the root folder of this repository (where \zure.yml\ is located).
+2.  Run the following command:
+    \\\ash
+    azd up
+    \\\
+    Follow the prompts to select your Azure subscription and environment.
+
+**What is provisioned:**
+
+*   **Azure Cosmos DB for NoSQL**: Serverless account with the \Hotels\ database.
+    *   3 Containers: \hotels_flat\, \hotels_quantizedflat\, \hotels_diskann\.
+*   **Azure OpenAI**: Resource with deployments for:
+    *   Embedding model: \	ext-embedding-3-small\
+    *   Chat model: \gpt-4o-mini\
+*   **Managed Identity**: User-assigned identity for secure access.
+*   RBAC assignments for Keyless authentication.
+
+
 ## Configuration
 
 Update ppsettings.json with your service endpoints:
@@ -42,3 +67,4 @@ Update ppsettings.json with your service endpoints:
     dotnet run
     `
 3.  Select an option from the menu (1 to embed, 3-5 to search).
+
