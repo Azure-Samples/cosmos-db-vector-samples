@@ -38,15 +38,15 @@ class Program
             string? command;
             while (true)
             {
-                Console.WriteLine("\n=== Cosmos DB Vector Samples Menu ===\nPlease enter your choice (0-5):\n1. Create embeddings for data\n2. Show all database indexes\n3. Run IVF vector search\n4. Run HNSW vector search\n5. Run DiskANN vector search\n0. Exit\n");
+                Console.WriteLine("\n=== Cosmos DB Vector Samples Menu ===\nPlease enter your choice (0-5):\n1. Create embeddings for data\n2. Show all database indexes\n3. Run Flat vector search\n4. Run Quantized Flat vector search\n5. Run DiskANN vector search\n0. Exit\n");
                 
                 var input = Console.ReadLine();
                 command = input switch
                 {
                     "1" => "embed",
                     "2" => "show-indexes",
-                    "3" => "ivf",
-                    "4" => "hnsw",
+                    "3" => "flat",
+                    "4" => "quantized_flat",
                     "5" => "diskann",
                     "0" => null,
                     _ => "invalid"
@@ -70,10 +70,10 @@ class Program
                 case "show-indexes":
                     await serviceProvider.GetRequiredService<CosmosDbService>().ShowAllIndexesAsync();
                     break;
-                case "ivf":
-                case "hnsw":
+                case "flat":
+                case "quantized_flat":
                 case "diskann":
-                    var indexType = command switch { "ivf" => VectorIndexType.IVF, "hnsw" => VectorIndexType.HNSW, _ => VectorIndexType.DiskANN };
+                    var indexType = command switch { "flat" => VectorIndexType.Flat, "quantized_flat" => VectorIndexType.QuantizedFlat, _ => VectorIndexType.DiskANN };
                     await serviceProvider.GetRequiredService<VectorSearchService>().RunSearchAsync(indexType);
                     break;
                 default:
@@ -90,7 +90,7 @@ class Program
 
 public enum VectorIndexType
 {
-    IVF,
-    HNSW,
+    Flat,
+    QuantizedFlat,
     DiskANN
 }

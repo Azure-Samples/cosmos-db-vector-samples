@@ -25,7 +25,7 @@ public class CosmosDbService
         {
             SerializerOptions = new CosmosSerializationOptions
             {
-                PropertyNamingPolicy = CosmosPropertyNamingPolicy.CamelCase,
+                PropertyNamingPolicy = CosmosPropertyNamingPolicy.Default,
                 IgnoreNullValues = true
             },
             // Allow bulk execution for data loading
@@ -35,25 +35,20 @@ public class CosmosDbService
         _client = new CosmosClient(_config.CosmosDb.Endpoint, new DefaultAzureCredential(), options);
     }
 
-    public async Task<Container> GetContainerAsync(string databaseName, string containerName)
+    public Task<Container> GetContainerAsync(string databaseName, string containerName)
     {
-        var databaseResponse = await _client.CreateDatabaseIfNotExistsAsync(databaseName);
-        var properties = new ContainerProperties(containerName, "/HotelId");
-        return (await databaseResponse.Database.CreateContainerIfNotExistsAsync(properties)).Container;
+        return Task.FromResult(_client.GetContainer(databaseName, containerName));
     }
 
     public async Task CreateVectorIndexAsync(string databaseName, string containerName, string vectorField, VectorIndexType indexType, int dimensions)
     {
         var database = _client.GetDatabase(databaseName);
-        var container = database.GetContainer(containerName);
+        
+        _logger.LogInformation($"Ensuring container '{containerName}' exists with vector index '{indexType}'...");
 
-        _logger.LogInformation($"Updating container '{containerName}' with vector index '{indexType}'...");
-
-        var response = await container.ReadContainerAsync();
-        var properties = response.Resource;
+        var properties = new ContainerProperties(containerName, "/HotelId");
 
         // Define Vector Embedding Policy
-        // Note: For Update, we need to set the policy.
         var embeddings = new Collection<Embedding>
         {
             new Embedding
@@ -68,13 +63,12 @@ public class CosmosDbService
         properties.VectorEmbeddingPolicy = new VectorEmbeddingPolicy(embeddings);
 
         // Define Indexing Policy
-        // Clear existing vector indexes to be safe or just set it
         properties.IndexingPolicy.VectorIndexes.Clear();
         
         var cosmosIndexType = indexType switch
         {
-            VectorIndexType.IVF => Microsoft.Azure.Cosmos.VectorIndexType.QuantizedFlat,
-            VectorIndexType.HNSW => Microsoft.Azure.Cosmos.VectorIndexType.QuantizedFlat, 
+            VectorIndexType.Flat => Microsoft.Azure.Cosmos.VectorIndexType.Flat,
+            VectorIndexType.QuantizedFlat => Microsoft.Azure.Cosmos.VectorIndexType.QuantizedFlat,
             VectorIndexType.DiskANN => Microsoft.Azure.Cosmos.VectorIndexType.DiskANN,
             _ => Microsoft.Azure.Cosmos.VectorIndexType.Flat
         };
@@ -84,12 +78,10 @@ public class CosmosDbService
             Path = "/" + vectorField,
             Type = cosmosIndexType
         });
-
-        // Ensure indexing mode is consistent (usually default is ok, but consistent is required for vectors?)
-        // properties.IndexingPolicy.IndexingMode = IndexingMode.Consistent;
-
-        await container.ReplaceContainerAsync(properties);
-        _logger.LogInformation($"Container '{containerName}' updated successfully.");
+        
+        // Use CreateContainerIfNotExistsAsync to behave like TS app (matches on GET if exists)
+        await database.CreateContainerIfNotExistsAsync(properties);
+        _logger.LogInformation($"Container '{containerName}' checked/created.");
     }
 
     public async Task<int> LoadDataIfNeededAsync(Container container, string dataFilePath)
@@ -97,15 +89,27 @@ public class CosmosDbService
         try
         {
             // Check if data exists
-            var iterator = container.GetItemQueryIterator<int>("SELECT VALUE COUNT(1) FROM c");
-            if (iterator.HasMoreResults)
+            try 
             {
-                var count = (await iterator.ReadNextAsync()).FirstOrDefault();
-                if (count > 0)
+                var iterator = container.GetItemQueryIterator<int>("SELECT VALUE COUNT(1) FROM c");
+                if (iterator.HasMoreResults)
                 {
-                    _logger.LogInformation("Container already contains data, skipping load operation");
-                    return 0;
+                    var count = (await iterator.ReadNextAsync()).FirstOrDefault();
+                    if (count > 0)
+                    {
+                        _logger.LogInformation("Container already contains data, skipping load operation");
+                        return 0;
+                    }
                 }
+            }
+            catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.NotFound)
+            {
+                // Container might not exist yet if checking before creation logic completes/propagates in some flows
+                // But in this app flow, we expect container to be available. 
+                // However, GetItemQueryIterator doesn't validate container existence immediately. 
+                // ReadNextAsync will fail if container missing. 
+                _logger.LogWarning("Container does not exist yet for data load check. Proceeding to load (will create items after container creation).");
+                // Fallthrough intended if logic supports it, but here container should exist.
             }
 
             _logger.LogInformation($"Loading data from {dataFilePath}...");

@@ -39,25 +39,25 @@ public class VectorSearchService
             // Setup container (simulating collection behavior)
             var collectionSuffix = indexType switch 
             { 
-                VectorIndexType.IVF => "ivf", 
-                VectorIndexType.HNSW => "hnsw", 
+                VectorIndexType.Flat => "flat", 
+                VectorIndexType.QuantizedFlat => "quantizedflat", 
                 VectorIndexType.DiskANN => "diskann", 
                 _ => throw new ArgumentException($"Unknown index type: {indexType}") 
             };
-            var containerName = $"hotels_{collectionSuffix}_nosql";
+            var containerName = $"hotels_{collectionSuffix}";
             
-            // Get Container (creates database/container if needed)
+            // Create/Update Vector Index (Ensure container exists first)
+            await _cosmosService.CreateVectorIndexAsync(
+                _config.CosmosDb.DatabaseName, containerName, 
+                _config.Embedding.EmbeddedField, indexType, _config.Embedding.Dimensions);
+
+            // Get Container
             var container = await _cosmosService.GetContainerAsync(_config.CosmosDb.DatabaseName, containerName);
             
             // Load data from file if collection is empty
             var assemblyLocation = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location) ?? string.Empty;
             var dataFilePath = Path.Combine(assemblyLocation, _config.DataFiles.WithVectors);
             await _cosmosService.LoadDataIfNeededAsync(container, dataFilePath);
-
-            // Create/Update Vector Index
-            await _cosmosService.CreateVectorIndexAsync(
-                _config.CosmosDb.DatabaseName, containerName, 
-                _config.Embedding.EmbeddedField, indexType, _config.Embedding.Dimensions);
             
             _logger.LogInformation($"Vector index ready. Waiting for indexing to catch up...");
             await Task.Delay(5000); 
