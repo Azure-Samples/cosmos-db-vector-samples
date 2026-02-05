@@ -345,7 +345,7 @@ vectorIndexes: [
 |----------------|-----------|-------------|------------------------|-----------|---------------------------------------------------------------------------------------------|
 | **DiskANN**    | High      | Very Fast   | 50k+ vectors           | ≤ 4096     | Production, medium-to-large scale and when cost-efficiency/latency at scale are important |
 | **QuantizedFlat** | ~100%  | Fast        | Up to 50k+ vectors     | ≤ 4096     | Production or when searches isolated to small number of vectors with partition key filter |
-| **Flat**       | 100%      | Very Slow   | Thousands of vectors   | ≤ 505      | Dev/test on small dimensional vectors                                                      |                   |
+| **Flat**       | 100%      | Very Slow   | Thousands of vectors   | ≤ 505      | Dev/test on small dimensional vectors                                                      |
 
 ## 📏 Distance Metrics
 
