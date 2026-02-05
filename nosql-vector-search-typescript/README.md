@@ -230,6 +230,19 @@ npm run build
 npm run start:embed
 ```
 
+### Bulk Insert & RU accounting
+
+This repo includes sample helpers that use the Cosmos DB SDK `executeBulkOperations()` API for high-throughput inserts. Key points from the samples:
+
+- Use `executeBulkOperations()` with pre-batched operations (the sample uses `LOAD_SIZE_BATCH` / `batchSize` environment variable). Start with 50–100 items per batch and adjust for your RU capacity.
+- The sample code pauses 500ms between batches to allow RU budget recovery.
+- The helper provides an insert method to provide bulk operations
+- RU accounting: the repository provides a method to get BulkOperation RUs
+
+Notes:
+- Bulk responses vary between SDK versions. 
+- Bulk operations are not transactional; use `TransactionalBatch` for atomicity within a single partition (max 100 ops).
+
 This reads hotel data from `DATA_FILE_WITHOUT_VECTORS`, generates embeddings using Azure OpenAI, and saves the result to `DATA_FILE_WITH_VECTORS`.
 
 ## 🔍 Understanding Vector Search
@@ -295,7 +308,7 @@ vectorIndexes: [
 
 **Characteristics:**
 - 🚀 Faster brute-force search on quantized vectors
-- 📊 High recall.
+- 📊 High recall
 - 📐 Supports up to 4096 dimensions
 - ⚖️ Balance of speed, accuracy, and cost for smaller datasets
 - ✅ **Recommended for most use cases**
@@ -406,14 +419,34 @@ const indexingPolicy: IndexingPolicy = {
     excludedPaths: [{ path: "/vector/*" }]
 };
 
-// Create container
-const { database } = await client.databases.createIfNotExists({ id: "Hotels" });
-await database.containers.createIfNotExists({
-    id: "hotels",
-    vectorEmbeddingPolicy: vectorEmbeddingPolicy,
-    indexingPolicy: indexingPolicy,
-    partitionKey: { paths: ['/HotelId'] }
-});
+// IMPORTANT: Samples must NOT create or check resources. Assume the database
+// and container were provisioned by the repo's provisioning script or by the
+// user via the portal/CLI and that appropriate data-plane RBAC is configured.
+// Do NOT call management-plane APIs such as `createIfNotExists()` in sample code.
+
+// Get references to existing resources (data-plane only)
+const database = client.database("Hotels");
+const container = database.container("hotels");
+
+// The following `vectorEmbeddingPolicy` and `indexingPolicy` are shown for
+// documentation purposes only to illustrate the expected container settings.
+// Do not attempt to create or modify these policies from sample code.
+const vectorEmbeddingPolicy: VectorEmbeddingPolicy = {
+    vectorEmbeddings: [{
+        path: "/vector",
+        dataType: VectorEmbeddingDataType.Float32,
+        dimensions: 1536,
+        distanceFunction: VectorEmbeddingDistanceFunction.Cosine,
+    }]
+};
+
+const indexingPolicy: IndexingPolicy = {
+    vectorIndexes: [
+        { path: "/vector", type: VectorIndexType.DiskANN }
+    ],
+    includedPaths: [{ path: "/*" }],
+    excludedPaths: [{ path: "/vector/*" }]
+};
 ```
 
 ### Inserting Documents with Vectors
@@ -440,26 +473,31 @@ await container.items.create(hotel);
 ### Querying with VectorDistance
 
 ```typescript
-// Generate embedding for search query
-const queryEmbedding = await aiClient.embeddings.create({
-    model: "text-embedding-3-small",
+// Generate embedding for search query using the Azure OpenAI client
+const queryEmbeddingResp = await aiClient.embeddings.create({
+    model: process.env.AZURE_OPENAI_EMBEDDING_MODEL || "text-embedding-3-small",
     input: ["find a hotel by a lake"]
 });
 
-// Perform vector similarity search
-const { resources } = await container.items.query({
-    query: `SELECT TOP 5 c.HotelName, c.Description, c.Rating, 
-            VectorDistance(c.vector, @embedding) AS SimilarityScore 
-            FROM c 
-            ORDER BY VectorDistance(c.vector, @embedding)`,
-    parameters: [
-        { name: "@embedding", value: queryEmbedding.data[0].embedding }
-    ]
-}).fetchAll();
+// If your samples allow the embedding field name to be configured (env/config),
+// validate it before injecting into the SQL string to prevent SQL injection.
+const embeddedField = process.env.EMBEDDED_FIELD ?? "vector";
+if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(embeddedField)) {
+    throw new Error(`Invalid embedded field name: ${embeddedField}`);
+}
 
-// Display results
+// Build query with embedded field injected via template literal (field name
+// cannot be passed as a SQL parameter in Cosmos DB SQL syntax).
+const querySpec = {
+    query: `SELECT TOP 5 c.HotelName, c.Description, c.Rating, VectorDistance(c.${embeddedField}, @embedding) AS SimilarityScore FROM c ORDER BY VectorDistance(c.${embeddedField}, @embedding)`,
+    parameters: [
+        { name: "@embedding", value: queryEmbeddingResp.data[0].embedding }
+    ]
+};
+
+const { resources } = await container.items.query(querySpec).fetchAll();
 resources.forEach(item => {
-    console.log(`${item.HotelName} - Score: ${item.SimilarityScore.toFixed(4)}`);
+    console.log(`${item.HotelName} - Score: ${item.SimilarityScore?.toFixed(4) ?? 'n/a'}`);
 });
 ```
 
