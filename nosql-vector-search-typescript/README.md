@@ -308,7 +308,7 @@ vectorIndexes: [
 
 **Characteristics:**
 - 🚀 Faster brute-force search on quantized vectors
-- 📊 High recall.
+- 📊 High recall
 - 📐 Supports up to 4096 dimensions
 - ⚖️ Balance of speed, accuracy, and cost for smaller datasets
 - ✅ **Recommended for most use cases**
@@ -326,11 +326,11 @@ vectorIndexes: [
 ```
 
 **Characteristics:**
-- ✅ High recall (exact k-NN search using brute-force)
+- ✅ 100% recall (exact k-NN search using brute-force)
 - 🐌 Very slow for any significant dataset size
-- ⚠️ Scales linearly as the number of vectors increases
-- 📏 Limited to 505 dimensions
-- 🧪 Best for testing or very small scenarios; may be suitable for isolated partition searches up to ~50,000 vectors
+- ⚠️ Scales linearly as the number of vectors increases.
+- 📏 Limited to only 505 dimensions
+- 🧪 Only suitable for testing or tiny datasets
 - ❌ **Not recommended for production use**
 
 **Why avoid Flat?**
@@ -343,9 +343,9 @@ vectorIndexes: [
 
 | Index Type      | Accuracy  | Performance | Scale                  | Dimensions | Use Case                                                                                  |
 |----------------|-----------|-------------|------------------------|-----------|---------------------------------------------------------------------------------------------|
-| **DiskANN**      | High       | Very Fast   | 50k+ vectors             | ≤ 4096     | Production, medium-to-large scale and when cost-efficiency/latency at scale are important |
-| **QuantizedFlat**| High       | Fast        | Up to 50k+ vectors       | ≤ 4096     | Production or when searches are isolated to a small number of vectors with partition key filter |
-| **Flat**         | High       | Very Slow   | Up to ~50k vectors       | ≤ 505      | Dev/test or very small scenarios; isolated partition searches only                      |
+| **DiskANN**    | High      | Very Fast   | 50k+ vectors           | ≤ 4096     | Production, medium-to-large scale and when cost-efficiency/latency at scale are important |
+| **QuantizedFlat** | ~100%  | Fast        | Up to 50k+ vectors     | ≤ 4096     | Production or when searches isolated to small number of vectors with partition key filter |
+| **Flat**       | 100%      | Very Slow   | Thousands of vectors   | ≤ 505      | Dev/test on small dimensional vectors                                                      |                   |
 
 ## 📏 Distance Metrics
 
