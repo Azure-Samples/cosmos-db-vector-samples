@@ -230,6 +230,19 @@ npm run build
 npm run start:embed
 ```
 
+### Bulk Insert & RU accounting
+
+This repo includes sample helpers that use the Cosmos DB SDK `executeBulkOperations()` API for high-throughput inserts. Key points from the samples:
+
+- Use `executeBulkOperations()` with pre-batched operations (the sample uses `LOAD_SIZE_BATCH` / `batchSize` environment variable). Start with 50–100 items per batch and adjust for your RU capacity.
+- The sample code pauses 500ms between batches to allow RU budget recovery.
+- The helper provides an insert method to provide bulk operations
+- RU accounting: the repository provides a method to get BulkOperation RUs
+
+Notes:
+- Bulk responses vary between SDK versions. 
+- Bulk operations are not transactional; use `TransactionalBatch` for atomicity within a single partition (max 100 ops).
+
 This reads hotel data from `DATA_FILE_WITHOUT_VECTORS`, generates embeddings using Azure OpenAI, and saves the result to `DATA_FILE_WITH_VECTORS`.
 
 ## 🔍 Understanding Vector Search
