@@ -142,6 +142,62 @@ public class CosmosDbService
         }
     }
 
+    /// <summary>
+    /// Helper to clear all data from a container using Bulk support
+    /// </summary>
+    public async Task DeleteAllItemsAsync(Container container)
+    {
+        _logger.LogInformation($"Deleting all items from container '{container.Id}'...");
+
+        try 
+        {
+            // 1. Query only the ID and Partition Key
+            var query = new QueryDefinition("SELECT c.id, c.HotelId FROM c");
+            using var iterator = container.GetItemQueryIterator<dynamic>(query);
+
+            var tasks = new List<Task>();
+            const int BatchSize = 10; // Process in chunks to avoid 429 Rate Limiting
+            
+            while (iterator.HasMoreResults)
+            {
+                var response = await iterator.ReadNextAsync();
+                foreach (var item in response)
+                {
+                    string id = item.id;
+                    string partitionKey = item.HotelId;
+
+                    tasks.Add(container.DeleteItemAsync<object>(id, new PartitionKey(partitionKey))
+                        .ContinueWith(t => 
+                        {
+                            if (t.IsFaulted) _logger.LogError($"Failed to delete {id}: {t.Exception?.InnerException?.Message}");
+                        }));
+
+                    // Execute batch if we reach the limit
+                    if (tasks.Count >= BatchSize)
+                    {
+                        await Task.WhenAll(tasks);
+                        tasks.Clear();
+                        _logger.LogInformation($"Deleted batch of {BatchSize} items...");
+                    }
+                }
+            }
+
+            // Clean up remaining tasks
+            if (tasks.Count > 0)
+            {
+                await Task.WhenAll(tasks);
+                _logger.LogInformation($"Deleted final batch of {tasks.Count} items.");
+            }
+            
+            _logger.LogInformation($"All items deleted from '{container.Id}'.");
+        }
+        catch(Exception ex)
+        {
+            _logger.LogError(ex, "Failed to delete items");
+            throw;
+        }
+    }
+
     public async Task ShowAllIndexesAsync()
     {
         // Simple implementation to list databases and containers

@@ -104,6 +104,10 @@ public class VectorSearchService
                     _logger.LogInformation($"  {i + 1}. {hotelName} (Similarity: {result.Score:F4})");
                 }
             }
+            
+            // Delete all items after search
+            _logger.LogInformation("Cleaning up: Deleting all items from the container...");
+            await _cosmosService.DeleteAllItemsAsync(container);
         }
         catch (Exception ex)
         {
