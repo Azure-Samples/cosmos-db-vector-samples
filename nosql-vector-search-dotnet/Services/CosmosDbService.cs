@@ -88,29 +88,9 @@ public class CosmosDbService
     {
         try
         {
-            // Check if data exists
-            try 
-            {
-                var iterator = container.GetItemQueryIterator<int>("SELECT VALUE COUNT(1) FROM c");
-                if (iterator.HasMoreResults)
-                {
-                    var count = (await iterator.ReadNextAsync()).FirstOrDefault();
-                    if (count > 0)
-                    {
-                        _logger.LogInformation("Container already contains data, skipping load operation");
-                        return 0;
-                    }
-                }
-            }
-            catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.NotFound)
-            {
-                // Container might not exist yet if checking before creation logic completes/propagates in some flows
-                // But in this app flow, we expect container to be available. 
-                // However, GetItemQueryIterator doesn't validate container existence immediately. 
-                // ReadNextAsync will fail if container missing. 
-                _logger.LogWarning("Container does not exist yet for data load check. Proceeding to load (will create items after container creation).");
-                // Fallthrough intended if logic supports it, but here container should exist.
-            }
+            // TypeScript app does NOT check 'SELECT COUNT(1)' first.
+            // It simply tries to load data and relies on 409 Conflict for existing items.
+            // Removed the pre-check to match TypeScript behavior.
 
             _logger.LogInformation($"Loading data from {dataFilePath}...");
             var jsonContent = await File.ReadAllTextAsync(dataFilePath);
@@ -128,72 +108,33 @@ public class CosmosDbService
                 // Ensure ID is set
                 if (string.IsNullOrEmpty(item.Id)) item.Id = Guid.NewGuid().ToString();
                 
-                tasks.Add(container.CreateItemAsync(item, new PartitionKey(item.HotelId)));
+                // Matches TypeScript behavior: Try Create, assume failure on conflict (409) means "already exists"
+                tasks.Add(container.CreateItemAsync(item, new PartitionKey(item.HotelId))
+                    .ContinueWith(t => 
+                    {
+                        if (t.IsFaulted)
+                        {
+                            var cosmosEx = t.Exception?.InnerException as CosmosException;
+                            if (cosmosEx?.StatusCode == HttpStatusCode.Conflict)
+                            {
+                                // Item already exists (409 Conflict), which is fine.
+                                // We swallow this error to match TypeScript "try/catch -> continue" behavior
+                            }
+                            else
+                            {
+                                _logger.LogError($"Failed to insert item {item.HotelId}: {t.Exception?.InnerException?.Message}");
+                            }
+                        }
+                    }));
             }
 
             await Task.WhenAll(tasks);
-            _logger.LogInformation($"Loaded {items.Count} items.");
+            _logger.LogInformation($"Loaded {items.Count} items (skipping existing).");
             return items.Count;
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to load data");
-            throw;
-        }
-    }
-
-    /// <summary>
-    /// Helper to clear all data from a container using Bulk support
-    /// </summary>
-    public async Task DeleteAllItemsAsync(Container container)
-    {
-        _logger.LogInformation($"Deleting all items from container '{container.Id}'...");
-
-        try 
-        {
-            // 1. Query only the ID and Partition Key
-            var query = new QueryDefinition("SELECT c.id, c.HotelId FROM c");
-            using var iterator = container.GetItemQueryIterator<dynamic>(query);
-
-            var tasks = new List<Task>();
-            const int BatchSize = 10; // Process in chunks to avoid 429 Rate Limiting
-            
-            while (iterator.HasMoreResults)
-            {
-                var response = await iterator.ReadNextAsync();
-                foreach (var item in response)
-                {
-                    string id = item.id;
-                    string partitionKey = item.HotelId;
-
-                    tasks.Add(container.DeleteItemAsync<object>(id, new PartitionKey(partitionKey))
-                        .ContinueWith(t => 
-                        {
-                            if (t.IsFaulted) _logger.LogError($"Failed to delete {id}: {t.Exception?.InnerException?.Message}");
-                        }));
-
-                    // Execute batch if we reach the limit
-                    if (tasks.Count >= BatchSize)
-                    {
-                        await Task.WhenAll(tasks);
-                        tasks.Clear();
-                        _logger.LogInformation($"Deleted batch of {BatchSize} items...");
-                    }
-                }
-            }
-
-            // Clean up remaining tasks
-            if (tasks.Count > 0)
-            {
-                await Task.WhenAll(tasks);
-                _logger.LogInformation($"Deleted final batch of {tasks.Count} items.");
-            }
-            
-            _logger.LogInformation($"All items deleted from '{container.Id}'.");
-        }
-        catch(Exception ex)
-        {
-            _logger.LogError(ex, "Failed to delete items");
             throw;
         }
     }
