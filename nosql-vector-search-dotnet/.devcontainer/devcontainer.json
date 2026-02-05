@@ -1,0 +1,48 @@
+{
+  "name": "Azure DocumentDB Vector Search - .NET 8",
+  "image": "mcr.microsoft.com/devcontainers/dotnet:1-8.0-bookworm",
+  
+  "features": {
+    "ghcr.io/devcontainers/features/azure-cli:1": {},
+    "ghcr.io/devcontainers/features/github-cli:1": {},
+    "ghcr.io/devcontainers/features/common-utils:2": {
+      "installZsh": true,
+      "configureZshAsDefaultShell": true,
+      "installOhMyZsh": true
+    }
+  },
+
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-dotnettools.csdevkit",
+        "ms-dotnettools.vscodeintellicode-csharp",
+        "ms-azuretools.vscode-azureresourcegroups",
+        "ms-azuretools.vscode-cosmosdb",
+        "mongodb.mongodb-vscode"
+      ],
+      "settings": {
+        "dotnet.completion.showCompletionItemsFromUnimportedNamespaces": true,
+        "files.exclude": {
+          "**/bin": true,
+          "**/obj": true
+        }
+      }
+    }
+  },
+
+  "postCreateCommand": "dotnet restore && dotnet build",
+  "remoteUser": "vscode",
+  
+  "containerEnv": {
+    "DOTNET_CLI_TELEMETRY_OPTOUT": "1",
+    "DOTNET_NOLOGO": "1"
+  },
+
+  "mounts": [
+    "source=${localEnv:HOME}${localEnv:USERPROFILE}/.azure,target=/home/vscode/.azure,type=bind,consistency=cached"
+  ],
+
+  "capAdd": ["SYS_PTRACE"],
+  "securityOpt": ["seccomp:unconfined"]
+}
