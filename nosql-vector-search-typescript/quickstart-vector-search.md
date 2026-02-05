@@ -53,46 +53,36 @@ Find the sample code with resource provisioning on [GitHub](https://github.com/A
 1. Install the required packages:
 
     ```bash
-    npm install @azure/identity @azure/cosmos openai uuid 
-    npm install @types/node @types/uuid --save-dev
+    npm install @azure/identity @azure/cosmos openai
+    npm install @types/node --save-dev
     ```
 
     * **@azure/identity** - Azure authentication library for passwordless (managed identity) connections
     * **@azure/cosmos** - Azure Cosmos DB client library for database operations
     * **openai** - OpenAI SDK for generating embeddings with Azure OpenAI
-    * **uuid** && **@types/uuid** - Generate unique identifiers for documents with types
     * **@types/node** (dev) - TypeScript type definitions for Node.js APIs
 
 
 1. Create a `.env` file in your project root for the environment variables:
 
     ```bash
-    # Azure Cosmos DB
-    AZURE_COSMOSDB_ENDPOINT="YOUR_COSMOS_DB_ENDPOINT"
-    AZURE_COSMOSDB_DATABASENAME="Hotels"
-    COSMOS_ENDPOINT="YOUR_COSMOS_DB_ENDPOINT"
+    # Identity for local developer authentication with Azure CLI
+    AZURE_TOKEN_CREDENTIALS=AzureCliCredential
 
-    # Azure OpenAI Service
-    AZURE_OPENAI_SERVICE="YOUR_AZURE_OPENAI_SERVICE_NAME"
-    AZURE_OPENAI_ENDPOINT="YOUR_AZURE_OPENAI_ENDPOINT"
+    # Azure OpenAI Embedding Settings
+    AZURE_OPENAI_EMBEDDING_MODEL=text-embedding-3-small
+    AZURE_OPENAI_EMBEDDING_API_VERSION=2023-05-15
+    AZURE_OPENAI_EMBEDDING_ENDPOINT=
+    EMBEDDING_SIZE_BATCH=16
 
-    # Azure OpenAI - Embedding Model
-    AZURE_OPENAI_EMBEDDING_ENDPOINT="YOUR_AZURE_OPENAI_ENDPOINT"
-    AZURE_OPENAI_EMBEDDING_MODEL="text-embedding-3-small"
-    AZURE_OPENAI_EMBEDDING_DEPLOYMENT="text-embedding-3-small"
-    AZURE_OPENAI_EMBEDDING_API_VERSION="2024-08-01-preview"
+    # Cosmos DB configuration
+    COSMOSDB_ENDPOINT=
 
-    # Data Files
-    DATA_FILE_WITH_VECTORS="../data/HotelsData_toCosmosDB_Vector.json"
-    DATA_FILE_WITHOUT_VECTORS="../data/HotelsData_toCosmosDB.JSON"
-
-    # Embedding Configuration
-    FIELD_TO_EMBED="Description"
-    EMBEDDED_FIELD="DescriptionVector"
+    # Data file
+    DATA_FILE_WITH_VECTORS=../data/HotelsData_toCosmosDB_Vector.json
+    FIELD_TO_EMBED=Description
+    EMBEDDED_FIELD=DescriptionVector
     EMBEDDING_DIMENSIONS=1536
-    EMBEDDING_BATCH_SIZE=16
-
-    # Processing Configuration
     LOAD_SIZE_BATCH=50
     ```
 
@@ -269,6 +259,8 @@ Sign in to Azure CLI before you run the application so it can access Azure resou
 az login
 ```
 
+The code uses your local developer authentication to access Azure Cosmos DB and Azure OpenAI with the `getClientsPasswordless` function from `utils.ts`. When you set `AZURE_TOKEN_CREDENTIALS=AzureCliCredential`, this setting tells the function to use Azure CLI credentials for authentication _deterministically_. The function relies on [DefaultAzureCredential](/javascript/api/@azure/identity/defaultazurecredential) from **@azure/identity** to find your Azure credentials in the environment. Learn more about how to [Authenticate JavaScript apps to Azure services using the Azure Identity library](/azure/developer/javascript/sdk/authentication/overview).
+
 ## Build and run the application
 
 Build the TypeScript files, then run the application:
@@ -347,7 +339,7 @@ Delete the resource group, Cosmos DB account, and Azure OpenAI resource when you
 
 ## Related content
 
-* [Azure Cosmos DB vector search overview]()
-* [Vector indexing policies]()
-* [Azure OpenAI embeddings]()
-* [Sample code on GitHub](https://github.com/Azure-Samples/cosmos-db-vector-samples)
+- [Vector search in Azure Cosmos DB](https://learn.microsoft.com/en-us/azure/cosmos-db/gen-ai/vector-search-overview)
+- [Document Indexer for Azure Cosmos DB (preview)](https://learn.microsoft.com/en-us/azure/cosmos-db/gen-ai/document-indexer)
+- [Vector embeddings in Azure Cosmos DB](https://learn.microsoft.com/en-us/azure/cosmos-db/gen-ai/vector-embeddings)
+- [Support for geospatial queries](https://learn.microsoft.com/en-us/azure/cosmos-db/gen-ai/geospatial-support)
