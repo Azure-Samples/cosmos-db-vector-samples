@@ -76,7 +76,7 @@ Find the sample code with resource provisioning on [GitHub](https://github.com/A
     EMBEDDING_SIZE_BATCH=16
 
     # Cosmos DB configuration
-    COSMOSDB_ENDPOINT=
+    COSMOS_ENDPOINT=
 
     # Data file
     DATA_FILE_WITH_VECTORS=../data/HotelsData_toCosmosDB_Vector.json
