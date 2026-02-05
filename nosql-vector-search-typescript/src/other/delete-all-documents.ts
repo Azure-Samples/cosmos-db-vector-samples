@@ -1,4 +1,4 @@
-import { getClientsPasswordless, getBulkOperationRUs } from './utils.js';
+import { getClientsPasswordless, getBulkOperationRUs } from '../utils.js';
 import { BulkOperationType } from '@azure/cosmos';
 
 const config = {

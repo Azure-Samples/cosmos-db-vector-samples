@@ -341,23 +341,122 @@ export async function diagnoseVectorData(container: any, embeddedField: string, 
     }
 }
 export function getBulkOperationRUs(response: any): number {
+    // Response shape can vary depending on SDK/version:
+    // - An array of operation results
+    // - An object with `resources` or `results` array
+    // - A single operation result object
+    if (!response) {
+        console.warn('Empty response. Cannot calculate RUs from bulk operation.');
+        return 0;
+    }
 
-    if (!response || !Array.isArray(response)) {
-        console.warn('Response is not an array. Cannot calculate RUs from bulk operation.');
+    // Normalize into an array of result items
+    let items: any[] = [];
+    if (Array.isArray(response)) {
+        items = response;
+    } else if (Array.isArray(response.resources)) {
+        items = response.resources;
+    } else if (Array.isArray(response.results)) {
+        items = response.results;
+    } else if (Array.isArray(response.result)) {
+        items = response.result;
+    } else if (typeof response === 'object') {
+        // If it's a single operation result, wrap it so downstream logic is uniform
+        items = [response];
+    } else {
+        console.warn('Response does not contain bulk operation results.');
         return 0;
     }
 
     let totalRequestCharge = 0;
 
-    response.forEach((result: any) => {
+    items.forEach((result: any) => {
+        let requestCharge = 0;
 
-        // Track RU consumption from individual operation response
-        const requestCharge = result.requestCharge || result.operationResponse?.headers?.['x-ms-request-charge'] || 0;
-        console.log(`   Operation ${result.operationType} on item with id ${result.resourceBody?.id || 'N/A'}: Request Charge = ${requestCharge} RUs`);
-        if (requestCharge) {
-            totalRequestCharge += requestCharge;
+        // 1) Direct numeric property
+        if (typeof result.requestCharge === 'number') {
+            requestCharge = result.requestCharge;
         }
+
+        // 1b) Some SDKs nest the operation response under `response` and expose requestCharge there
+        if (!requestCharge && result.response && typeof result.response.requestCharge === 'number') {
+            requestCharge = result.response.requestCharge;
+        }
+
+        if (!requestCharge && result.response && typeof result.response.requestCharge === 'string') {
+            const parsed = parseFloat(result.response.requestCharge);
+            requestCharge = isNaN(parsed) ? 0 : parsed;
+        }
+
+        // 2) String numeric value
+        if (!requestCharge && typeof result.requestCharge === 'string') {
+            const parsed = parseFloat(result.requestCharge);
+            requestCharge = isNaN(parsed) ? 0 : parsed;
+        }
+
+        // 3) operationResponse may contain headers in different shapes
+        if (!requestCharge && result.operationResponse) {
+            const op = result.operationResponse;
+            const headerVal = op.headers?.['x-ms-request-charge']
+                ?? (typeof op.headers?.get === 'function' ? op.headers.get('x-ms-request-charge') : undefined)
+                ?? op._response?.headers?.['x-ms-request-charge'];
+
+            if (headerVal !== undefined) {
+                const parsed = parseFloat(headerVal as any);
+                requestCharge = isNaN(parsed) ? 0 : parsed;
+            }
+        }
+
+        // 4) Some responses include headers at top-level or in `headers`
+        if (!requestCharge && result.headers) {
+            const hv = result.headers['x-ms-request-charge'] ?? (typeof result.headers.get === 'function' ? result.headers.get('x-ms-request-charge') : undefined);
+            if (hv !== undefined) {
+                const parsed = parseFloat(hv as any);
+                requestCharge = isNaN(parsed) ? 0 : parsed;
+            }
+        }
+
+        // 5) Fallback: some SDKs expose RU on resourceOperation or nested fields
+        if (!requestCharge) {
+            // Try several nested locations where headers may be present
+            const candidateHeaders =
+                result.operationResponse?._response?.headers
+                ?? result.operationResponse?.headers
+                ?? result._response?.headers
+                ?? result.headers;
+
+            const fallback = candidateHeaders ? (candidateHeaders['x-ms-request-charge'] ?? (typeof candidateHeaders.get === 'function' ? candidateHeaders.get('x-ms-request-charge') : undefined)) : undefined;
+
+            if (fallback !== undefined) {
+                const parsed = parseFloat(fallback as any);
+                requestCharge = isNaN(parsed) ? 0 : parsed;
+            }
+        }
+
+        totalRequestCharge += requestCharge;
     });
+
+    // If we didn't find any RUs, print a small sample to help debugging
+    if (totalRequestCharge === 0) {
+        try {
+            const sample = items[0];
+            const sampleKeys = sample ? Object.keys(sample) : [];
+            console.warn('getBulkOperationRUs: no RUs found. Sample result keys:', sampleKeys);
+            if (sample && sample.response) {
+                try {
+                    const respKeys = Object.keys(sample.response);
+                    console.warn('  sample.response keys:', respKeys);
+                    const hdrs = sample.response.headers ?? sample.response._response?.headers ?? sample.response?.operationResponse?.headers;
+                    console.warn('  sample.response headers sample:', hdrs ? Object.keys(hdrs) : hdrs);
+                } catch (e) {
+                    console.warn('  Could not inspect sample.response for headers:', e);
+                }
+            }
+        } catch (e) {
+            console.warn('Could not inspect sample result for debugging:', e);
+        }
+    }
+
     return totalRequestCharge;
 }
 

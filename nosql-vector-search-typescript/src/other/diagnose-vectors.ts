@@ -1,4 +1,4 @@
-import { getClientsPasswordless, validateFieldName, diagnoseVectorData } from './utils.js';
+import { getClientsPasswordless, validateFieldName, diagnoseVectorData } from '../utils.js';
 
 const config = {
     dbName: "Hotels",

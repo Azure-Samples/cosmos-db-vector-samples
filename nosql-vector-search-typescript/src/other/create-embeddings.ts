@@ -6,7 +6,7 @@
 import * as path from "node:path";
 import { AzureOpenAI } from "openai";
 import { Embedding } from "openai/resources";
-import { readFileReturnJson, writeFileJson, JsonData, getClientsPasswordless } from "./utils.js";
+import { readFileReturnJson, writeFileJson, JsonData, getClientsPasswordless } from "../utils.js";
 
 // ESM specific features - create __dirname equivalent
 import { fileURLToPath } from "node:url";
