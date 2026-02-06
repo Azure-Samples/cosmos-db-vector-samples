@@ -106,7 +106,10 @@ public class CosmosDbService
             foreach (var item in items)
             {
                 // Ensure ID is set
-                if (string.IsNullOrEmpty(item.Id)) item.Id = Guid.NewGuid().ToString();
+                if (string.IsNullOrEmpty(item.Id)) 
+                {
+                    item.Id = !string.IsNullOrEmpty(item.HotelId) ? item.HotelId : Guid.NewGuid().ToString();
+                }
                 
                 // Matches TypeScript behavior: Try Create, assume failure on conflict (409) means "already exists"
                 tasks.Add(container.CreateItemAsync(item, new PartitionKey(item.HotelId))
