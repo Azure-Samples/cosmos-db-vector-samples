@@ -207,11 +207,9 @@ output AZURE_OPENAI_EMBEDDING_DEPLOYMENT string = embeddingModelName
 output AZURE_OPENAI_EMBEDDING_ENDPOINT string = openAi.outputs.endpoint
 output AZURE_OPENAI_EMBEDDING_API_VERSION string = embeddingModelApiVersion
 
-output AZURE_COSMOSDB_ENDPOINT string = cosmosDbAccount.outputs.endpoint
-output AZURE_COSMOSDB_DATABASENAME string = databaseName
-
 // Environment variables needed by utils.ts
 output COSMOS_ENDPOINT string = cosmosDbAccount.outputs.endpoint
+output AZURE_COSMOSDB_DATABASENAME string = databaseName
 
 // Configuration for embedding creation and vector search
 output DATA_FILE_WITH_VECTORS string = dataFileWithVectors

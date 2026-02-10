@@ -42,7 +42,7 @@ async function main() {
             // Verify container exists by attempting a read
             await container.read();
         const data = await readFileReturnJson(path.join(__dirname, "..", config.dataFile));
-        const insertSummary = await insertData(config, container, data.slice(0, config.batchSize));
+        const insertSummary = await insertData(container, data);
 
         const createEmbeddedForQueryResponse = await aiClient.embeddings.create({
             model: config.deployment,
@@ -50,16 +50,23 @@ async function main() {
         });
 
         const safeEmbeddedField = validateFieldName(config.embeddedField);
+        const queryText = `SELECT TOP 5 c.HotelName, c.Description, c.Rating, VectorDistance(c.${safeEmbeddedField}, @embedding) AS SimilarityScore FROM c ORDER BY VectorDistance(c.${safeEmbeddedField}, @embedding)`;
+        
+        console.log('\n--- Executing Vector Search Query ---');
+        console.log('Query:', queryText);
+        console.log('Parameters: @embedding (vector with', createEmbeddedForQueryResponse.data[0].embedding.length, 'dimensions)');
+        console.log('--------------------------------------\n');
+        
         const { resources, requestCharge } = await container.items
             .query({
-                query: `SELECT TOP 5 c.HotelName, c.Description, c.Rating, VectorDistance(c.${safeEmbeddedField}, @embedding) AS SimilarityScore FROM c ORDER BY VectorDistance(c.${safeEmbeddedField}, @embedding)`,
+                query: queryText,
                 parameters: [
                     { name: "@embedding", value: createEmbeddedForQueryResponse.data[0].embedding }
                 ]
             })
             .fetchAll();
 
-            printSearchResults(insertSummary, resources, requestCharge);
+            printSearchResults(resources, requestCharge);
         } catch (error) {
             if ((error as any).code === 404) {
                 throw new Error(`Container or database not found. Ensure database '${config.dbName}' and container '${config.collectionName}' exist before running this script.`);

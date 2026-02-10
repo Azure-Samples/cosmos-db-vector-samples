@@ -6,12 +6,12 @@
   "scripts": {
     "build": "tsc",
     "create-env": "azd env get-values > .env",
-    "start:embed": "node --env-file .env dist/create-embeddings.js",
-    "start:index-and-query": "node --env-file .env dist/index-and-query.js",
-    "start:insert-at-scale": "node --env-file .env dist/insert-at-scale.js",
     "start:diskann": "node --env-file .env dist/diskann.js",
     "start:flat": "node --env-file .env dist/flat.js",
-    "start:quantizedflat": "node --env-file .env dist/quantizedFlat.js"
+    "start:quantizedflat": "node --env-file .env dist/quantizedFlat.js",
+
+    "start:embed": "node --env-file .env dist/other/create-embeddings.js",
+    "delete:all": "node --env-file .env dist/other/delete-all-documents.js"
   },
   "dependencies": {
     "@azure/cosmos": "^4.5.1",

@@ -37,45 +37,8 @@ This application demonstrates the following workflow:
      └────────────────────────────────────────┘
               Upsert doc with vector
               VectorDistance top-k query
-              Matches + scores
-```
 
-## ✨ Features
 
-This project demonstrates:
-
-✅ **Embedding Generation** - Generate vector embeddings using Azure OpenAI  
-✅ **Vector Storage** - Store embeddings in JSON documents in Cosmos DB  
-✅ **Vector Indexing** - Multiple indexing algorithms (DiskANN and QuantizedFlat are recommended)  
-✅ **Similarity Search** - Query with `VectorDistance` for nearest neighbors  
-✅ **Managed Identity** - Passwordless authentication with Azure AD  
-✅ **Distance Metrics** - Support for Cosine, Euclidean (L2), and DotProduct  
-✅ **Score Interpretation** - Understand and interpret similarity scores  
-
-## 📋 Prerequisites
-
-Before you begin, ensure you have:
-
-- **Azure Subscription** - [Create a free account](https://azure.microsoft.com/free/)
-- **Node.js** - Version 18.x or higher ([Download](https://nodejs.org/))
-- **TypeScript** - Installed globally (`npm install -g typescript`)
-- **Azure Cosmos DB Account** - NoSQL API account ([Create via Portal](https://learn.microsoft.com/azure/cosmos-db/quickstart-template-bicep))
-- **Azure OpenAI Service** - With `text-embedding-3-small` model deployed ([Setup Guide](https://learn.microsoft.com/azure/ai-services/openai/how-to/create-resource))
-- **Azure CLI** - For authentication ([Install Guide](https://learn.microsoft.com/cli/azure/install-azure-cli))
-
-## 🚀 Getting Started
-
-### Option A: Automated Provisioning (Recommended)
-
-Use the provided Azure CLI script to automatically create all required resources with proper RBAC roles:
-
-```bash
-# Set your Azure AD user principal
-export USER_PRINCIPAL="your-email@domain.com"
-
-# Run the provisioning script
-./provision-azure-resources.sh
-```
 
 The script will:
 - Create a resource group
@@ -99,136 +62,18 @@ export LOCATION="eastus2"
 
 After the script completes, copy the environment configuration output to your `.env` file.
 
-### Option B: Manual Setup
+### Bulk Insert & RU accounting
 
-#### 1. Clone the Repository
+This repo includes sample helpers that use the Cosmos DB SDK `executeBulkOperations()` API for high-throughput inserts. Key points from the samples:
 
-```bash
-git clone https://github.com/Azure-Samples/cosmos-db-vector-samples.git
-cd cosmos-db-vector-samples/nosql-vector-search-typescript
-```
+- Use `executeBulkOperations()` — the modern SDK method for bulk operations. The SDK accepts an unbounded list of operations and internally handles batching, dispatch, and throttling through congestion control algorithms. The API is designed to handle a large number of operations efficiently.
+- **Pre-batching is not required** — unless you have memory limitations with the input data, you do not need to manually batch operations before sending. Only batch if memory constraints exist.
+- The helper provides an insert method to provide bulk operations.
+- RU accounting: the repository provides a method to get BulkOperation RUs.
 
-#### 2. Install Dependencies
-
-```bash
-npm install
-```
-
-#### 3. Configure Environment Variables
-
-Create a `.env` file from the example:
-
-```bash
-cp .env.example .env
-```
-
-Edit `.env` with your Azure resource information:
-
-```env
-# Azure OpenAI Configuration
-AZURE_OPENAI_EMBEDDING_MODEL=text-embedding-3-small
-AZURE_OPENAI_EMBEDDING_API_VERSION=2023-05-15
-AZURE_OPENAI_EMBEDDING_ENDPOINT=https://<your-resource>.openai.azure.com
-
-# Cosmos DB Configuration
-COSMOS_ENDPOINT=https://<your-account>.documents.azure.com:443/
-
-# Data Configuration
-DATA_FILE_WITHOUT_VECTORS=../data/HotelsData_toCosmosDB.JSON
-DATA_FILE_WITH_VECTORS=../data/HotelsData_toCosmosDB_Vector.json
-FIELD_TO_EMBED=Description
-EMBEDDED_FIELD=vector
-EMBEDDING_DIMENSIONS=1536
-LOAD_SIZE_BATCH=50
-```
-
-#### 4. Set Up Azure Resources and RBAC
-
-**Create Cosmos DB Account:**
-
-```bash
-# Create Cosmos DB account
-az cosmosdb create \
-    --name <your-cosmos-account> \
-    --resource-group <your-rg> \
-    --location eastus \
-    --kind GlobalDocumentDB
-```
-
-**Assign Cosmos DB RBAC Roles:**
-
-Cosmos DB has custom RBAC roles for data plane access:
-
-```bash
-# Get your user object ID
-USER_ID=$(az ad user show --id your-email@domain.com --query id -o tsv)
-
-# Get Cosmos DB resource ID
-COSMOS_ID=$(az cosmosdb show --name <your-cosmos-account> --resource-group <your-rg> --query id -o tsv)
-
-# Assign data plane access (Cosmos DB Built-in Data Contributor)
-az cosmosdb sql role assignment create \
-    --account-name <your-cosmos-account> \
-    --resource-group <your-rg> \
-    --role-definition-id "00000000-0000-0000-0000-000000000002" \
-    --principal-id $USER_ID \
-    --scope $COSMOS_ID
-
-# Assign control plane access (DocumentDB Account Contributor)
-az role assignment create \
-    --assignee $USER_ID \
-    --role "DocumentDB Account Contributor" \
-    --scope $COSMOS_ID
-```
-
-**Create Azure OpenAI and Assign Roles:**
-
-```bash
-# Create Azure OpenAI account
-az cognitiveservices account create \
-    --name <your-openai-account> \
-    --resource-group <your-rg> \
-    --kind OpenAI \
-    --sku S0 \
-    --location eastus
-
-# Get OpenAI resource ID
-OPENAI_ID=$(az cognitiveservices account show --name <your-openai-account> --resource-group <your-rg> --query id -o tsv)
-
-# Assign OpenAI User role
-az role assignment create \
-    --assignee $USER_ID \
-    --role "Cognitive Services OpenAI User" \
-    --scope $OPENAI_ID
-
-# Deploy embedding model
-az cognitiveservices account deployment create \
-    --name <your-openai-account> \
-    --resource-group <your-rg> \
-    --deployment-name text-embedding-3-small \
-    --model-name text-embedding-3-small \
-    --model-version "2" \
-    --model-format OpenAI \
-    --sku-name "Standard" \
-    --sku-capacity 10
-```
-
-#### 5. Authenticate with Azure
-
-The samples use **managed identity** for passwordless authentication:
-
-```bash
-az login
-```
-
-#### 6. Generate Embeddings (Optional)
-
-If you need to generate embeddings for your data:
-
-```bash
-npm run build
-npm run start:embed
-```
+Notes:
+- Bulk responses vary between SDK versions.
+- Bulk operations are not transactional; use `TransactionalBatch` for atomicity within a single partition (max 100 ops).
 
 This reads hotel data from `DATA_FILE_WITHOUT_VECTORS`, generates embeddings using Azure OpenAI, and saves the result to `DATA_FILE_WITH_VECTORS`.
 
@@ -295,7 +140,7 @@ vectorIndexes: [
 
 **Characteristics:**
 - 🚀 Faster brute-force search on quantized vectors
-- 📊 High recall.
+- 📊 High recall
 - 📐 Supports up to 4096 dimensions
 - ⚖️ Balance of speed, accuracy, and cost for smaller datasets
 - ✅ **Recommended for most use cases**
@@ -406,14 +251,34 @@ const indexingPolicy: IndexingPolicy = {
     excludedPaths: [{ path: "/vector/*" }]
 };
 
-// Create container
-const { database } = await client.databases.createIfNotExists({ id: "Hotels" });
-await database.containers.createIfNotExists({
-    id: "hotels",
-    vectorEmbeddingPolicy: vectorEmbeddingPolicy,
-    indexingPolicy: indexingPolicy,
-    partitionKey: { paths: ['/HotelId'] }
-});
+// IMPORTANT: Samples must NOT create or check resources. Assume the database
+// and container were provisioned by the repo's provisioning script or by the
+// user via the portal/CLI and that appropriate data-plane RBAC is configured.
+// Do NOT call management-plane APIs such as `createIfNotExists()` in sample code.
+
+// Get references to existing resources (data-plane only)
+const database = client.database("Hotels");
+const container = database.container("hotels");
+
+// The following `vectorEmbeddingPolicy` and `indexingPolicy` are shown for
+// documentation purposes only to illustrate the expected container settings.
+// Do not attempt to create or modify these policies from sample code.
+const vectorEmbeddingPolicy: VectorEmbeddingPolicy = {
+    vectorEmbeddings: [{
+        path: "/vector",
+        dataType: VectorEmbeddingDataType.Float32,
+        dimensions: 1536,
+        distanceFunction: VectorEmbeddingDistanceFunction.Cosine,
+    }]
+};
+
+const indexingPolicy: IndexingPolicy = {
+    vectorIndexes: [
+        { path: "/vector", type: VectorIndexType.DiskANN }
+    ],
+    includedPaths: [{ path: "/*" }],
+    excludedPaths: [{ path: "/vector/*" }]
+};
 ```
 
 ### Inserting Documents with Vectors
@@ -440,30 +305,48 @@ await container.items.create(hotel);
 ### Querying with VectorDistance
 
 ```typescript
-// Generate embedding for search query
-const queryEmbedding = await aiClient.embeddings.create({
-    model: "text-embedding-3-small",
+// Generate embedding for search query using the Azure OpenAI client
+const queryEmbeddingResp = await aiClient.embeddings.create({
+    model: process.env.AZURE_OPENAI_EMBEDDING_MODEL || "text-embedding-3-small",
     input: ["find a hotel by a lake"]
 });
 
-// Perform vector similarity search
-const { resources } = await container.items.query({
-    query: `SELECT TOP 5 c.HotelName, c.Description, c.Rating, 
-            VectorDistance(c.vector, @embedding) AS SimilarityScore 
-            FROM c 
-            ORDER BY VectorDistance(c.vector, @embedding)`,
-    parameters: [
-        { name: "@embedding", value: queryEmbedding.data[0].embedding }
-    ]
-}).fetchAll();
+// If your samples allow the embedding field name to be configured (env/config),
+// validate it before injecting into the SQL string to prevent SQL injection.
+const embeddedField = process.env.EMBEDDED_FIELD ?? "vector";
+if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(embeddedField)) {
+    throw new Error(`Invalid embedded field name: ${embeddedField}`);
+}
 
-// Display results
+// Build query with embedded field injected via template literal (field name
+// cannot be passed as a SQL parameter in Cosmos DB SQL syntax).
+const querySpec = {
+    query: `SELECT TOP 5 c.HotelName, c.Description, c.Rating, VectorDistance(c.${embeddedField}, @embedding) AS SimilarityScore FROM c ORDER BY VectorDistance(c.${embeddedField}, @embedding)`,
+    parameters: [
+        { name: "@embedding", value: queryEmbeddingResp.data[0].embedding }
+    ]
+};
+
+const { resources } = await container.items.query(querySpec).fetchAll();
 resources.forEach(item => {
-    console.log(`${item.HotelName} - Score: ${item.SimilarityScore.toFixed(4)}`);
+    console.log(`${item.HotelName} - Score: ${item.SimilarityScore?.toFixed(4) ?? 'n/a'}`);
 });
 ```
 
+## Prerequisites
+
+- Node.js 22
+- [Azure Developer CLI (azd)](https://aka.ms/azd/install)
+- [Azure CLI](https://docs.microsoft.com/cli/azure/install-azure-cli) (for login)
+
 ## 🏃 Running the Samples
+
+Clone the Repository
+
+```bash
+git clone https://github.com/Azure-Samples/cosmos-db-vector-samples.git
+cd cosmos-db-vector-samples/nosql-vector-search-typescript
+```
 
 Build the TypeScript code:
 
@@ -471,7 +354,9 @@ Build the TypeScript code:
 npm run build
 ```
 
-### Generate Embeddings
+### Optional - Generate Embeddings
+
+This step is only needed if you choose a different embedding model or data. By default, the sample uses `text-embedding-3-small` and the provided hotel data, which already has embeddings generated. If you want to generate your own embeddings for the sample data, run:
 
 ```bash
 npm run start:embed
@@ -502,23 +387,6 @@ npm run start:flat
 ```
 
 Demonstrates exact vector search with Flat index. **Note:** This is provided for testing purposes only and is generally not recommended for production use due to performance at scale. Use QuantizedFlat or DiskANN instead.
-
-
-### All-in-One Demo
-
-```bash
-npm run start:index-and-query
-```
-
-Complete demo: creates index, inserts data, and performs search.
-
-### Enterprise-Grade Insert
-
-```bash
-npm run start:insert-at-scale
-```
-
-Demonstrates resilient, production-ready document insertion with retry logic.
 
 ## 📊 Understanding Query Results
 
