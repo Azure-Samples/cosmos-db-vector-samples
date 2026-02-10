@@ -69,6 +69,83 @@ For more information on management plane vs. data plane access in Azure Cosmos D
 
 ---
 
+## Bulk Insert Best Practices
+
+### ✅ Why Use Bulk Execution?
+
+The Cosmos DB SDK's bulk execution API is optimized for high-throughput, large-scale data ingestion, especially for documents with vector embeddings:
+
+- **High Throughput:** Automatically batches and parallelizes operations across partitions.
+- **Cross-Partition Support:** Handles inserts across multiple partition keys in a single call.
+- **Automatic Retry & Throttling:** Built-in handling of 429 (rate-limited) responses with exponential backoff.
+- **Simplified Code:** No need for custom retry logic or managing partition-specific batches.
+- **Vector-Friendly:** Efficiently handles documents with large vector fields.
+
+⚠️ **Important:** Bulk operations are **not transactional**. Each operation is executed independently. Use `TransactionalBatch` if atomicity is required within a single partition (max 100 operations).
+
+### Recommended Approach: TypeScript / Node.js
+
+For TypeScript/Node.js projects, use `executeBulkOperations()` and let the SDK handle batching, dispatch, and throttling internally:
+
+```typescript
+import { CosmosClient, BulkOperationType } from "@azure/cosmos";
+
+const operations = data.map((item) => ({
+  operationType: BulkOperationType.Create,
+  resourceBody: item,
+  partitionKey: [item.HotelId],
+}));
+
+try {
+  const response = await container.items.executeBulkOperations(operations);
+  // Process results
+  let inserted = 0;
+  let failed = 0;
+  if (response) {
+    response.forEach(result => {
+      if (result.statusCode >= 200 && result.statusCode < 300) {
+        inserted++;
+      } else {
+        failed++;
+      }
+    });
+  }
+} catch (error) {
+  console.error(`Bulk insert failed:`, error);
+}
+```
+
+**Key points:**
+- **Use `executeBulkOperations()`** — the modern SDK method for bulk operations.
+- **Pre-batching is not required** — the SDK accepts an unbounded list of operations and internally handles batching, dispatch, and throttling through congestion control algorithms. The API is designed to handle a large number of operations efficiently.
+- **Only batch if memory constraints exist** — unless you have memory limitations with the input data, you do not need to manually batch operations before sending.
+- The SDK handles retry logic and backoff automatically.
+- The SDK automatically distributes operations across partition ranges and mini-batches them for optimal throughput.
+- Partition key can be in the `resourceBody` or as a separate `partitionKey` field in the operation.
+- Supports all CRUD operations: Create, Upsert, Read, Replace, Delete, Patch.
+- Returns individual operation results; errors in one operation don't block others.
+
+### SDK Support Across Languages
+
+| Language   | Native Bulk Support | Recommended Method             | Requires Pre-Batching |
+|------------|---------------------|--------------------------------|-----------------------|
+| **TypeScript / Node.js** | ✅ Yes (v4.3+)         | `executeBulkOperations()`      | ❌ No (unless memory constraints) |
+| **.NET / C#**     | ✅ Yes (v3.4+)         | `AllowBulkExecution = true` + parallel tasks | ❌ No (unless memory constraints)  |
+| **Java**     | ✅ Yes (v4+)           | `executeBulkOperations()`      | ❌ No (unless memory constraints)   |
+| **Python**   | ❌ No              | `TransactionalBatch` (max 100 ops, single partition) | ✅ Required (max 100)  |
+| **Go**       | ❌ No              | `TransactionalBatch` + goroutines | ✅ Required (max 100)  |
+
+### Best Practices for Vector Data
+
+- **Batch before sending:** Pre-batch operations into manageable chunks (50-100) before calling `executeBulkOperations()` to avoid rate limiting.
+- **Pause between batches:** Add 500ms delays between batch requests to allow the container to recover RU budget.
+- Use well-distributed partition keys (e.g., `HotelId`) to maximize parallelism across partition ranges.
+- Consider enabling autoscale to handle variable throughput demands.
+- Set `contentResponseOnWriteEnabled: false` to reduce response payload size when you don't need the inserted document back.
+- Monitor RU/s usage during bulk operations and adjust batch size if hitting rate limits.
+
+---
+
 ## Azure Cosmos DB Vector Search Specific Instructions
 
 These instructions apply to Azure Cosmos DB Vector Search example prompts and are based on PR review feedback from the Azure Cosmos DB team.

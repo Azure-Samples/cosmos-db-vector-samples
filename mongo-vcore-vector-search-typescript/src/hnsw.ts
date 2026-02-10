@@ -37,7 +37,7 @@ async function main() {
         const collection = await db.createCollection(config.collectionName);
         console.log('Created collection:', config.collectionName);
         const data = await readFileReturnJson(path.join(__dirname, "..", config.dataFile));
-        const insertSummary = await insertData(config, collection, data);
+        const insertSummary = await insertData(collection, data);
 
         // Create the vector index
         const indexOptions = {
@@ -89,7 +89,7 @@ async function main() {
         ]).toArray();
 
         // Print the results
-        printSearchResults(insertSummary, vectorIndexSummary, searchResults);
+        printSearchResults(vectorIndexSummary, searchResults);
 
     } catch (error) {
         console.error('App failed:', error);

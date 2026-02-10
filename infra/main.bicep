@@ -22,9 +22,17 @@ param location string
 @description('Id of the principal to assign database and application roles.')
 param deploymentUserPrincipalId string = ''
 
+@description('Vector distance function for similarity search')
+@allowed([
+  'cosine'
+  'euclidean'
+  'dotproduct'
+])
+param vectorDistanceFunction string = 'cosine'
+
 var resourceToken = toLower(uniqueString(subscription().id, environmentName, location))
 var tags = { 'azd-env-name': environmentName }
-var prefix = '${environmentName}${resourceToken}'
+var prefix = take('${environmentName}${resourceToken}', 40)
 
 // Organize resources in a resource group
 resource resourceGroup 'Microsoft.Resources/resourceGroups@2021-04-01' = {
@@ -57,9 +65,10 @@ var dataFileWithVectors = '../data/HotelsData_toCosmosDB_Vector.json'
 var dataFileWithoutVectors = '../data/HotelsData_toCosmosDB.JSON'
 var fieldToEmbed = 'Description'
 var embeddedFieldName = 'DescriptionVector'
-var embeddingDimensions = '1536'
 var embeddingBatchSize = '16'
-var loadSizeBatch = '50'
+
+// Vector search configuration
+var vectorEmbeddingDimensions = 1536
 
 var openAiServiceName = 'openai-${prefix}'
 module openAi 'br/public:avm/res/cognitive-services/account:0.7.1' = {
@@ -125,7 +134,7 @@ module cosmosDbAccount 'br/public:avm/res/document-db/database-account:0.8.1' = 
   name: 'cosmos-db-account'
   scope: resourceGroup
   params: {
-    name: 'cosmos-db-nosql-${prefix}'
+    name: 'cdb-${prefix}'
     location: location
     locations: [
       {
@@ -172,13 +181,13 @@ module cosmosDbAccount 'br/public:avm/res/document-db/database-account:0.8.1' = 
             ]
           }
           {
-            name: 'hotels_flat'
+            name: 'hotels_quantizedflat'
             paths: [
               '/HotelId'
             ]
           }
           {
-            name: 'hotels_quantizedflat'
+            name: 'hotels_flat'
             paths: [
               '/HotelId'
             ]
@@ -186,6 +195,33 @@ module cosmosDbAccount 'br/public:avm/res/document-db/database-account:0.8.1' = 
         ]
       }
     ]
+  }
+}
+
+// Deployment script to configure vector policies and indexes using Azure CLI
+module configureVectorIndexesModule './deploymentScript.bicep' = {
+  scope: resourceGroup
+  name: 'configure-vector-indexes'
+  params: {
+    location: location
+    cosmosAccountName: cosmosDbAccount.outputs.name
+    databaseName: databaseName
+    resourceGroupName: resourceGroup.name
+    managedIdentityResourceId: managedIdentity.outputs.resourceId
+  }
+  dependsOn: [
+    // Ensure role assignment is created before deployment script runs
+    managedIdentityRoleAssignment
+  ]
+}
+
+// Role assignment for managed identity to manage Cosmos DB (management plane)
+resource managedIdentityRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid('${subscription().id}${resourceGroup.id}cosmos-db-operator')
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '5bd9cd88-fe45-4216-938b-f97437e15450')  // Cosmos DB Operator
+    principalId: managedIdentity.outputs.principalId
+    principalType: 'ServicePrincipal'
   }
 }
 
@@ -207,17 +243,15 @@ output AZURE_OPENAI_EMBEDDING_DEPLOYMENT string = embeddingModelName
 output AZURE_OPENAI_EMBEDDING_ENDPOINT string = openAi.outputs.endpoint
 output AZURE_OPENAI_EMBEDDING_API_VERSION string = embeddingModelApiVersion
 
-output AZURE_COSMOSDB_ENDPOINT string = cosmosDbAccount.outputs.endpoint
-output AZURE_COSMOSDB_DATABASENAME string = databaseName
-
 // Environment variables needed by utils.ts
 output COSMOS_ENDPOINT string = cosmosDbAccount.outputs.endpoint
+output AZURE_COSMOSDB_DATABASENAME string = databaseName
 
 // Configuration for embedding creation and vector search
 output DATA_FILE_WITH_VECTORS string = dataFileWithVectors
 output DATA_FILE_WITHOUT_VECTORS string = dataFileWithoutVectors
 output FIELD_TO_EMBED string = fieldToEmbed
 output EMBEDDED_FIELD string = embeddedFieldName
-output EMBEDDING_DIMENSIONS string = embeddingDimensions
+output EMBEDDING_DIMENSIONS string = string(vectorEmbeddingDimensions)
 output EMBEDDING_BATCH_SIZE string = embeddingBatchSize
-output LOAD_SIZE_BATCH string = loadSizeBatch
+output VECTOR_DISTANCE_FUNCTION string = vectorDistanceFunction
