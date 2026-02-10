@@ -85,57 +85,41 @@ The Cosmos DB SDK's bulk execution API is optimized for high-throughput, large-s
 
 ### Recommended Approach: TypeScript / Node.js
 
-For TypeScript/Node.js projects, use `executeBulkOperations()` method with **intelligent batching** to manage throughput:
+For TypeScript/Node.js projects, use `executeBulkOperations()` and let the SDK handle batching, dispatch, and throttling internally:
 
 ```typescript
 import { CosmosClient, BulkOperationType } from "@azure/cosmos";
 
-const batchSize = 50; // Adjust based on document size and provisioned RUs
-const totalBatches = Math.ceil(data.length / batchSize);
+const operations = data.map((item) => ({
+  operationType: BulkOperationType.Create,
+  resourceBody: item,
+  partitionKey: [item.HotelId],
+}));
 
-for (let i = 0; i < totalBatches; i++) {
-  const start = i * batchSize;
-  const end = Math.min(start + batchSize, data.length);
-  const batchData = data.slice(start, end);
-
-  // Prepare operations for this batch
-  const operations = batchData.map((item) => ({
-    operationType: BulkOperationType.Create,
-    resourceBody: item,
-  }));
-
-  try {
-    const response = await container.items.executeBulkOperations(operations);
-    
-    // Process results
-    let inserted = 0;
-    let failed = 0;
-    if (response) {
-      response.forEach(result => {
-        if (result.statusCode >= 200 && result.statusCode < 300) {
-          inserted++;
-        } else {
-          failed++;
-        }
-      });
-    }
-  } catch (error) {
-    console.error(`Batch ${i + 1} failed:`, error);
+try {
+  const response = await container.items.executeBulkOperations(operations);
+  // Process results
+  let inserted = 0;
+  let failed = 0;
+  if (response) {
+    response.forEach(result => {
+      if (result.statusCode >= 200 && result.statusCode < 300) {
+        inserted++;
+      } else {
+        failed++;
+      }
+    });
   }
-
-  // Pause between batches to allow RU recovery
-  if (i < totalBatches - 1) {
-    await new Promise(resolve => setTimeout(resolve, 500));
-  }
+} catch (error) {
+  console.error(`Bulk insert failed:`, error);
 }
 ```
 
 **Key points:**
 - **Use `executeBulkOperations()`** — the modern SDK method for bulk operations.
-- **Batch your operations before sending** — Do NOT send all data at once. Large batches (thousands of ops) can hit rate limits (429 errors) even with SDK retry logic.
-- Start with batch size of 50-100 and adjust based on document size and provisioned RUs. Smaller batches = safer; larger batches = faster (if RUs allow).
-- Pause 500ms between batches to allow the container to recover RU budget.
-- The SDK handles retry logic and backoff within each batch automatically.
+- **Pre-batching is not required** — the SDK accepts an unbounded list of operations and internally handles batching, dispatch, and throttling through congestion control algorithms. The API is designed to handle a large number of operations efficiently.
+- **Only batch if memory constraints exist** — unless you have memory limitations with the input data, you do not need to manually batch operations before sending.
+- The SDK handles retry logic and backoff automatically.
 - The SDK automatically distributes operations across partition ranges and mini-batches them for optimal throughput.
 - Partition key can be in the `resourceBody` or as a separate `partitionKey` field in the operation.
 - Supports all CRUD operations: Create, Upsert, Read, Replace, Delete, Patch.
@@ -145,9 +129,9 @@ for (let i = 0; i < totalBatches; i++) {
 
 | Language   | Native Bulk Support | Recommended Method             | Requires Pre-Batching |
 |------------|---------------------|--------------------------------|-----------------------|
-| **TypeScript / Node.js** | ✅ Yes (v4.3+)         | `executeBulkOperations()`      | ✅ Yes (recommended)   |
-| **.NET / C#**     | ✅ Yes (v3.4+)         | `AllowBulkExecution = true` + parallel tasks | ⚠️ Depends on scale  |
-| **Java**     | ✅ Yes (v4+)           | `executeBulkOperations()`      | ⚠️ Depends on scale   |
+| **TypeScript / Node.js** | ✅ Yes (v4.3+)         | `executeBulkOperations()`      | ❌ No (unless memory constraints) |
+| **.NET / C#**     | ✅ Yes (v3.4+)         | `AllowBulkExecution = true` + parallel tasks | ❌ No (unless memory constraints)  |
+| **Java**     | ✅ Yes (v4+)           | `executeBulkOperations()`      | ❌ No (unless memory constraints)   |
 | **Python**   | ❌ No              | `TransactionalBatch` (max 100 ops, single partition) | ✅ Required (max 100)  |
 | **Go**       | ❌ No              | `TransactionalBatch` + goroutines | ✅ Required (max 100)  |
 

@@ -115,51 +115,49 @@ export async function insertData(config, container, data) {
     }
 
     // Cosmos DB uses containers instead of collections
-    // Use SDK bulk operations with intelligent batching to avoid rate limiting
-    console.log(`Inserting ${data.length} items in batches of ${config.batchSize}...`);
+    // Use SDK bulk operations; let SDK handle batching, dispatch, and throttling
+    console.log(`Inserting ${data.length} items using executeBulkOperations...`);
 
-    const totalBatches = Math.ceil(data.length / config.batchSize);
+    // Prepare bulk operations for all items
+    const operations = data.map((item: any) => ({
+        operationType: BulkOperationType.Create,
+        resourceBody: {
+            id: item.HotelId,  // Map HotelId to id (required by Cosmos DB)
+            ...item,
+        },
+        // Partition key must be passed as array: [value] for /HotelId partition
+        partitionKey: [item.HotelId],
+    }));
+
     let inserted = 0;
     let failed = 0;
     let totalRequestCharge = 0;
 
-    for (let i = 0; i < totalBatches; i++) {
-        const start = i * config.batchSize;
-        const end = Math.min(start + config.batchSize, data.length);
-        const batchData = data.slice(start, end);
+    try {
+        const startTime = Date.now();
+        console.log(`Starting bulk insert (${operations.length} items)...`);
 
-        // Prepare bulk operations for this batch
-        // The executeBulkOperations API requires partition key in the operation
-        const operations = batchData.map((item: any) => ({
-            operationType: BulkOperationType.Create,
-            resourceBody: {
-                id: item.HotelId,  // Map HotelId to id (required by Cosmos DB)
-                ...item,
-            },
-            // Partition key must be passed as array: [value] for /HotelId partition
-            partitionKey: [item.HotelId],
-        }));
+        const response = await container.items.executeBulkOperations(operations);
 
-        try {
-            const startTime = Date.now();
-            console.log(`Batch ${i + 1}/${totalBatches}: Starting bulk insert (${batchData.length} items)...`);
+        const endTime = Date.now();
+        const duration = ((endTime - startTime) / 1000).toFixed(2);
+        console.log(`Bulk insert completed in ${duration}s`);
 
-            const response = await container.items.executeBulkOperations(operations);
+        totalRequestCharge += getBulkOperationRUs(response);
 
-            const endTime = Date.now();
-            const duration = ((endTime - startTime) / 1000).toFixed(2);
-            console.log(`Batch ${i + 1}/${totalBatches}: Completed in ${duration}s`);
-
-            totalRequestCharge += getBulkOperationRUs(response);
-        } catch (error) {
-            console.error(`Batch ${i + 1}/${totalBatches} failed:`, error);
-            failed += batchData.length;
+        // Count inserted and failed
+        if (response) {
+            response.forEach((result: any) => {
+                if (result.statusCode >= 200 && result.statusCode < 300) {
+                    inserted++;
+                } else {
+                    failed++;
+                }
+            });
         }
-
-        // Pause between batches to allow RU recovery
-        if (i < totalBatches - 1) {
-            await new Promise(resolve => setTimeout(resolve, 500));
-        }
+    } catch (error) {
+        console.error(`Bulk insert failed:`, error);
+        failed = operations.length;
     }
 
     console.log(`\nInsert Request Charge: ${totalRequestCharge.toFixed(2)} RUs\n`);
