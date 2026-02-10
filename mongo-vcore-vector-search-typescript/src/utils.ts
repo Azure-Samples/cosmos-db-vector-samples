@@ -97,7 +97,7 @@ export async function writeFileJson(filePath: string, jsonData: JsonData): Promi
 
     console.log(`Wrote JSON file to ${filePath}`);
 }
-export async function insertData(config, collection, data) {
+export async function insertData(collection, data) {
     console.log(`Processing in batches of ${config.batchSize}...`);
     const totalBatches = Math.ceil(data.length / config.batchSize);
 
@@ -147,7 +147,7 @@ export async function insertData(config, collection, data) {
     return { total: data.length, inserted, updated, skipped, failed };
 }
 
-export function printSearchResults(insertSummary, indexSummary, searchResults) {
+export function printSearchResults(indexSummary, searchResults) {
 
 
     if (!searchResults || searchResults.length === 0) {

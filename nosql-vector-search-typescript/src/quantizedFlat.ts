@@ -42,7 +42,7 @@ async function main() {
             // Verify container exists by attempting a read
             await container.read();
         const data = await readFileReturnJson(path.join(__dirname, "..", config.dataFile));
-        const insertSummary = await insertData(config, container, data.slice(0, config.batchSize));
+        const insertSummary = await insertData(container, data);
 
         const createEmbeddedForQueryResponse = await aiClient.embeddings.create({
             model: config.deployment,
@@ -66,7 +66,7 @@ async function main() {
             })
             .fetchAll();
 
-            printSearchResults(insertSummary, resources, requestCharge);
+            printSearchResults(resources, requestCharge);
         } catch (error) {
             if ((error as any).code === 404) {
                 throw new Error(`Container or database not found. Ensure database '${config.dbName}' and container '${config.collectionName}' exist before running this script.`);

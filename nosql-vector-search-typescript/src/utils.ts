@@ -105,7 +105,7 @@ async function getDocumentCount(container: any): Promise<number> {
     return countResult.resources[0];
 }
 
-export async function insertData(config, container, data) {
+export async function insertData(container, data) {
     // Check if container already has documents
     const existingCount = await getDocumentCount(container);
 
@@ -195,7 +195,7 @@ export function validateFieldName(fieldName: string): string {
 /**
  * Print search results in a consistent format
  */
-export function printSearchResults(insertSummary: any, searchResults: any[], requestCharge?: number): void {
+export function printSearchResults(searchResults: any[], requestCharge?: number): void {
     console.log('\n--- Search Results ---');
     if (!searchResults || searchResults.length === 0) {
         console.log('No results found.');

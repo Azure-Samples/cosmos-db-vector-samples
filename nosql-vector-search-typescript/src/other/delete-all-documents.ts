@@ -10,75 +10,6 @@ const config = {
     ]
 };
 
-async function deleteAllDocumentsInContainer(container: any, containerName: string) {
-    console.log(`\nProcessing container: ${containerName}`);
-    
-    try {
-        // Query all documents to get their IDs and partition keys
-        const { resources } = await container.items
-            .query('SELECT c.id, c.HotelId FROM c')
-            .fetchAll();
-        
-        if (resources.length === 0) {
-            console.log(`  No documents found in ${containerName}`);
-            return { total: 0, deleted: 0, failed: 0 };
-        }
-
-        console.log(`  Found ${resources.length} documents to delete`);
-
-        // Use batching to avoid rate limiting (429 errors)
-        const batchSize = 50;
-        const totalBatches = Math.ceil(resources.length / batchSize);
-        let totalDeleted = 0;
-        let totalFailed = 0;
-        let totalRequestCharge = 0;
-
-        for (let i = 0; i < totalBatches; i++) {
-            const start = i * batchSize;
-            const end = Math.min(start + batchSize, resources.length);
-            const batchDocs = resources.slice(start, end);
-
-            // Prepare bulk delete operations for this batch
-            const operations = batchDocs.map((doc: any) => ({
-                operationType: BulkOperationType.Delete,
-                id: doc.id,
-                partitionKey: [doc.HotelId]  // Partition key as array
-            }));
-
-            const startTime = Date.now();
-            console.log(`  Batch ${i + 1}/${totalBatches}: Deleting ${batchDocs.length} documents...`);
-            
-            const response = await container.items.executeBulkOperations(operations);
-            
-            const endTime = Date.now();
-            const duration = ((endTime - startTime) / 1000).toFixed(2);
-            console.log(`  Batch ${i + 1}/${totalBatches}: Completed in ${duration}s`);
-
-            // Count successful and failed operations
-            let batchDeleted = 0;
-            let batchFailed = 0;
-            
-            totalRequestCharge += getBulkOperationRUs(response);
-
-            totalDeleted += batchDeleted;
-            totalFailed += batchFailed;
-
-            // Pause between batches to allow RU recovery
-            if (i < totalBatches - 1) {
-                await new Promise(resolve => setTimeout(resolve, 500));
-            }
-        }
-
-        console.log(`  ✓ Deleted: ${totalDeleted}, Failed: ${totalFailed}`);
-        console.log(`  Delete Request Charge: ${totalRequestCharge.toFixed(2)} RUs`);
-        return { total: resources.length, deleted: totalDeleted, failed: totalFailed };
-        
-    } catch (error) {
-        console.error(`  ✗ Error processing container ${containerName}:`, error);
-        return { total: 0, deleted: 0, failed: 0 };
-    }
-}
-
 async function main() {
     const { dbClient } = getClientsPasswordless();
 
@@ -97,36 +28,74 @@ async function main() {
         for (const containerName of config.containers) {
             try {
                 const container = database.container(containerName);
+                console.log(`\nDeleting documents from container: ${containerName}`);
                 
                 // Verify container exists
-                await container.read();
-                
-                const result = await deleteAllDocumentsInContainer(container, containerName);
-                totalDeleted += result.deleted;
-                totalFailed += result.failed;
-                
-            } catch (error) {
-                if ((error as any).code === 404) {
-                    console.log(`\n⚠ Container '${containerName}' not found - skipping`);
-                } else {
-                    console.error(`\n✗ Error accessing container '${containerName}':`, error);
+                try {
+                    // Query all documents to get their IDs and partition keys
+                    const { resources } = await container.items
+                        .query('SELECT c.id, c.HotelId FROM c')
+                        .fetchAll();
+
+                    if (resources.length === 0) {
+                        console.log(`  No documents found in ${containerName}`);
+                        return { total: 0, deleted: 0, failed: 0 };
+                    }
+
+                    console.log(`  Found ${resources.length} documents to delete`);
+
+                    // Prepare bulk delete operations for all documents
+                    const operations = resources.map((doc: any) => ({
+                        operationType: BulkOperationType.Delete,
+                        id: doc.id,
+                        partitionKey: [doc.HotelId]  // Partition key as array
+                    }));
+
+                    const startTime = Date.now();
+                    console.log(`  Deleting ${operations.length} documents in bulk...`);
+
+                    const response = await container.items.executeBulkOperations(operations);
+
+                    const endTime = Date.now();
+                    const duration = ((endTime - startTime) / 1000).toFixed(2);
+                    console.log(`  Bulk delete completed in ${duration}s`);
+
+                    // Count successful and failed operations
+                    let deleted = 0;
+                    let failed = 0;
+                    if (response) {
+                        response.forEach((result: any) => {
+                            if (result.statusCode >= 200 && result.statusCode < 300) {
+                                deleted++;
+                            } else {
+                                failed++;
+                            }
+                        });
+                    }
+
+                    const totalRequestCharge = getBulkOperationRUs(response);
+
+                    console.log(`  ✓ Deleted: ${deleted}, Failed: ${failed}`);
+                    console.log(`  Delete Request Charge: ${totalRequestCharge.toFixed(2)} RUs`);
+                    return { total: resources.length, deleted, failed };
+                } catch (error) {
+                    console.error(`  ✗ Error processing container ${containerName}:`, error);
+                    return { total: 0, deleted: 0, failed: 0 };
                 }
+            } catch (error) {
+                console.error(`  ✗ Error connecting to container ${containerName}:`, error);
+                return { total: 0, deleted: 0, failed: 0 };
             }
         }
 
-        console.log(`\n=== Summary ===`);
-        console.log(`Total deleted: ${totalDeleted}`);
-        console.log(`Total failed: ${totalFailed}`);
-        console.log(`Containers processed: ${config.containers.length}`);
-
+        console.log(`\nSummary: Total Deleted: ${totalDeleted}, Total Failed: ${totalFailed}`);
     } catch (error) {
-        console.error('Script failed:', error);
+        console.error('App failed:', error);
         process.exitCode = 1;
     }
 }
 
-// Execute the main function
-main().catch(error => {
-    console.error('Unhandled error:', error);
+main().catch((error) => {
+    console.error('Unexpected error:', error);
     process.exitCode = 1;
 });
