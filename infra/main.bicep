@@ -168,20 +168,89 @@ module cosmosDbAccount 'br/public:avm/res/document-db/database-account:0.8.1' = 
           {
             name: 'hotels_diskann'
             paths: [
-              '/HotelId'
+              '/*'
             ]
+            indexingPolicy: {
+              indexingMode: 'consistent'
+              automatic: true
+              includedPaths: [
+                {
+                  path: '/*'
+                }
+              ]
+              excludedPaths: [
+                {
+                  path: '/_etag/?'
+                }
+                {
+                  path: '/DescriptionVector/*'
+                }
+              ]
+              vectorIndexes: [
+                {
+                  path: '/DescriptionVector'
+                  type: 'diskANN'
+                }
+              ]
+            }
           }
           {
             name: 'hotels_flat'
             paths: [
-              '/HotelId'
+              '/*'
             ]
+            indexingPolicy: {
+              indexingMode: 'consistent'
+              automatic: true
+              includedPaths: [
+                {
+                  path: '/*'
+                }
+              ]
+              excludedPaths: [
+                {
+                  path: '/_etag/?'
+                }
+                {
+                  path: '/DescriptionVector/*'
+                }
+              ]
+              vectorIndexes: [
+                {
+                  path: '/DescriptionVector'
+                  type: 'flat'
+                }
+              ]
+            }
           }
           {
             name: 'hotels_quantizedflat'
             paths: [
-              '/HotelId'
+              '/*'
             ]
+            indexingPolicy: {
+              indexingMode: 'consistent'
+              automatic: true
+              includedPaths: [
+                {
+                  path: '/*'
+                }
+              ]
+              excludedPaths: [
+                {
+                  path: '/_etag/?'
+                }
+                {
+                  path: '/DescriptionVector/*'
+                }
+              ]
+              vectorIndexes: [
+                {
+                  path: '/DescriptionVector'
+                  type: 'quantizedFlat'
+                }
+              ]
+            }
           }
         ]
       }
