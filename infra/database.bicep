@@ -5,9 +5,10 @@ param location string = resourceGroup().location
 param tags object = {}
 param managedIdentityPrincipalId string
 param deploymentUserPrincipalId string = ''
+param databaseName string
 
 var database = {
-  name: 'Hotels' // Database for application
+  name: databaseName // Database for application
 }
 
 var containers = [

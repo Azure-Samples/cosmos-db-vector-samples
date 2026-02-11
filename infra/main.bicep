@@ -55,6 +55,7 @@ var embeddingModelApiVersion = '2024-08-01-preview'
 // Data and embedding configuration
 var dataFileWithVectors = '../data/HotelsData_toCosmosDB_Vector.json'
 var dataFileWithoutVectors = '../data/HotelsData_toCosmosDB.JSON'
+var databaseName = 'Hotels'
 var fieldToEmbed = 'Description'
 var embeddedFieldName = 'DescriptionVector'
 var embeddingDimensions = '1536'
@@ -130,6 +131,7 @@ module database './database.bicep' = {
     tags: tags
     managedIdentityPrincipalId: managedIdentity.outputs.principalId
     deploymentUserPrincipalId: deploymentUserPrincipalId
+    databaseName: databaseName
   }
 }
 
@@ -154,7 +156,7 @@ output AZURE_OPENAI_EMBEDDING_API_VERSION string = embeddingModelApiVersion
 
 // Environment variables needed by utils.ts
 output COSMOS_ENDPOINT string =  database.outputs.endpoint
-output AZURE_COSMOSDB_DATABASENAME string = database.outputs.accountName
+output AZURE_COSMOSDB_DATABASENAME string = databaseName
 
 // Configuration for embedding creation and vector search
 output DATA_FILE_WITH_VECTORS string = dataFileWithVectors
