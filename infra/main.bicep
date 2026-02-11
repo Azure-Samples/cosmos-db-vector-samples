@@ -28,9 +28,9 @@ var prefix = '${environmentName}${resourceToken}'
 
 // Organize resources in a resource group
 resource resourceGroup 'Microsoft.Resources/resourceGroups@2021-04-01' = {
-    name: '${environmentName}-${resourceToken}-rg'
-    location: location
-    tags: tags
+  name: '${environmentName}-${resourceToken}-rg'
+  location: location
+  tags: tags
 }
 
 module managedIdentity 'br/public:avm/res/managed-identity/user-assigned-identity:0.4.0' = {
@@ -109,85 +109,30 @@ module openAi 'br/public:avm/res/cognitive-services/account:0.7.1' = {
           roleDefinitionIdOrName: 'Cognitive Services OpenAI User'
         }
       ],
-      !empty(deploymentUserPrincipalId) ? [
-        {
-          principalId: deploymentUserPrincipalId
-          roleDefinitionIdOrName: 'Cognitive Services OpenAI User'
-        }
-      ] : []
+      !empty(deploymentUserPrincipalId)
+        ? [
+            {
+              principalId: deploymentUserPrincipalId
+              roleDefinitionIdOrName: 'Cognitive Services OpenAI User'
+            }
+          ]
+        : []
     )
   }
 }
 
-var databaseName = 'Hotels'
-
-module cosmosDbAccount 'br/public:avm/res/document-db/database-account:0.8.1' = {
-  name: 'cosmos-db-account'
+module database './database.bicep' = {
+  name: 'database'
   scope: resourceGroup
   params: {
-    name: 'cosmos-db-nosql-${prefix}'
+    accountName: 'db-${prefix}'
     location: location
-    locations: [
-      {
-        failoverPriority: 0
-        locationName: location
-        isZoneRedundant: false
-      }
-    ]
     tags: tags
-    disableKeyBasedMetadataWriteAccess: true
-    disableLocalAuth: true
-    networkRestrictions: {
-      publicNetworkAccess: 'Enabled'
-      ipRules: []
-      virtualNetworkRules: []
-    }
-    capabilitiesToAdd: [
-      'EnableServerless'
-    ]
-    sqlRoleDefinitions: [
-      {
-        name: 'nosql-data-plane-contributor'
-        dataAction: [
-          'Microsoft.DocumentDB/databaseAccounts/readMetadata'
-          'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers/items/*'
-          'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers/*'
-        ]
-      }
-    ]
-    sqlRoleAssignmentsPrincipalIds: concat(
-      [
-        managedIdentity.outputs.principalId
-      ],
-      !empty(deploymentUserPrincipalId) ? [deploymentUserPrincipalId] : []
-    )
-    sqlDatabases: [
-      {
-        name: databaseName
-        containers: [
-          {
-            name: 'hotels_diskann'
-            paths: [
-              '/HotelId'
-            ]
-          }
-          {
-            name: 'hotels_flat'
-            paths: [
-              '/HotelId'
-            ]
-          }
-          {
-            name: 'hotels_quantizedflat'
-            paths: [
-              '/HotelId'
-            ]
-          }
-        ]
-      }
-    ]
+    managedIdentityPrincipalId: managedIdentity.outputs.principalId
+    deploymentUserPrincipalId: deploymentUserPrincipalId
   }
 }
+
 
 output AZURE_LOCATION string = location
 output AZURE_TENANT_ID string = tenant().tenantId
@@ -208,8 +153,8 @@ output AZURE_OPENAI_EMBEDDING_ENDPOINT string = openAi.outputs.endpoint
 output AZURE_OPENAI_EMBEDDING_API_VERSION string = embeddingModelApiVersion
 
 // Environment variables needed by utils.ts
-output COSMOS_ENDPOINT string = cosmosDbAccount.outputs.endpoint
-output AZURE_COSMOSDB_DATABASENAME string = databaseName
+output COSMOS_ENDPOINT string =  database.outputs.endpoint
+output AZURE_COSMOSDB_DATABASENAME string = database.outputs.accountName
 
 // Configuration for embedding creation and vector search
 output DATA_FILE_WITH_VECTORS string = dataFileWithVectors
