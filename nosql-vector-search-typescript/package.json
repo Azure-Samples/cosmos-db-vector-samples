@@ -6,15 +6,15 @@
   "scripts": {
     "build": "tsc",
     "create-env": "azd env get-values > .env",
-    "start:diskann": "node --env-file .env dist/diskann.js",
-    "start:flat": "node --env-file .env dist/flat.js",
-    "start:quantizedflat": "node --env-file .env dist/quantizedFlat.js",
-
-    "metrics:diskann": "set COSMOS_CONTAINER=hotels_diskann&& node --env-file .env dist/other/query-metrics.js",
-    "metrics:quantizedflat": "set COSMOS_CONTAINER=hotels_quantizedflat&& node --env-file .env dist/other/query-metrics.js",
+    
+    "start:diskann": "set VECTOR_ALGORITHM=diskann && node --env-file .env dist/vector-search.js",
+    "start:quantizedflat": "set VECTOR_ALGORITHM=quantizedflat && node --env-file .env dist/vector-search.js",
 
     "start:embed": "node --env-file .env dist/other/create-embeddings.js",
+    "metrics:diskann": "set VECTOR_ALGORITHM=diskann && node --env-file .env dist/other/query-metrics.js",
+    "metrics:quantizedflat": "set VECTOR_ALGORITHM=quantizedflat && node --env-file .env dist/other/query-metrics.js",
     "delete:all": "node --env-file .env dist/other/delete-all-documents.js"
+
   },
   "dependencies": {
     "@azure/cosmos": "^4.5.1",
