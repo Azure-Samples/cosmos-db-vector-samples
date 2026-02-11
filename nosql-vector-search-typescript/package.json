@@ -6,15 +6,12 @@
   "scripts": {
     "build": "tsc",
     "create-env": "azd env get-values > .env",
-    
-    "start:diskann": "set VECTOR_ALGORITHM=diskann && node --env-file .env dist/vector-search.js",
-    "start:quantizedflat": "set VECTOR_ALGORITHM=quantizedflat && node --env-file .env dist/vector-search.js",
-
+    "start:diskann": "cross-env VECTOR_ALGORITHM=diskann node --env-file .env dist/vector-search.js",
+    "start:quantizedflat": "cross-env VECTOR_ALGORITHM=quantizedflat node --env-file .env dist/vector-search.js",
     "start:embed": "node --env-file .env dist/other/create-embeddings.js",
-    "metrics:diskann": "set VECTOR_ALGORITHM=diskann && node --env-file .env dist/other/query-metrics.js",
-    "metrics:quantizedflat": "set VECTOR_ALGORITHM=quantizedflat && node --env-file .env dist/other/query-metrics.js",
+    "metrics:diskann": "cross-env VECTOR_ALGORITHM=diskann node --env-file .env dist/other/query-metrics.js",
+    "metrics:quantizedflat": "cross-env VECTOR_ALGORITHM=quantizedflat node --env-file .env dist/other/query-metrics.js",
     "delete:all": "node --env-file .env dist/other/delete-all-documents.js"
-
   },
   "dependencies": {
     "@azure/cosmos": "^4.5.1",
@@ -23,6 +20,7 @@
   },
   "devDependencies": {
     "@types/node": "^24.3.0",
+    "cross-env": "^10.1.0",
     "typescript": "^5.9.2"
   }
 }
