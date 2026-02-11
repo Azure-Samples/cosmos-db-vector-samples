@@ -21,13 +21,6 @@ Azure Cosmos DB provides integrated vector search capabilities for AI-powered se
   - Managed identity authentication
   - Comprehensive documentation and examples
 
-### MongoDB vCore API Samples
-
-- **[mongo-vcore-vector-search-typescript](./mongo-vcore-vector-search-typescript/)** - TypeScript samples for MongoDB vCore
-- **[mongo-vcore-vector-search-python](./mongo-vcore-vector-search-python/)** - Python samples for MongoDB vCore
-- **[mongo-vcore-vector-search-dotnet](./mongo-vcore-vector-search-dotnet/)** - .NET samples for MongoDB vCore
-- **[mongo-vcore-vector-search-go](./mongo-vcore-vector-search-go/)** - Go samples for MongoDB vCore
-
 ## 🚀 Features
 
 This project demonstrates:
