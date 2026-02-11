@@ -1,3 +1,15 @@
+<!--
+---
+page_type: sample
+name: "DocumentDB Vector Search for Go"
+description: This sample demonstrates vector search capabilities using Azure DocumentDB with Go. It includes implementations of three different vector index types: DiskANN, HNSW, and IVF, along with utilities for embedding generation and data management.
+urlFragment: vector-search-go
+languages:
+- go
+products:
+- azure
+---
+-->
 # Azure DocumentDB Vector Samples (Go)
 
 This project demonstrates vector search capabilities using Azure DocumentDB with Go. It includes implementations of three different vector index types: DiskANN, HNSW, and IVF, along with utilities for embedding generation and data management.
