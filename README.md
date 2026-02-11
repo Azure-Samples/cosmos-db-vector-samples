@@ -59,14 +59,19 @@ This project demonstrates:
 ```bash
 # Clone the repository
 git clone https://github.com/Azure-Samples/cosmos-db-vector-samples.git
+
+# Provision Azure resources with Azure Developer CLI
+azd auth login
+azd up
+
+# Work with TypeScript sample
 cd cosmos-db-vector-samples/nosql-vector-search-typescript
 
 # Install dependencies
 npm install
 
-# Configure environment variables
-cp .env.example .env
-# Edit .env with your Azure resource information
+# Set environment variables from provisioned infrstructure
+azd env get-values > .env
 
 # Build and run
 npm run build
