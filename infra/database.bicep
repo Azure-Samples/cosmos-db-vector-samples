@@ -47,9 +47,6 @@ var containers = [
         }
       ]
     }
-    fullTextPolicy: {
-      fullTextPaths: []
-    }
   }
   {
     name: 'hotels_quantizedflat'
@@ -78,9 +75,6 @@ var containers = [
           type: 'quantizedFlat'
         }
       ]
-      fullTextPolicy: {
-        fullTextPaths: []
-      }
     }
     vectorEmbeddingPolicy: {
       vectorEmbeddings: [
@@ -130,7 +124,6 @@ module cosmosDbContainers './cosmos-db/nosql/container.bicep' = [
       partitionKeyPaths: container.partitionKeyPaths
       indexingPolicy: container.indexingPolicy
       vectorEmbeddingPolicy: container.vectorEmbeddingPolicy
-      fullTextPolicy: container.fullTextPolicy
     }
   }
 ]
