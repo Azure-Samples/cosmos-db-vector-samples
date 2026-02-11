@@ -2,6 +2,8 @@
 
 This project demonstrates how to use **Azure Cosmos DB for NoSQL** as a vector store for AI-powered semantic search applications. It shows how to generate embeddings with Azure OpenAI, store vectors in JSON documents, and query with `VectorDistance` for nearest neighbors.
 
+
+**Troubleshooting note:** JSON numbers in documents are not typed (float32 vs float64), but the vector policy is. Cosmos DB validates that the field is an array of numeric values and can be interpreted as float32 with the specified dimension length. If the policy is wrong, container creation fails or vector queries return 400s.
 ## 📚 Table of Contents
 
 - [Architecture Overview](#architecture-overview)
@@ -431,6 +433,22 @@ A vector search query returns:
   "SimilarityScore": 0.9234
 }
 ```
+
+## 🧰 Troubleshooting
+
+### Vector query return codes
+
+| Status | Meaning | Typical causes | Fix |
+| --- | --- | --- | --- |
+| 200 | Query succeeded | n/a | n/a |
+| 204 | No results | Query valid but no matches | Verify data and query text |
+| 400 | Bad request | Wrong vector path, wrong dimensions, vector capability not enabled, invalid SQL | Check vector policy path/dimensions and account capability |
+| 401 | Unauthorized | Missing or expired token | Re-authenticate, check credential source |
+| 403 | Forbidden | RBAC missing for data plane | Assign Cosmos DB Built-in Data Contributor |
+| 404 | Not found | Database or container name mismatch | Verify db/container names |
+| 409 | Conflict | Write conflicts (not typical for queries) | Use unique IDs or retry write |
+| 412 | Precondition failed | ETag mismatch | Refresh ETag or remove condition |
+| 429 | Rate limited | RU throttling | Retry with backoff or increase RU |
 
 ## 📖 Resources
 

@@ -10,6 +10,9 @@
     "start:flat": "node --env-file .env dist/flat.js",
     "start:quantizedflat": "node --env-file .env dist/quantizedFlat.js",
 
+    "metrics:diskann": "set COSMOS_CONTAINER=hotels_diskann&& node --env-file .env dist/other/query-metrics.js",
+    "metrics:quantizedflat": "set COSMOS_CONTAINER=hotels_quantizedflat&& node --env-file .env dist/other/query-metrics.js",
+
     "start:embed": "node --env-file .env dist/other/create-embeddings.js",
     "delete:all": "node --env-file .env dist/other/delete-all-documents.js"
   },
