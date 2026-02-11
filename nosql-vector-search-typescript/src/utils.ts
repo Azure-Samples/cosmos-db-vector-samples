@@ -27,8 +27,8 @@ export function getClients(): { aiClient: AzureOpenAI | null; dbClient: CosmosCl
 
     // Cosmos DB connection string or endpoint/key
     // You may need to use endpoint and key separately for CosmosClient
-    const cosmosEndpoint = process.env.COSMOS_ENDPOINT!;
-    const cosmosKey = process.env.COSMOS_KEY!;
+    const cosmosEndpoint = process.env.AZURE_COSMOSDB_ENDPOINT!;
+    const cosmosKey = process.env.AZURE_COSMOSDB_KEY!;
 
     if (cosmosEndpoint && cosmosKey) {
         dbClient = new CosmosClient({ endpoint: cosmosEndpoint, key: cosmosKey });
@@ -65,7 +65,7 @@ export function getClientsPasswordless(): { aiClient: AzureOpenAI | null; dbClie
     }
 
     // For Cosmos DB with DefaultAzureCredential
-    const cosmosEndpoint = process.env.COSMOS_ENDPOINT!;
+    const cosmosEndpoint = process.env.AZURE_COSMOSDB_ENDPOINT!;
 
     if (cosmosEndpoint) {
         const credential = new DefaultAzureCredential();

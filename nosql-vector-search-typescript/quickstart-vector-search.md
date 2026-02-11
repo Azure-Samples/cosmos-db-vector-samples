@@ -69,21 +69,23 @@ Find the sample code with resource provisioning on [GitHub](https://github.com/A
     # Identity for local developer authentication with Azure CLI
     AZURE_TOKEN_CREDENTIALS=AzureCliCredential
 
-    # Azure OpenAI Embedding Settings
-    AZURE_OPENAI_EMBEDDING_MODEL=text-embedding-3-small
-    AZURE_OPENAI_EMBEDDING_API_VERSION=2023-05-15
-    AZURE_OPENAI_EMBEDDING_ENDPOINT=
-    EMBEDDING_SIZE_BATCH=16
-
-    # Cosmos DB configuration
-    COSMOS_ENDPOINT=
-
-    # Data file
-    DATA_FILE_WITH_VECTORS=../data/HotelsData_toCosmosDB_Vector.json
-    FIELD_TO_EMBED=Description
-    EMBEDDED_FIELD=DescriptionVector
+    # Azure OpenAI - Embedding Model
+    AZURE_OPENAI_EMBEDDING_ENDPOINT="YOUR_AZURE_OPENAI_ENDPOINT"
+    AZURE_OPENAI_EMBEDDING_MODEL="text-embedding-3-small"
+    AZURE_OPENAI_EMBEDDING_API_VERSION="2024-08-01-preview"
+    
+    # Azure Cosmos DB
+    AZURE_COSMOSDB_ENDPOINT="YOUR_COSMOS_DB_ENDPOINT"
+    
+    
+    # Data Files
+    DATA_FILE_WITH_VECTORS="../data/HotelsData_toCosmosDB_Vector.json"
+    DATA_FILE_WITHOUT_VECTORS="../data/HotelsData_toCosmosDB.JSON"
+    
+    # Embedding Configuration
+    FIELD_TO_EMBED="Description"
+    EMBEDDED_FIELD="DescriptionVector"
     EMBEDDING_DIMENSIONS=1536
-    LOAD_SIZE_BATCH=50
     ```
 
 1. Add a `tsconfig.json` file to configure TypeScript:
