@@ -128,6 +128,8 @@ module database './database.bicep' = {
     accountName: 'db-${prefix}'
     location: location
     tags: tags
+    managedIdentityPrincipalId: managedIdentity.outputs.principalId
+    deploymentUserPrincipalId: deploymentUserPrincipalId
   }
 }
 
