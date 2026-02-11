@@ -1,9 +1,14 @@
-import { getClientsPasswordless, validateFieldName } from '../utils.js';
+import { getClientsPasswordless, validateFieldName, getQueryActivityId } from '../utils.js';
+
+const vectorAlgorithm = process.env.VECTOR_ALGORITHM?.trim();
+if (!vectorAlgorithm) {
+    throw new Error('VECTOR_ALGORITHM environment variable is required (e.g., diskann, quantizedflat)');
+}
 
 const config = {
     query: 'quintessential lodging near running trails, eateries, retail',
     dbName: 'Hotels',
-    collectionNames: ['hotels_diskann', 'hotels_quantizedflat'],
+    containerName: `hotels_${vectorAlgorithm.toLowerCase()}`,
     embeddedField: process.env.EMBEDDED_FIELD!,
     deployment: process.env.AZURE_OPENAI_EMBEDDING_MODEL!,
 };
@@ -27,46 +32,49 @@ async function main() {
     const safeEmbeddedField = validateFieldName(config.embeddedField);
     const queryText = `SELECT TOP 5 c.HotelName, c.Description, c.Rating, VectorDistance(c.${safeEmbeddedField}, @embedding) AS SimilarityScore FROM c ORDER BY VectorDistance(c.${safeEmbeddedField}, @embedding)`;
 
-    for (const containerName of config.collectionNames) {
-        const container = database.container(containerName);
-        const response = await container.items
-            .query({
-                query: queryText,
-                parameters: [
-                    { name: '@embedding', value: createEmbeddedForQueryResponse.data[0].embedding },
-                ],
-            })
-            .fetchAll();
+    const container = database.container(config.containerName);
+    const response = await container.items
+        .query({
+            query: queryText,
+            parameters: [
+                { name: '@embedding', value: createEmbeddedForQueryResponse.data[0].embedding },
+            ],
+        })
+        .fetchAll();
 
-        console.log(`\nContainer: ${containerName}`);
-        console.log('Request charge:', response.requestCharge);
-
-        const queryMetrics = response.queryMetrics;
-        if (queryMetrics && typeof queryMetrics === 'object') {
-            console.log('Query metrics:', JSON.stringify(queryMetrics, null, 2));
-        } else {
-            console.log('Query metrics:', queryMetrics ?? 'n/a');
-        }
-
-        if (response.diagnostics && typeof response.diagnostics === 'object') {
-            const clientStats = (response.diagnostics as any).clientSideRequestStatistics;
-            const gatewayStats = Array.isArray(clientStats?.gatewayStatistics)
-                ? clientStats.gatewayStatistics.filter((entry: any) => entry.statusCode === 200)
-                : [];
-
-            if (gatewayStats.length > 0) {
-                console.log('Gateway statistics (success only):', JSON.stringify(gatewayStats, null, 2));
-            } else {
-                const diagnosticsText = JSON.stringify(response.diagnostics, null, 2);
-                const truncatedDiagnostics = diagnosticsText.length > 4000
-                    ? `${diagnosticsText.slice(0, 4000)}\n... (truncated)`
-                    : diagnosticsText;
-                console.log('Diagnostics:', truncatedDiagnostics);
-            }
-        }
-
-        console.log('Results:', response.resources?.length ?? 0);
+    const activityId = getQueryActivityId(response);
+    if (activityId) {
+        console.log('Query activity ID:', activityId);
     }
+
+    console.log(`\nContainer: ${config.containerName} (algorithm: ${vectorAlgorithm})`);
+    console.log('Request charge:', response.requestCharge);
+
+    const queryMetrics = response.queryMetrics;
+    if (queryMetrics && typeof queryMetrics === 'object') {
+        console.log('Query metrics:', JSON.stringify(queryMetrics, null, 2));
+    } else {
+        console.log('Query metrics:', queryMetrics ?? 'n/a');
+    }
+
+    if (response.diagnostics && typeof response.diagnostics === 'object') {
+        const clientStats = (response.diagnostics as any).clientSideRequestStatistics;
+        const gatewayStats = Array.isArray(clientStats?.gatewayStatistics)
+            ? clientStats.gatewayStatistics.filter((entry: any) => entry.statusCode === 200)
+            : [];
+
+        if (gatewayStats.length > 0) {
+            console.log('Gateway statistics (success only):', JSON.stringify(gatewayStats, null, 2));
+        } else {
+            const diagnosticsText = JSON.stringify(response.diagnostics, null, 2);
+            const truncatedDiagnostics = diagnosticsText.length > 4000
+                ? `${diagnosticsText.slice(0, 4000)}\n... (truncated)`
+                : diagnosticsText;
+            console.log('Diagnostics:', truncatedDiagnostics);
+        }
+    }
+
+    console.log('Results:', response.resources?.length ?? 0);
 }
 
 main().catch((error) => {

@@ -105,7 +105,7 @@ async function getDocumentCount(container: any): Promise<number> {
     return countResult.resources[0];
 }
 
-export async function insertData(container, data) {
+export async function insertData(container, data): Promise<{ total: number; inserted: number; failed: number; skipped: number; requestCharge: number }> {
     // Check if container already has documents
     const existingCount = await getDocumentCount(container);
 
@@ -131,6 +131,7 @@ export async function insertData(container, data) {
 
     let inserted = 0;
     let failed = 0;
+    let skipped = 0;
     let totalRequestCharge = 0;
 
     try {
@@ -145,11 +146,13 @@ export async function insertData(container, data) {
 
         totalRequestCharge += getBulkOperationRUs(response);
 
-        // Count inserted and failed
+        // Count inserted, skipped, and failed
         if (response) {
             response.forEach((result: any) => {
                 if (result.statusCode >= 200 && result.statusCode < 300) {
                     inserted++;
+                } else if (result.statusCode === 409) {
+                    skipped++;
                 } else {
                     failed++;
                 }
@@ -161,7 +164,7 @@ export async function insertData(container, data) {
     }
 
     console.log(`\nInsert Request Charge: ${totalRequestCharge.toFixed(2)} RUs\n`);
-    return { total: data.length, inserted, failed, requestCharge: totalRequestCharge };
+    return { total: data.length, inserted, failed, skipped, requestCharge: totalRequestCharge };
 }
 
 /**
@@ -210,6 +213,20 @@ export function printSearchResults(searchResults: any[], requestCharge?: number)
         console.log(`\nVector Search Request Charge: ${requestCharge.toFixed(2)} RUs`);
     }
     console.log('');
+}
+
+export function getQueryActivityId(queryResponse: any): string | undefined {
+    if (!queryResponse) {
+        return undefined;
+    }
+
+    const diagnostics = queryResponse.diagnostics as any;
+    const gatewayStats = Array.isArray(diagnostics?.clientSideRequestStatistics?.gatewayStatistics)
+        ? diagnostics.clientSideRequestStatistics.gatewayStatistics
+        : [];
+    const gatewayActivityId = gatewayStats.find((entry: any) => entry?.activityId)?.activityId;
+
+    return queryResponse.activityId ?? gatewayActivityId;
 }
 
 export function getBulkOperationRUs(response: any): number {
