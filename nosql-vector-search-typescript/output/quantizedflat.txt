@@ -16,7 +16,7 @@ Query: SELECT TOP 5 c.HotelName, c.Description, c.Rating, VectorDistance(c.Descr
 Parameters: @embedding (vector with 1536 dimensions)
 --------------------------------------
 
-Query activity ID: 058efbe5-9421-46e9-8c78-f4228b82bcaa
+Query activity ID: <ACTIVITY_ID>
 
 --- Search Results ---
 1. Royal Cottage Resort, Score: 0.4991
@@ -24,5 +24,6 @@ Query activity ID: 058efbe5-9421-46e9-8c78-f4228b82bcaa
 3. Nordick's Valley Motel, Score: 0.4635
 4. Economy Universe Motel, Score: 0.4461
 5. Roach Motel, Score: 0.4388
+
 
 Vector Search Request Charge: 5.32 RUs
