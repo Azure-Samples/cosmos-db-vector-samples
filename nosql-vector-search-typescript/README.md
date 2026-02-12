@@ -1,3 +1,15 @@
+<!--
+---
+page_type: sample
+name: "DocumentDB Vector Search for TypeScript"
+description: This sample demonstrates how to use Azure Cosmos DB for NoSQL as a vector store for AI-powered semantic search applications. It shows how to generate embeddings with Azure OpenAI, store vectors in JSON documents, and query with VectorDistance for nearest neighbors.
+urlFragment: vector-search-typescript
+languages:
+- typescript
+products:
+- azure
+---
+-->
 # Azure Cosmos DB NoSQL Vector Search with TypeScript
 
 This project demonstrates how to use **Azure Cosmos DB for NoSQL** as a vector store for AI-powered semantic search applications. It shows how to generate embeddings with Azure OpenAI, store vectors in JSON documents, and query with `VectorDistance` for nearest neighbors.

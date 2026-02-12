@@ -1,3 +1,15 @@
+<!--
+---
+page_type: sample
+name: "DocumentDB Vector Search for .NET"
+description: This console application demonstrates vector search capabilities in Azure Cosmos DB for NoSQL using the .NET SDK. It showcases hybrid and vector search using **Flat**, **QuantizedFlat**, and **DiskANN** index types.
+urlFragment: vector-search-dotnet
+languages:
+- csharp
+products:
+- azure
+---
+-->
 # Azure Cosmos DB NoSQL Vector Search Sample (.NET)
 
 This console application demonstrates vector search capabilities in Azure Cosmos DB for NoSQL using the .NET SDK. It showcases hybrid and vector search using **Flat**, **QuantizedFlat**, and **DiskANN** index types.
