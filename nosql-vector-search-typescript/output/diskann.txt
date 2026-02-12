@@ -1,11 +1,14 @@
 Connected to database: Hotels
 Connected to container: hotels_diskann
-Reading JSON file from /Users/geraldinefberry/repos/azure-samples/cosmos-db-vector-samples/data/HotelsData_toCosmosDB_Vector.json
-Inserting 50 items in batches of 50...
-Batch 1/1: Starting bulk insert (50 items)...
-Batch 1/1: Completed in 5.18s
 
-Insert Request Charge: 15545.95 RUs
+📊 Vector Search Algorithm: DiskANN
+📏 Distance Function: cosine
+Reading JSON file from C:\azure-samples\cosmos-db-vector-samples\data\HotelsData_toCosmosDB_Vector.json
+Inserting 50 items using executeBulkOperations...
+Starting bulk insert (50 items)...
+Bulk insert completed in 3.19s
+
+Insert Request Charge: 6805.25 RUs
 
 
 --- Executing Vector Search Query ---
@@ -13,6 +16,7 @@ Query: SELECT TOP 5 c.HotelName, c.Description, c.Rating, VectorDistance(c.Descr
 Parameters: @embedding (vector with 1536 dimensions)
 --------------------------------------
 
+Query activity ID: <ACTIVITY_ID>
 
 --- Search Results ---
 1. Royal Cottage Resort, Score: 0.4991
@@ -21,4 +25,5 @@ Parameters: @embedding (vector with 1536 dimensions)
 4. Economy Universe Motel, Score: 0.4461
 5. Roach Motel, Score: 0.4388
 
-Vector Search Request Charge: 5.37 RUs
+
+Vector Search Request Charge: 5.32 RUs
