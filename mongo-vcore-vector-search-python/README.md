@@ -1,15 +1,3 @@
-<!--
----
-page_type: sample
-name: "DocumentDB Vector Search for Python"
-description: This sample demonstrates vector search capabilities using Azure Cosmos DB for MongoDB (vCore) with Python. It includes implementations of three different vector index types: DiskANN, HNSW, and IVF, along with utilities for embedding generation and data management.
-urlFragment: vector-search-python
-languages:
-- python
-products:
-- azure
----
--->
 # Cosmos DB Vector Samples (Python)
 
 This project demonstrates vector search capabilities using Azure Cosmos DB for MongoDB (vCore) with Python. It includes implementations of three different vector index types: DiskANN, HNSW, and IVF, along with utilities for embedding generation and data management.
