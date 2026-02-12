@@ -433,3 +433,10 @@ FodyWeavers.xsd
 dist/
 build/
 node_modules/
+
+# Go build artifacts
+**/mongo-vcore-vector-search-go/src/create_embeddings
+**/mongo-vcore-vector-search-go/src/diskann
+**/mongo-vcore-vector-search-go/src/hnsw
+**/mongo-vcore-vector-search-go/src/ivf
+**/mongo-vcore-vector-search-go/src/show_indexes
