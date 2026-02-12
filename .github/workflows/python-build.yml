@@ -17,6 +17,9 @@ on:
       - '.github/workflows/python-build.yml'
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   build:
     runs-on: ubuntu-latest
