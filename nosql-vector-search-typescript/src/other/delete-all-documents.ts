@@ -4,7 +4,6 @@ import { BulkOperationType } from '@azure/cosmos';
 const config = {
     dbName: "Hotels",
     containers: [
-        "hotels_flat",
         "hotels_diskann",
         "hotels_quantizedflat"
     ]
