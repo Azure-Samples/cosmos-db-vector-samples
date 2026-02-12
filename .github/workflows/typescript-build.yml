@@ -1,0 +1,54 @@
+name: TypeScript Build Validation
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - '**/*.ts'
+      - '**/*.js'
+      - '**/package.json'
+      - '**/tsconfig.json'
+      - '**/typescript/**'
+      - '.github/workflows/typescript-build.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - '**/*.ts'
+      - '**/*.js'
+      - '**/package.json'
+      - '**/tsconfig.json'
+      - '**/typescript/**'
+      - '.github/workflows/typescript-build.yml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: true
+      matrix:
+        sample:
+          - nosql-vector-search-typescript
+          - mongo-vcore-vector-search-typescript
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+
+    - name: Install dependencies - ${{ matrix.sample }}
+      run: |
+        if [ -f package-lock.json ]; then
+          npm ci
+        else
+          npm install
+        fi
+      working-directory: ${{ matrix.sample }}
+
+    - name: Build - ${{ matrix.sample }}
+      run: npm run build
+      working-directory: ${{ matrix.sample }}

@@ -1,0 +1,44 @@
+name: Python Build Validation
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - '**/*.py'
+      - '**/requirements.txt'
+      - '**/python/**'
+      - '.github/workflows/python-build.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - '**/*.py'
+      - '**/requirements.txt'
+      - '**/python/**'
+      - '.github/workflows/python-build.yml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: true
+      matrix:
+        sample:
+          - mongo-vcore-vector-search-python
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Setup Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: Install dependencies - ${{ matrix.sample }}
+      run: pip install -r requirements.txt
+      working-directory: ${{ matrix.sample }}
+
+    - name: Compile Python files - ${{ matrix.sample }}
+      run: python -m py_compile src/*.py
+      working-directory: ${{ matrix.sample }}

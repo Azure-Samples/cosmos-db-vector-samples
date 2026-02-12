@@ -1,0 +1,45 @@
+name: .NET Build Validation
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - '**/*.cs'
+      - '**/*.csproj'
+      - '**/dotnet/**'
+      - '.github/workflows/dotnet-build.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - '**/*.cs'
+      - '**/*.csproj'
+      - '**/dotnet/**'
+      - '.github/workflows/dotnet-build.yml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: true
+      matrix:
+        sample:
+          - nosql-vector-search-dotnet
+          - mongo-vcore-vector-search-dotnet
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '10.0.x'
+
+    - name: Restore dependencies - ${{ matrix.sample }}
+      run: dotnet restore
+      working-directory: ${{ matrix.sample }}
+
+    - name: Build - ${{ matrix.sample }}
+      run: dotnet build --no-restore --configuration Release
+      working-directory: ${{ matrix.sample }}

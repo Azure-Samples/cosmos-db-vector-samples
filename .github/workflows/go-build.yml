@@ -1,0 +1,51 @@
+name: Go Build Validation
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - '**/*.go'
+      - '**/go.mod'
+      - '**/go.sum'
+      - '.github/workflows/go-build.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - '**/*.go'
+      - '**/go.mod'
+      - '**/go.sum'
+      - '.github/workflows/go-build.yml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: true
+      matrix:
+        sample:
+          - mongo-vcore-vector-search-go
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Setup Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.24'
+
+    - name: Download dependencies - ${{ matrix.sample }}
+      run: go mod download
+      working-directory: ${{ matrix.sample }}
+
+    - name: Build - ${{ matrix.sample }}
+      run: |
+        cd src
+        for mainfile in *.go; do
+          if [ "$mainfile" != "utils.go" ] && grep -q "^func main()" "$mainfile"; then
+            echo "Building $mainfile..."
+            go build -v "$mainfile" utils.go
+          fi
+        done
+      working-directory: ${{ matrix.sample }}
