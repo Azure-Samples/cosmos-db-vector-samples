@@ -11,6 +11,7 @@
     "start:embed": "node --env-file .env dist/other/create-embeddings.js",
     "metrics:diskann": "cross-env VECTOR_ALGORITHM=diskann node --env-file .env dist/other/query-metrics.js",
     "metrics:quantizedflat": "cross-env VECTOR_ALGORITHM=quantizedflat node --env-file .env dist/other/query-metrics.js",
+    "verify:vector-setup": "node --env-file .env dist/other/verify-vector-setup.js",
     "delete:all": "node --env-file .env dist/other/delete-all-documents.js"
   },
   "dependencies": {
