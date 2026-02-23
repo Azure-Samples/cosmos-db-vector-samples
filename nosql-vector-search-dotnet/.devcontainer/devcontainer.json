@@ -18,8 +18,7 @@
         "ms-dotnettools.csdevkit",
         "ms-dotnettools.vscodeintellicode-csharp",
         "ms-azuretools.vscode-azureresourcegroups",
-        "ms-azuretools.vscode-cosmosdb",
-        "mongodb.mongodb-vscode"
+        "ms-azuretools.vscode-cosmosdb"
       ],
       "settings": {
         "dotnet.completion.showCompletionItemsFromUnimportedNamespaces": true,
