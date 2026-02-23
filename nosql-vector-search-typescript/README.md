@@ -485,7 +485,6 @@ A vector search query returns:
 
 ### Related Samples
 
-- [MongoDB vCore Vector Search (TypeScript)](../mongo-vcore-vector-search-typescript/)
 - [Cosmos DB Vector Samples (All Languages)](https://github.com/Azure-Samples/cosmos-db-vector-samples)
 
 ## 🚀 Using Azure Developer CLI (azd)

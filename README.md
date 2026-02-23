@@ -36,7 +36,7 @@ This project demonstrates:
 ## 📋 Prerequisites
 
 - **Azure Subscription** - [Create a free account](https://azure.microsoft.com/free/)
-- **Azure Cosmos DB Account** - NoSQL or MongoDB vCore API
+- **Azure Cosmos DB Account** - NoSQL API
 - **Azure OpenAI Service** - With embedding model deployed
 - **Development Environment** - Node.js, Python, .NET, or Go depending on sample
 
