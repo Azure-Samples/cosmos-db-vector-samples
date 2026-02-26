@@ -1,0 +1,30 @@
+{
+  "name": "cosmos-db-vector-algorithms",
+  "version": "1.0.0",
+  "description": "Azure Cosmos DB Vector Index Algorithms & Query Behavior Sample",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "benchmark": "node index.js"
+  },
+  "keywords": [
+    "azure",
+    "cosmos-db",
+    "vector-search",
+    "algorithms",
+    "benchmark",
+    "diskann",
+    "ann",
+    "performance"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@azure/cosmos": "^4.0.0",
+    "@azure/openai": "^1.0.0-beta.12",
+    "dotenv": "^16.4.5"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
