@@ -629,9 +629,6 @@ This sample uses **diskANN** or **quantizedFlat**. Here's how the available inde
 |---|---|---|---|
 | **DiskANN** | Production, > 10K vectors | Graph-based search | High (tunable) |
 | **QuantizedFlat** | General use, moderate scale | Vector quantization | High |
-| **Flat** | Testing only, < 50K small-dimension vectors | Brute-force scan | High |
-
-> **Note:** Flat is suitable only for testing or very small scenarios with small dimensional vectors. For production workloads, use QuantizedFlat or DiskANN, which are optimized for low latency, highly scalable workloads with efficient RU consumption at scale.
 
 > **Important:** QuantizedFlat uses vector quantization techniques. DiskANN is graph-based. These are distinct approaches.
 
@@ -716,7 +713,6 @@ The following table summarizes the core concepts demonstrated in this quickstart
 | Dimension match is critical | Embedding model output must equal the container's `vectorEmbeddingPolicy.dimensions` |
 | DiskANN for production | Graph-based, optimized for low latency and efficient RU consumption at scale |
 | QuantizedFlat for general use | Vector quantization, good balance of recall and performance |
-| Flat for testing only | Brute-force scan, suitable for < 50K vectors in test scenarios |
 
 ## Clean up resources
 
