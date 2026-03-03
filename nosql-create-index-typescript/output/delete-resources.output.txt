@@ -1,0 +1,20 @@
+============================================================
+Delete Azure Resources
+============================================================
+  Resource group:     my-vector-rg-3
+  Location:           eastus2
+  OpenAI account:     oai-vector-994464d9
+
+
+1/2  Deleting resource group: my-vector-rg-3...
+     Resource group deletion started (runs in background).
+
+2/2  Purging Azure OpenAI resource: oai-vector-994464d9...
+     Waiting for resource group deletion to remove the resource...
+     (This may take a few minutes.)
+     Waiting... (15s)
+     OpenAI resource purged.
+
+============================================================
+Done
+============================================================
