@@ -32,6 +32,7 @@ export function createArmClient(credential: TokenCredential, subscriptionId: str
 export async function createContainer(armClient: CosmosDBManagementClient, config) {
   console.log("\n=== Step 1: Create Container with Vector Index ===");
   console.log(`  Container:         ${config.cosmos.containerName}`);
+  console.log(`  Index type:        ${config.vectorIndexType}`);
   console.log(`  Dimensions:        ${config.expectedDimensions}`);
   console.log(`  Distance function: cosine`);
 
@@ -59,7 +60,7 @@ export async function createContainer(armClient: CosmosDBManagementClient, confi
           vectorIndexes: [
             {
               path: embeddingPath,
-              type: "diskANN",
+              type: config.vectorIndexType,
             },
           ],
         },

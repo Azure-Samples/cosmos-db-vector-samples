@@ -53,6 +53,7 @@ const config = {
     embeddingApiVersion:
       process.env.AZURE_OPENAI_EMBEDDING_API_VERSION || "2024-08-01-preview",
   },
+  vectorIndexType: process.env.VECTOR_INDEX_TYPE || "diskANN",
   embeddingField: process.env.EMBEDDED_FIELD || "DescriptionVector",
   expectedDimensions: parseInt(process.env.EMBEDDING_DIMENSIONS || "1536", 10),
   dataFile:

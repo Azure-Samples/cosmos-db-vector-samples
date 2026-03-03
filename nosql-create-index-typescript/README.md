@@ -181,6 +181,13 @@ This is the critical step. The container's `vectorEmbeddingPolicy` and `vectorIn
 
 ### [DiskANN](#tab/tab-diskann)
 
+Set the following in your `.env` file:
+
+```dotenv
+VECTOR_INDEX_TYPE="diskANN"
+AZURE_COSMOSDB_CONTAINER_NAME="hotels_diskann"
+```
+
 ```typescript
 async function createContainer() {
   const embeddingPath = "/DescriptionVector";
@@ -238,6 +245,13 @@ Configuration decisions:
 | `path` | `/DescriptionVector` | Field in each document that stores the embedding vector |
 
 ### [Quantized flat](#tab/tab-quantizedflat)
+
+Set the following in your `.env` file:
+
+```dotenv
+VECTOR_INDEX_TYPE="quantizedFlat"
+AZURE_COSMOSDB_CONTAINER_NAME="hotels_quantizedflat"
+```
 
 ```typescript
 async function createContainer() {
@@ -389,8 +403,8 @@ The sample loads pre-vectorized hotel data from `data/HotelsData_toCosmosDB_Vect
 ```typescript
 async function insertDocuments(container, config) {
   // Load pre-vectorized hotel data from JSON file
-  const filePath = path.resolve(__dirname, "..", config.dataFile);
-  const fileContent = await fs.readFile(filePath, "utf-8");
+  const filePath = resolve(__dirname, "..", config.dataFile);
+  const fileContent = await readFile(filePath, "utf-8");
   const data = JSON.parse(fileContent);
 
   // Skip if container already has documents
@@ -422,11 +436,15 @@ Key points about this approach:
 Use `VectorDistance()` to find documents similar to a natural language query:
 
 ```typescript
-async function testVectorQuery(container) {
+async function vectorQuery(container, openaiClient, config) {
   const queryText = "hotel near the ocean";
-  const queryEmbedding = await generateEmbedding(queryText);
+  const queryEmbedding = await generateEmbedding(
+    openaiClient,
+    config.openai.embeddingDeployment,
+    queryText
+  );
 
-  const embeddingField = "DescriptionVector";
+  const embeddingField = config.embeddingField;
 
   // Validate field name — Cosmos DB SQL does not support parameter
   // placeholders for field names, so the field is string-interpolated.
@@ -455,6 +473,8 @@ async function testVectorQuery(container) {
 ## Expected output
 
 When you run `npm start`, the console output resembles the following:
+
+> **Tip:** The non-zero similarity scores in Step 5 confirm the vector search pipeline is working end-to-end — the vector index was created with the correct dimensions, embeddings are stored in the documents, and `VectorDistance()` is computing actual cosine distances. If the vector configuration were incorrect, the query would either fail with an error or return `null` similarity scores.
 
 ### [DiskANN](#tab/tab-diskann)
 
@@ -552,6 +572,55 @@ Complete — container, vector index, and RBAC created
 
 ---
 
+## Verify the vector index is working
+
+After running `npm start`, use these checks to confirm the vector index was created correctly, the query used it, and the results are genuinely from vector search.
+
+### 1. Confirm the vector index exists on the container
+
+Use Azure CLI to inspect the container's indexing policy and vector embedding policy:
+
+```bash
+az cosmosdb sql container show \
+  --account-name $AZURE_COSMOSDB_ACCOUNT_NAME \
+  --resource-group $AZURE_RESOURCE_GROUP \
+  --database-name Hotels \
+  --name hotels_diskann \
+  --query "{vectorIndexes: resource.indexingPolicy.vectorIndexes, vectorEmbeddingPolicy: resource.vectorEmbeddingPolicy}" \
+  --output json
+```
+
+The output should show the `vectorIndexes` array with your path and index type, and a `vectorEmbeddingPolicy` with matching dimensions, data type, and distance function. If either is `null` or empty, the container was not created with vector support.
+
+You can also verify in the Azure Portal: navigate to your Cosmos DB account → **Data Explorer** → select your database and container → **Settings** → **Indexing Policy** to see the `vectorIndexes` and `vectorEmbeddingPolicy` configuration.
+
+### 2. Confirm the query used the vector index
+
+Two signals confirm the vector index was actually used:
+
+- **The query succeeded** — `ORDER BY VectorDistance()` requires a vector index. Without one, Cosmos DB returns an error like `"The order by item requires a corresponding vector index."` If you see results, the index was used.
+- **Low RU charge** — a vector index query against 50 documents typically costs 2–5 RU. A brute-force scan (flat index) on the same data would cost significantly more. The `RU` value in Step 5 output reflects this.
+
+### 3. Confirm results are from vector search, not a regular query
+
+Vector search results have characteristics that a regular SQL query cannot produce:
+
+| Signal | Vector search (Step 5 output) | Regular SQL query |
+|---|---|---|
+| **Similarity scores** | Non-zero, varying values (e.g., 0.8234, 0.6012, 0.5891) | No similarity score column |
+| **Result ordering** | Ranked by semantic relevance to the query text | Arbitrary or alphabetical order |
+| **Top result** | Semantically related to "hotel near the ocean" (ocean views, beach) | Unrelated to the query text |
+
+To see the difference, run a regular query without `VectorDistance()`:
+
+```sql
+SELECT TOP 3 c.id, c.Description FROM c
+```
+
+The regular query returns documents in arbitrary order with no relevance to "hotel near the ocean." The vector query returns documents ranked by meaning — the top result describes ocean views and a beach, even though the query text doesn't appear verbatim in the document.
+
+> **Important:** If all similarity scores are `0` or `null`, the documents likely don't have the embedding field (`DescriptionVector`) populated. If the scores are all identical, the embeddings may be constant or corrupted. Both indicate a problem with the data, not the index.
+
 ## Index type comparison
 
 This sample uses **diskANN** or **quantizedFlat**. Here's how the available index types compare:
@@ -566,13 +635,13 @@ This sample uses **diskANN** or **quantizedFlat**. Here's how the available inde
 
 > **Important:** QuantizedFlat uses vector quantization techniques. DiskANN is graph-based. These are distinct approaches.
 
-To use a different index type, change `type` in the `createContainer` function (see [Step 1](#step-1-create-the-container-with-a-vector-index) tabs), and set `AZURE_COSMOSDB_CONTAINER_NAME` to a new container name in `.env` (since the index type on an existing container is immutable).
+To use a different index type, change `VECTOR_INDEX_TYPE` and `AZURE_COSMOSDB_CONTAINER_NAME` in your `.env` file (see [Step 1](#step-1-create-the-container-with-a-vector-index-control-planets) tabs), then run `npm start` again. You must use a new container name since the index type on an existing container is immutable.
 
 ## What if you need to change your index?
 
 Vector indexes are **immutable after container creation**. If you need to change the index type, dimensions, or distance function:
 
-1. **Update `src/control-plane.ts`** — change the `createContainer` function with the desired configuration and a new container name
+1. **Update `.env`** — set `VECTOR_INDEX_TYPE` to the desired algorithm and `AZURE_COSMOSDB_CONTAINER_NAME` to a new container name
 2. **Run `npm start`** — creates the new container (the account and database already exist and are idempotent)
 3. **Migrate data** — copy documents from the old container to the new container
 4. **Update your application** — point to the new container name
@@ -610,6 +679,7 @@ All values are written to `.env` by `scripts/create-resources.sh`:
 | `AZURE_COSMOSDB_ACCOUNT_NAME` | Cosmos DB account name |
 | `AZURE_COSMOSDB_ENDPOINT` | Cosmos DB document endpoint URL |
 | `AZURE_COSMOSDB_DATABASENAME` | Database name (default: `Hotels`) |
+| `VECTOR_INDEX_TYPE` | Vector index algorithm: `diskANN` or `quantizedFlat` (default: `diskANN`) |
 | `AZURE_OPENAI_ENDPOINT` | Azure OpenAI endpoint URL |
 | `AZURE_OPENAI_EMBEDDING_DEPLOYMENT` | Embedding model deployment name |
 | `AZURE_OPENAI_EMBEDDING_API_VERSION` | Embedding API version |
