@@ -26,6 +26,19 @@ var resourceToken = toLower(uniqueString(subscription().id, environmentName, loc
 var tags = { 'azd-env-name': environmentName }
 var prefix = '${environmentName}${resourceToken}'
 
+// Azure OpenAI model and configuration variables
+var chatModelName = 'gpt-4o-mini'
+var chatModelVersion = '2024-07-18'
+var chatModelApiVersion = '2024-08-01-preview'
+var chatModelSkuName = 'GlobalStandard'
+var chatModelCapacity = 50
+
+var embeddingModelName = 'text-embedding-3-small'
+var embeddingModelVersion = '1'
+var embeddingModelApiVersion = '2024-08-01-preview'
+var embeddingModelSkuName = 'Standard'
+var embeddingModelCapacity = 10
+
 // Organize resources in a resource group
 resource resourceGroup 'Microsoft.Resources/resourceGroups@2021-04-01' = {
   name: '${environmentName}-${resourceToken}-rg'
@@ -42,15 +55,6 @@ module managedIdentity 'br/public:avm/res/managed-identity/user-assigned-identit
     tags: tags
   }
 }
-
-// Azure OpenAI model and configuration variables
-var chatModelName = 'gpt-4o-mini'
-var chatModelVersion = '2024-07-18'
-var chatModelApiVersion = '2024-08-01-preview'
-
-var embeddingModelName = 'text-embedding-3-small'
-var embeddingModelVersion = '1'
-var embeddingModelApiVersion = '2024-08-01-preview'
 
 // Data and embedding configuration
 var dataFileWithVectors = '../data/HotelsData_toCosmosDB_Vector.json'
@@ -86,8 +90,8 @@ module openAi 'br/public:avm/res/cognitive-services/account:0.7.1' = {
           version: chatModelVersion
         }
         sku: {
-          name: 'GlobalStandard'
-          capacity: 50
+          name: chatModelSkuName
+          capacity: chatModelCapacity
         }
       }
       {
@@ -98,8 +102,8 @@ module openAi 'br/public:avm/res/cognitive-services/account:0.7.1' = {
           version: embeddingModelVersion
         }
         sku: {
-          name: 'Standard'
-          capacity: 10
+          name: embeddingModelSkuName
+          capacity: embeddingModelCapacity
         }
       }
     ]
