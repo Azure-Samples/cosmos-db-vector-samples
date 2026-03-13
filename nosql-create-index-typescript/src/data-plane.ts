@@ -12,6 +12,7 @@ import { getBearerTokenProvider, type TokenCredential } from "@azure/identity";
 import { readFile } from "node:fs/promises";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import type { SampleConfig } from "./config.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -21,7 +22,10 @@ const __dirname = dirname(__filename);
 // ---------------------------------------------------------------------------
 
 /** Create a Cosmos DB data-plane client. */
-export function createCosmosClient(credential: TokenCredential, endpoint: string) {
+export function createCosmosClient(
+  credential: TokenCredential,
+  endpoint: string
+) {
   return new CosmosClient({
     endpoint,
     aadCredentials: credential,
@@ -29,14 +33,17 @@ export function createCosmosClient(credential: TokenCredential, endpoint: string
 }
 
 /** Create an Azure OpenAI client for embedding generation. */
-export function createOpenAIClient(credential: TokenCredential, config) {
+export function createOpenAIClient(
+  credential: TokenCredential,
+  config: SampleConfig
+) {
   const tokenProvider = getBearerTokenProvider(
     credential,
     "https://cognitiveservices.azure.com/.default"
   );
   return new AzureOpenAI({
     azureADTokenProvider: tokenProvider,
-    endpoint: config.openai.endpoint,
+    endpoint: config.openai.endpoint!,
     apiVersion: config.openai.embeddingApiVersion,
   });
 }
@@ -46,7 +53,11 @@ export function createOpenAIClient(credential: TokenCredential, config) {
 // ---------------------------------------------------------------------------
 
 /** Generate an embedding vector for the given text. */
-async function generateEmbedding(openaiClient: AzureOpenAI, deployment: string, text: string) {
+async function generateEmbedding(
+  openaiClient: AzureOpenAI,
+  deployment: string,
+  text: string
+) {
   const response = await openaiClient.embeddings.create({
     model: deployment,
     input: [text],
@@ -57,7 +68,10 @@ async function generateEmbedding(openaiClient: AzureOpenAI, deployment: string, 
 // ---------------------------------------------------------------------------
 // Step 3 — Verify embedding dimensions
 // ---------------------------------------------------------------------------
-export async function verifyEmbeddingDimensions(openaiClient: AzureOpenAI, config) {
+export async function verifyEmbeddingDimensions(
+  openaiClient: AzureOpenAI,
+  config: SampleConfig
+) {
   console.log("\n=== Step 3: Verify Embedding Dimensions ===");
 
   const embedding = await generateEmbedding(
@@ -74,7 +88,7 @@ export async function verifyEmbeddingDimensions(openaiClient: AzureOpenAI, confi
   if (actual !== config.expectedDimensions) {
     throw new Error(
       `Dimension mismatch: model produces ${actual} but container expects ${config.expectedDimensions}. ` +
-        `Update EMBEDDING_DIMENSIONS and recreate the container.`
+        "Update EMBEDDING_DIMENSIONS and recreate the container."
     );
   }
 
@@ -85,7 +99,10 @@ export async function verifyEmbeddingDimensions(openaiClient: AzureOpenAI, confi
 // ---------------------------------------------------------------------------
 // Step 4 — Insert documents from data file (bulk)
 // ---------------------------------------------------------------------------
-export async function insertDocuments(container: Container, config) {
+export async function insertDocuments(
+  container: Container,
+  config: SampleConfig
+) {
   console.log("\n=== Step 4: Insert Documents ===");
 
   // Load pre-vectorized hotel data from JSON file
@@ -162,7 +179,11 @@ export async function insertDocuments(container: Container, config) {
 // ---------------------------------------------------------------------------
 // Step 5 — Vector similarity query
 // ---------------------------------------------------------------------------
-export async function vectorQuery(container: Container, openaiClient: AzureOpenAI, config) {
+export async function vectorQuery(
+  container: Container,
+  openaiClient: AzureOpenAI,
+  config: SampleConfig
+) {
   console.log("\n=== Step 5: Vector Similarity Query ===");
 
   const embeddingField = config.embeddingField;
@@ -201,13 +222,11 @@ export async function vectorQuery(container: Container, openaiClient: AzureOpenA
     `  Latency: ${latency}ms | RU: ${requestCharge.toFixed(2)} | Results: ${resources.length}`
   );
 
-  resources.forEach((r, i) => {
+  resources.forEach((resource, index) => {
     console.log(
-      `    ${i + 1}. ${r.Description} (similarity: ${r.similarity.toFixed(4)})`
+      `    ${index + 1}. ${resource.Description} (similarity: ${resource.similarity.toFixed(4)})`
     );
   });
 
   return { success: resources.length > 0, latency, requestCharge };
 }
-
-

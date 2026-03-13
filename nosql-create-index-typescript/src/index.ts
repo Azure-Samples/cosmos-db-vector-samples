@@ -19,7 +19,12 @@
  */
 
 import { DefaultAzureCredential } from "@azure/identity";
+import { pathToFileURL } from "node:url";
 import { createArmClient, createContainer, createRbacAccess } from "./control-plane.js";
+import {
+  loadConfigFromEnv,
+  validateRequiredEnvironmentVariables,
+} from "./config.js";
 import {
   createCosmosClient,
   createOpenAIClient,
@@ -29,66 +34,17 @@ import {
 } from "./data-plane.js";
 
 // ---------------------------------------------------------------------------
-// Configuration (from scripts/create-resources.sh → .env)
-// ---------------------------------------------------------------------------
-const config = {
-  azure: {
-    subscriptionId: process.env.AZURE_SUBSCRIPTION_ID,
-    resourceGroup: process.env.AZURE_RESOURCE_GROUP,
-    location: process.env.AZURE_LOCATION || "eastus2",
-    userPrincipalId: process.env.AZURE_USER_PRINCIPAL_ID,
-  },
-  cosmos: {
-    accountName: process.env.AZURE_COSMOSDB_ACCOUNT_NAME,
-    endpoint: process.env.AZURE_COSMOSDB_ENDPOINT,
-    databaseName: process.env.AZURE_COSMOSDB_DATABASENAME || "Hotels",
-    containerName:
-      process.env.AZURE_COSMOSDB_CONTAINER_NAME || "hotels_diskann",
-  },
-  openai: {
-    endpoint: process.env.AZURE_OPENAI_ENDPOINT,
-    embeddingDeployment:
-      process.env.AZURE_OPENAI_EMBEDDING_DEPLOYMENT ||
-      "text-embedding-3-small",
-    embeddingApiVersion:
-      process.env.AZURE_OPENAI_EMBEDDING_API_VERSION || "2024-08-01-preview",
-  },
-  vectorIndexType: process.env.VECTOR_INDEX_TYPE || "diskANN",
-  embeddingField: process.env.EMBEDDED_FIELD || "DescriptionVector",
-  expectedDimensions: parseInt(process.env.EMBEDDING_DIMENSIONS || "1536", 10),
-  dataFile:
-    process.env.DATA_FILE_WITH_VECTORS ||
-    "../data/HotelsData_toCosmosDB_Vector.json",
-};
-
-// ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
-async function main() {
+export async function main() {
   console.log("=".repeat(70));
   console.log(
     "Azure Cosmos DB — Create Container with Vector Index via ARM SDK"
   );
   console.log("=".repeat(70));
 
-  // Validate required env vars
-  const required = [
-    ["AZURE_SUBSCRIPTION_ID", config.azure.subscriptionId],
-    ["AZURE_RESOURCE_GROUP", config.azure.resourceGroup],
-    ["AZURE_COSMOSDB_ACCOUNT_NAME", config.cosmos.accountName],
-    ["AZURE_COSMOSDB_ENDPOINT", config.cosmos.endpoint],
-    ["AZURE_OPENAI_ENDPOINT", config.openai.endpoint],
-  ];
-  const missing = required.filter(([, v]) => !v).map(([k]) => k);
-  if (missing.length > 0) {
-    console.error(
-      `\nMissing required environment variables: ${missing.join(", ")}`
-    );
-    console.error(
-      "Run scripts/create-resources.sh first, or populate .env manually."
-    );
-    process.exit(1);
-  }
+  const config = loadConfigFromEnv();
+  validateRequiredEnvironmentVariables(config);
 
   const credential = new DefaultAzureCredential();
 
@@ -117,7 +73,13 @@ async function main() {
   console.log("=".repeat(70));
 }
 
-main().catch((err) => {
-  console.error("\nError:", err.message);
-  process.exit(1);
-});
+const isDirectExecution = process.argv[1]
+  ? pathToFileURL(process.argv[1]).href === import.meta.url
+  : false;
+
+if (isDirectExecution) {
+  main().catch((err: Error) => {
+    console.error("\nError:", err.message);
+    process.exit(1);
+  });
+}

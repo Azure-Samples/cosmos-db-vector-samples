@@ -7,13 +7,14 @@
 
 import { CosmosDBManagementClient } from "@azure/arm-cosmosdb";
 import type { TokenCredential } from "@azure/identity";
+import type { SampleConfig } from "./config.js";
 
 // Deterministic GUIDs for idempotent role definition / assignment
-const ROLE_DEFINITION_GUID = "e4e1a8b7-0a7e-4c6c-8f1d-000000000001";
-const ROLE_ASSIGNMENT_GUID = "e4e1a8b7-0a7e-4c6c-8f1d-000000000002";
+export const ROLE_DEFINITION_GUID = "e4e1a8b7-0a7e-4c6c-8f1d-000000000001";
+export const ROLE_ASSIGNMENT_GUID = "e4e1a8b7-0a7e-4c6c-8f1d-000000000002";
 
 /** Build the full ARM resource ID for the Cosmos DB account. */
-function accountResourceId(config) {
+function accountResourceId(config: SampleConfig) {
   return (
     `/subscriptions/${config.azure.subscriptionId}` +
     `/resourceGroups/${config.azure.resourceGroup}` +
@@ -22,14 +23,20 @@ function accountResourceId(config) {
 }
 
 /** Create an ARM management client for Cosmos DB. */
-export function createArmClient(credential: TokenCredential, subscriptionId: string) {
+export function createArmClient(
+  credential: TokenCredential,
+  subscriptionId: string
+) {
   return new CosmosDBManagementClient(credential, subscriptionId);
 }
 
 // ---------------------------------------------------------------------------
 // Step 1 — Create container with vector index
 // ---------------------------------------------------------------------------
-export async function createContainer(armClient: CosmosDBManagementClient, config) {
+export async function createContainer(
+  armClient: CosmosDBManagementClient,
+  config: SampleConfig
+) {
   console.log("\n=== Step 1: Create Container with Vector Index ===");
   console.log(`  Container:         ${config.cosmos.containerName}`);
   console.log(`  Index type:        ${config.vectorIndexType}`);
@@ -40,8 +47,8 @@ export async function createContainer(armClient: CosmosDBManagementClient, confi
 
   const start = Date.now();
   await armClient.sqlResources.beginCreateUpdateSqlContainerAndWait(
-    config.azure.resourceGroup,
-    config.cosmos.accountName,
+    config.azure.resourceGroup!,
+    config.cosmos.accountName!,
     config.cosmos.databaseName,
     config.cosmos.containerName,
     {
@@ -82,14 +89,17 @@ export async function createContainer(armClient: CosmosDBManagementClient, confi
   const elapsed = ((Date.now() - start) / 1000).toFixed(1);
   console.log(`  Created in ${elapsed}s`);
   console.log(
-    `  Vector index is IMMUTABLE — cannot be changed after creation`
+    "  Vector index is IMMUTABLE — cannot be changed after creation"
   );
 }
 
 // ---------------------------------------------------------------------------
 // Step 2 — Create data-plane RBAC role definition + assignment
 // ---------------------------------------------------------------------------
-export async function createRbacAccess(armClient: CosmosDBManagementClient, config) {
+export async function createRbacAccess(
+  armClient: CosmosDBManagementClient,
+  config: SampleConfig
+) {
   console.log("\n=== Step 2: Create Data-Plane RBAC Access ===");
 
   const accountId = accountResourceId(config);
@@ -98,8 +108,8 @@ export async function createRbacAccess(armClient: CosmosDBManagementClient, conf
   console.log("  Creating role definition...");
   await armClient.sqlResources.beginCreateUpdateSqlRoleDefinitionAndWait(
     ROLE_DEFINITION_GUID,
-    config.azure.resourceGroup,
-    config.cosmos.accountName,
+    config.azure.resourceGroup!,
+    config.cosmos.accountName!,
     {
       roleName: "Write to Azure Cosmos DB for NoSQL data plane",
       type: "CustomRole",
@@ -130,8 +140,8 @@ export async function createRbacAccess(armClient: CosmosDBManagementClient, conf
 
   await armClient.sqlResources.beginCreateUpdateSqlRoleAssignmentAndWait(
     ROLE_ASSIGNMENT_GUID,
-    config.azure.resourceGroup,
-    config.cosmos.accountName,
+    config.azure.resourceGroup!,
+    config.cosmos.accountName!,
     {
       roleDefinitionId,
       scope: accountId,
@@ -140,5 +150,3 @@ export async function createRbacAccess(armClient: CosmosDBManagementClient, conf
   );
   console.log(`  Role assigned to principal: ${config.azure.userPrincipalId}`);
 }
-
-
