@@ -1,0 +1,47 @@
+$ npm run start
+
+> nosql-create-index-typescript@1.0.0 start
+> tsc && node --env-file .env dist/index.js
+
+======================================================================
+Azure Cosmos DB — Create Container with Vector Index via ARM SDK
+======================================================================
+
+=== Step 1: Create Container with Vector Index ===
+  Container:         hotels_diskann
+  Dimensions:        1536
+  Distance function: cosine
+  Created in 10.4s
+  Vector index is IMMUTABLE — cannot be changed after creation
+
+=== Step 2: Create Data-Plane RBAC Access ===
+  Creating role definition...
+  Role definition created
+  Assigning role to current user...
+  Role assigned to principal: 419095a2-f637-4729-925a-460252bafc17
+
+  Waiting 15 s for RBAC propagation...
+
+=== Step 3: Verify Embedding Dimensions ===
+  Model:    text-embedding-3-small
+  Actual:   1536
+  Expected: 1536
+  Dimensions match
+
+=== Step 4: Insert Documents ===
+  Data file: C:\Users\diberry\repos\azure-samples\cosmos-db-vector-samples\data\HotelsData_toCosmosDB_Vector.json
+  Loaded 50 documents (embeddings already included)
+  Inserting 50 items using executeBulkOperations...
+  Bulk insert completed in 35.63s
+  Inserted: 50/50 | Failed: 0 | RU: 6805.25
+
+=== Step 5: Vector Similarity Query ===
+  Query:   "hotel near the ocean"
+  Latency: 392ms | RU: 5.21 | Results: 3
+    1. Oceanfront hotel overlooking the beach features rooms with a private balcony and 2 indoor and outdoor pools. Inspired by the natural beauty of the island, each room includes an original painting of local scenes by the owner. Rooms include a mini fridge, Keurig coffee maker, and flatscreen TV. Various shops and art entertainment are on the boardwalk, just steps away. (similarity: 0.5268)
+    2. New Luxury Hotel for the vacation of a lifetime. Bay views from every room, location near the pier, rooftop pool, waterfront dining & more. (similarity: 0.5176)
+    3. AAA Four Diamond Resort. Nestled on six beautifully landscaped acres, located 2 blocks from the park. Unwind at the spa and indulge in art tours on site. (similarity: 0.4229)
+
+======================================================================
+Complete — container, vector index, and RBAC created
+======================================================================
