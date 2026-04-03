@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
-	"sort"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/ai/azopenai"
 	"github.com/Azure/azure-sdk-for-go/sdk/data/azcosmos"
@@ -18,6 +17,15 @@ type QueryResult struct {
 	Rating          float64 `json:"Rating"`
 	SimilarityScore float64 `json:"SimilarityScore"`
 }
+
+// NOTE: The Go azcosmos SDK has limited cross-partition query support.
+// TOP and ORDER BY clauses are not supported in cross-partition queries.
+// See: https://pkg.go.dev/github.com/Azure/azure-sdk-for-go/sdk/data/azcosmos#ContainerClient.NewQueryItemsPager
+// To enable all query patterns (including VectorDistance with TOP/ORDER BY),
+// this sample uses a single partition key value so all documents reside
+// in the same logical partition. This restriction is temporary and will be
+// revisited when the Go SDK adds full cross-partition query support.
+const partitionKeyValue = "hotels"
 
 // validIdentifier matches safe SQL identifiers (letters, digits, underscores).
 var validIdentifier = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
@@ -65,13 +73,13 @@ func ExecuteVectorSearch(
 	}
 
 	// Build the SQL query with VectorDistance.
-	// Uses TOP without ORDER BY for cross-partition compatibility with the Go SDK.
-	// VectorDistance results are sorted client-side.
+	// TOP + ORDER BY works here because all docs share a single partition key.
 	queryText := fmt.Sprintf(
 		"SELECT TOP 5 c.HotelName, c.Description, c.Rating, "+
 			"VectorDistance(c.%s, @embedding) AS SimilarityScore "+
-			"FROM c",
-		embeddedField,
+			"FROM c "+
+			"ORDER BY VectorDistance(c.%s, @embedding)",
+		embeddedField, embeddedField,
 	)
 
 	// Serialize the embedding to a JSON array for the parameter value.
@@ -80,12 +88,10 @@ func ExecuteVectorSearch(
 		return nil, 0, fmt.Errorf("failed to marshal embedding: %w", err)
 	}
 
-	crossPartition := true
 	params := azcosmos.QueryOptions{
 		QueryParameters: []azcosmos.QueryParameter{
 			{Name: "@embedding", Value: json.RawMessage(embeddingJSON)},
 		},
-		EnableCrossPartitionQuery: &crossPartition,
 	}
 
 	fmt.Println("\n--- Executing Vector Search Query ---")
@@ -93,7 +99,7 @@ func ExecuteVectorSearch(
 	fmt.Printf("Parameters: @embedding (vector with %d dimensions)\n", len(embedding))
 	fmt.Println("--------------------------------------")
 
-	pk := azcosmos.NewPartitionKey()
+	pk := azcosmos.NewPartitionKey().AppendString(partitionKeyValue)
 	pager := container.NewQueryItemsPager(queryText, pk, &params)
 
 	var results []QueryResult
@@ -119,14 +125,6 @@ func ExecuteVectorSearch(
 			}
 			results = append(results, r)
 		}
-	}
-
-	// Sort by similarity score (lower distance = more similar for cosine).
-	sort.Slice(results, func(i, j int) bool {
-		return results[i].SimilarityScore < results[j].SimilarityScore
-	})
-	if len(results) > 5 {
-		results = results[:5]
 	}
 
 	return results, totalCharge, nil

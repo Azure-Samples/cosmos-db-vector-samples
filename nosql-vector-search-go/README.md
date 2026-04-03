@@ -34,7 +34,7 @@ This sample demonstrates vector search using **Azure Cosmos DB NoSQL** (SQL API)
 
 1. **Azure Cosmos DB NoSQL account** with:
    - A database named `Hotels`
-   - Containers: `hotels_diskann` and/or `hotels_quantizedflat` with **MultiHash** partition key on `/HotelId` and a vector index configured
+   - Containers: `hotels_diskann` and/or `hotels_quantizedflat` with partition key on `/HotelId` and a vector index configured
 2. **Azure OpenAI resource** with an embedding model deployment (e.g., `text-embedding-3-small`)
 
 ## Setup
@@ -139,7 +139,22 @@ nosql-vector-search-go/
 | `failed to create DefaultAzureCredential` | Run `az login` to authenticate |
 | `Container already has N documents` | Data was already inserted; this is expected behavior |
 | 404 on container | Ensure the Cosmos DB database and container exist with the correct names |
-| Cross-partition query error | Ensure you are using azcosmos v1.1.0+ which supports cross-partition queries |
+| Cross-partition query error | This sample uses a single partition key value; see [Known Limitations](#known-limitations) |
+
+## Known Limitations
+
+### Single partition key for Go SDK
+
+The Go [`azcosmos`](https://pkg.go.dev/github.com/Azure/azure-sdk-for-go/sdk/data/azcosmos) SDK does not currently support `TOP` and `ORDER BY` clauses in cross-partition queries (see [`NewQueryItemsPager` docs](https://pkg.go.dev/github.com/Azure/azure-sdk-for-go/sdk/data/azcosmos#ContainerClient.NewQueryItemsPager)). Because `VectorDistance` queries typically require `TOP N ... ORDER BY`, this sample inserts **all hotel documents with a single constant partition key value** (`"hotels"`) so that every query runs within a single logical partition.
+
+**What this means:**
+
+- All 50 hotel documents share the partition key value `"hotels"` (the `HotelId` field is set to `"hotels"` for all documents)
+- The unique document identity is preserved in the `id` field
+- No cross-partition queries are needed, so `TOP` + `ORDER BY` work correctly
+- If other language samples (Python, Java, TypeScript) insert into the same container with per-hotel partition keys, the Go documents coexist in their own partition
+
+**This is a temporary workaround.** It will be revisited when the Go SDK adds full cross-partition query support.
 
 ## Resources
 

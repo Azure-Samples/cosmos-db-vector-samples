@@ -12,6 +12,15 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/data/azcosmos"
 )
 
+// NOTE: The Go azcosmos SDK has limited cross-partition query support.
+// TOP and ORDER BY clauses are not supported in cross-partition queries.
+// See: https://pkg.go.dev/github.com/Azure/azure-sdk-for-go/sdk/data/azcosmos#ContainerClient.NewQueryItemsPager
+// To enable all query patterns (including VectorDistance with TOP/ORDER BY),
+// this sample uses a single partition key value so all documents reside
+// in the same logical partition. This restriction is temporary and will be
+// revisited when the Go SDK adds full cross-partition query support.
+const partitionKeyValue = "hotels"
+
 // Hotel represents a single hotel document from the JSON data file.
 // Fields match the HotelsData_toCosmosDB_Vector.json schema.
 type Hotel struct {
@@ -68,7 +77,7 @@ func InsertData(ctx context.Context, container *azcosmos.ContainerClient, hotels
 		// Build the document with "id" set to HotelId (required by Cosmos DB).
 		doc := map[string]interface{}{
 			"id":                 h.HotelID,
-			"HotelId":           h.HotelID,
+			"HotelId":           partitionKeyValue, // constant PK — all docs in one partition
 			"HotelName":         h.HotelName,
 			"Description":       h.Description,
 			"Description_fr":    h.DescriptionFr,
@@ -91,7 +100,7 @@ func InsertData(ctx context.Context, container *azcosmos.ContainerClient, hotels
 			continue
 		}
 
-		pk := azcosmos.NewPartitionKey().AppendString(h.HotelID)
+		pk := azcosmos.NewPartitionKey().AppendString(partitionKeyValue)
 		resp, err := container.CreateItem(ctx, pk, body, nil)
 		if err != nil {
 			var respErr *azcore.ResponseError
