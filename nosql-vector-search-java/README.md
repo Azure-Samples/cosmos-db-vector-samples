@@ -1,5 +1,7 @@
 # Azure Cosmos DB NoSQL Vector Search with Java
 
+> **Note:** This sample uses `azure-ai-openai 1.0.0-beta.16` (preview). This dependency may have breaking changes in future releases.
+
 Java sample demonstrating Azure Cosmos DB NoSQL as a vector store, using the `com.azure:azure-cosmos` SDK with passwordless authentication.
 
 ## Features
@@ -38,32 +40,24 @@ cp sample.env .env
 Then load the variables into your shell:
 
 ```bash
-# Linux / macOS
-export $(grep -v '^#' .env | xargs)
-
-# Windows PowerShell
-Get-Content .env | ForEach-Object {
-    if ($_ -match '^([^#=]+)=(.*)$') {
-        [System.Environment]::SetEnvironmentVariable($matches[1].Trim(), $matches[2].Trim('"'))
-    }
-}
+set -a && source .env && set +a
 ```
 
 ### 2. Build the project
 
 ```bash
-mvn clean compile
+mvn compile
 ```
 
 ### 3. Run the sample
 
 ```bash
-# Default algorithm (DiskANN)
+# DiskANN (default)
 mvn exec:java
 
-# Explicit algorithm selection
-VECTOR_ALGORITHM=diskann mvn exec:java
-VECTOR_ALGORITHM=quantizedflat mvn exec:java
+# QuantizedFlat
+export VECTOR_ALGORITHM=quantizedflat
+mvn exec:java
 ```
 
 ## Vector Search Algorithms
@@ -84,7 +78,7 @@ nosql-vector-search-java/
 ├── pom.xml                          # Maven configuration
 ├── sample.env                       # Environment variable template
 ├── README.md                        # This file
-└── src/main/java/com/azure/cosmos/vectorsearch/
+└── src/main/java/com/example/cosmos/vectorsearch/
     ├── VectorSearch.java            # Main entry point
     └── Utils.java                   # Auth, bulk insert, validation, formatting
 ```
