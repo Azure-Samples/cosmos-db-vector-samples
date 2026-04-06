@@ -1,0 +1,33 @@
+📊 Vector Search Algorithm: QuantizedFlat
+📏 Distance Function: cosine
+📦 Container: hotels_quantizedflat
+
+Initializing Azure clients...
+Connected to database: Hotels
+Connected to container: hotels_quantizedflat
+Reading JSON file from ../data/HotelsData_toCosmosDB_Vector.json
+Loaded 50 hotel documents
+Inserting 50 items (duplicates will be skipped)...
+
+Insert complete — inserted: 50, skipped: 0, failed: 0
+Insert Request Charge: 3261.62 RUs
+
+Generating embedding for query: "quintessential lodging near running trails, eateries, retail"
+Embedding generated (1536 dimensions)
+
+--- Executing Vector Search Query ---
+Query: SELECT TOP 5 c.HotelName, c.Description, c.Rating, VectorDistance(c.DescriptionVector, @embedding) AS SimilarityScore FROM c ORDER BY VectorDistance(c.DescriptionVector, @embedding)
+Parameters: @embedding (vector with 1536 dimensions)
+--------------------------------------
+Query activity ID: 34db9974-5bb0-41da-b60b-18b58af0d12e
+
+--- Search Results ---
+1. Royal Cottage Resort, Score: 0.4991
+2. Country Comfort Inn, Score: 0.4786
+3. Nordick's Valley Motel, Score: 0.4635
+4. Economy Universe Motel, Score: 0.4461
+5. Roach Motel, Score: 0.4388
+
+Vector Search Request Charge: 6.40 RUs
+
+Vector search completed successfully!
