@@ -436,3 +436,11 @@ FodyWeavers.xsd
 dist/
 build/
 node_modules/
+
+# Java build artifacts
+target/
+*.class
+*.jar
+
+# Allow sample.env templates
+!**/sample.env

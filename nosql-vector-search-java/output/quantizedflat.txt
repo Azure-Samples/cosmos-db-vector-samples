@@ -1,0 +1,27 @@
+Connected to database: Hotels
+Connected to container: hotels_quantizedflat
+
+📊 Vector Search Algorithm: QuantizedFlat
+📏 Distance Function: cosine
+Reading JSON file from ../data/HotelsData_toCosmosDB_Vector.json
+Inserting 50 items using bulk operations...
+Starting bulk insert (50 items)...
+Bulk insert completed in 3.28s
+
+Insert Request Charge: 3402.63 RUs
+
+
+--- Executing Vector Search Query ---
+Query: SELECT TOP 5 c.HotelName, c.Description, c.Rating, VectorDistance(c.DescriptionVector, @embedding) AS SimilarityScore FROM c ORDER BY VectorDistance(c.DescriptionVector, @embedding)
+Parameters: @embedding (vector with 1536 dimensions)
+--------------------------------------
+
+
+--- Search Results ---
+1. Royal Cottage Resort, Score: 0.4991
+2. Country Comfort Inn, Score: 0.4786
+3. Nordick's Valley Motel, Score: 0.4635
+4. Economy Universe Motel, Score: 0.4461
+5. Roach Motel, Score: 0.4388
+
+Vector Search Request Charge: 5.33 RUs
