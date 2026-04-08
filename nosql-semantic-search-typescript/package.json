@@ -1,0 +1,11 @@
+{
+  "name": "$dir",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": { "start": "node index.js" },
+  "dependencies": {
+    "@azure/cosmos": "^4.0.0",
+    "@azure/openai": "^1.0.0-beta.12",
+    "dotenv": "^16.4.5"
+  }
+}
