@@ -28,7 +28,7 @@ This project is configured to run with the Azure Developer CLI (azd), which prov
 
 To provision resources:
 
-1. Open a terminal in the root folder of this repository (where `azure.yml` is located).
+1. Open a terminal in the root folder of this repository (where `azure.yaml` is located).
 2. Run the following command:
 
     ```bash
