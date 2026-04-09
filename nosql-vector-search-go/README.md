@@ -131,6 +131,49 @@ nosql-vector-search-go/
 └── README.md                      # This file
 ```
 
+## Deployment prerequisites (quota and regions)
+
+Before running `azd up`, make sure your Azure subscription has sufficient quota for the models this template deploys.
+
+### Models and quota
+
+| Model | Deployment type | Capacity (TPM) | Purpose |
+|---|---|---|---|
+| `text-embedding-3-small` | **Standard** | 10 K | Generate 1536-dimension embeddings |
+| `gpt-4o-mini` | **GlobalStandard** | 50 K | Chat completion (optional) |
+
+You need available **Azure OpenAI** quota for both models in the target region. Quota is per-subscription, per-region, per-model.
+
+### Supported regions
+
+The Bicep template restricts deployment to regions that support both models:
+
+- **eastus2**
+- **swedencentral**
+
+If neither region works for your subscription, you can edit `infra/main.bicep` and add another region to the `@allowed` list — verify model availability in the [Azure OpenAI models documentation](https://learn.microsoft.com/azure/ai-services/openai/concepts/models).
+
+### Common deployment errors
+
+If `azd up` fails with quota-related errors, look for messages like:
+
+```
+InsufficientQuota: The specified capacity '10' for deployment
+'text-embedding-3-small' with model 'text-embedding-3-small' using sku
+'Standard' is not available. ...
+```
+
+```
+InvalidTemplateDeployment: The template deployment failed because of an
+inner error: "InsufficientQuota" ...
+```
+
+### How to fix quota errors
+
+1. **Try a different region** — re-run `azd up` and choose the other allowed region (`eastus2` or `swedencentral`).
+2. **Change the deployment SKU** — in `infra/main.bicep`, swap `'Standard'` to `'GlobalStandard'` (or vice versa) for the embedding model.
+3. **Request a quota increase** — in the Azure Portal, go to **Subscriptions → Resource providers → Microsoft.CognitiveServices → Quotas** and request more capacity for the model in your target region.
+
 ## Troubleshooting
 
 | Problem | Solution |
@@ -140,6 +183,7 @@ nosql-vector-search-go/
 | `Container already has N documents` | Data was already inserted; this is expected behavior |
 | 404 on container | Ensure the Cosmos DB database and container exist with the correct names |
 | Cross-partition query error | This sample uses a single partition key value; see [Known Limitations](#known-limitations) |
+| `InsufficientQuota` during `azd up` | See [Deployment prerequisites](#deployment-prerequisites-quota-and-regions) above |
 
 ## Known Limitations
 

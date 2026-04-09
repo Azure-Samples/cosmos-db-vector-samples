@@ -27,12 +27,24 @@ var tags = { 'azd-env-name': environmentName }
 var prefix = '${environmentName}${resourceToken}'
 
 // Azure OpenAI model and configuration variables
+//
+// QUOTA REQUIREMENT: Both models below require available quota in the target
+// region (eastus2 or swedencentral). If deployment fails with
+// "InsufficientQuota" or "The specified capacity ... is not available", try:
+//   1. A different allowed region (change the @allowed list above)
+//   2. A different SKU (e.g., swap 'Standard' ↔ 'GlobalStandard')
+//   3. Requesting a quota increase in the Azure Portal under
+//      Subscriptions > Resource providers > Microsoft.CognitiveServices > Quotas
+
+// Chat model: gpt-4o-mini, version 2024-07-18, deployed as GlobalStandard
 var chatModelName = 'gpt-4o-mini'
 var chatModelVersion = '2024-07-18'
 var chatModelApiVersion = '2024-08-01-preview'
 var chatModelSkuName = 'GlobalStandard'
 var chatModelCapacity = 50
 
+// Embedding model: text-embedding-3-small, version 1, deployed as Standard
+// This is the model used by all language samples to generate 1536-dimension vectors.
 var embeddingModelName = 'text-embedding-3-small'
 var embeddingModelVersion = '1'
 var embeddingModelApiVersion = '2024-08-01-preview'
