@@ -42,7 +42,7 @@ Follow the prompts to select your Azure subscription and environment.
 * **Azure Cosmos DB for NoSQL**: Serverless account with the `Hotels` database and containers
 * **Azure OpenAI**: Resource with deployments for:
   * Embedding model: `text-embedding-3-small`
-  * Chat model: `gpt-4o-mini`
+  * Chat model: `gpt-4.1-mini`
 * **Managed Identity**: User-assigned identity for secure access.
 * RBAC assignments for Keyless authentication.
 

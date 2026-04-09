@@ -36,11 +36,13 @@ var prefix = '${environmentName}${resourceToken}'
 //   3. Requesting a quota increase in the Azure Portal under
 //      Subscriptions > Resource providers > Microsoft.CognitiveServices > Quotas
 
-// Chat model: gpt-4o-mini, version 2024-07-18, deployed as GlobalStandard
-var chatModelName = 'gpt-4o-mini'
-var chatModelVersion = '2024-07-18'
+// Chat model: gpt-4.1-mini, version 2025-04-14, deployed as Standard
+// gpt-4o-mini Standard was deprecated 2026-03-31; gpt-4o-mini GlobalStandard has
+// 0 quota in this subscription. gpt-4.1-mini Standard has 460K+ quota in eastus2.
+var chatModelName = 'gpt-4.1-mini'
+var chatModelVersion = '2025-04-14'
 var chatModelApiVersion = '2024-08-01-preview'
-var chatModelSkuName = 'GlobalStandard'
+var chatModelSkuName = 'Standard'
 var chatModelCapacity = 50
 
 // Embedding model: text-embedding-3-small, version 1, deployed as Standard

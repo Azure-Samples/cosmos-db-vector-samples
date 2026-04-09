@@ -140,7 +140,7 @@ Before running `azd up`, make sure your Azure subscription has sufficient quota 
 | Model | Deployment type | Capacity (TPM) | Purpose |
 |---|---|---|---|
 | `text-embedding-3-small` | **Standard** | 10 K | Generate 1536-dimension embeddings |
-| `gpt-4o-mini` | **GlobalStandard** | 50 K | Chat completion (optional) |
+| `gpt-4.1-mini` | **Standard** | 50 K | Chat completion (optional) |
 
 You need available **Azure OpenAI** quota for both models in the target region. Quota is per-subscription, per-region, per-model.
 
