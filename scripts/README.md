@@ -12,7 +12,7 @@ The Bicep template deploys two Azure OpenAI models:
 
 | Model | Version | SKU (deployment type) | Capacity |
 |---|---|---|---|
-| `gpt-4o-mini` | 2024-07-18 | GlobalStandard | 50K TPM |
+| `gpt-4.1-mini` | 2025-04-14 | Standard | 50K TPM |
 | `text-embedding-3-small` | 1 | Standard | 10K TPM |
 
 Allowed regions: `eastus2`, `swedencentral`
@@ -65,7 +65,7 @@ Checking quota in target region(s)...
 
 Region           Model                      SKU               Requested       Used      Limit  Status
 ────────────────  ──────────────────────────  ────────────────  ──────────  ──────────  ──────────  ──────────────
-eastus2          gpt-4o-mini                GlobalStandard          50K         30K        80K  ✅ OK (50K free)
+eastus2          gpt-4.1-mini               Standard                50K         30K        80K  ✅ OK (50K free)
 eastus2          text-embedding-3-small     Standard                10K          0K       120K  ✅ OK (120K free)
 
 ✅ All models have sufficient quota. Ready to deploy!
