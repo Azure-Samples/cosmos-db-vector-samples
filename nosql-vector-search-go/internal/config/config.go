@@ -37,7 +37,6 @@ type Config struct {
 	// Azure OpenAI
 	OpenAIEndpoint   string
 	OpenAIDeployment string
-	OpenAIAPIVersion string
 
 	// Vector search
 	Algorithm        string
@@ -78,7 +77,6 @@ func LoadConfig() (*Config, error) {
 		ContainerName:    algCfg.ContainerName,
 		OpenAIEndpoint:   os.Getenv("AZURE_OPENAI_EMBEDDING_ENDPOINT"),
 		OpenAIDeployment: getEnvOrDefault("AZURE_OPENAI_EMBEDDING_DEPLOYMENT", os.Getenv("AZURE_OPENAI_EMBEDDING_MODEL")),
-		OpenAIAPIVersion: getEnvOrDefault("AZURE_OPENAI_EMBEDDING_API_VERSION", "2024-08-01-preview"),
 		Algorithm:        algorithm,
 		AlgorithmDisplay: algCfg.AlgorithmName,
 		DistanceFunction: getEnvOrDefault("VECTOR_DISTANCE_FUNCTION", "cosine"),
@@ -96,10 +94,9 @@ func LoadConfig() (*Config, error) {
 
 func validate(cfg *Config) error {
 	required := map[string]string{
-		"AZURE_COSMOSDB_ENDPOINT":            cfg.CosmosEndpoint,
-		"AZURE_OPENAI_EMBEDDING_ENDPOINT":    cfg.OpenAIEndpoint,
-		"AZURE_OPENAI_EMBEDDING_DEPLOYMENT":  cfg.OpenAIDeployment,
-		"AZURE_OPENAI_EMBEDDING_API_VERSION": cfg.OpenAIAPIVersion,
+		"AZURE_COSMOSDB_ENDPOINT":           cfg.CosmosEndpoint,
+		"AZURE_OPENAI_EMBEDDING_ENDPOINT":   cfg.OpenAIEndpoint,
+		"AZURE_OPENAI_EMBEDDING_DEPLOYMENT": cfg.OpenAIDeployment,
 	}
 	var missing []string
 	for name, val := range required {
