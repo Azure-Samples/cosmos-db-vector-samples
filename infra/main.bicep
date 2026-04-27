@@ -27,8 +27,11 @@ var tags = { 'azd-env-name': environmentName }
 var prefix = '${environmentName}${resourceToken}'
 
 // Azure OpenAI model and configuration variables
-var chatModelName = 'gpt-4o-mini'
-var chatModelVersion = '2024-07-18'
+// https://learn.microsoft.com/azure/ai-services/openai/concepts/models?tabs=python-secure%2Cglobal-standard%2Cstandard-chat-completions#models-by-deployment-type
+// To change deployment type, swap 'Standard' ↔ 'GlobalStandard' in the sku name variables below.
+// gpt-4o-mini Standard was deprecated 2026-03-31; use gpt-4.1-mini instead.
+var chatModelName = 'gpt-4.1-mini'
+var chatModelVersion = '2025-04-14'
 var chatModelApiVersion = '2024-08-01-preview'
 var chatModelSkuName = 'GlobalStandard'
 var chatModelCapacity = 50
@@ -67,7 +70,7 @@ var embeddingBatchSize = '16'
 var loadSizeBatch = '50'
 
 var openAiServiceName = 'openai-${prefix}'
-module openAi 'br/public:avm/res/cognitive-services/account:0.7.1' = {
+module openAi 'br/public:avm/res/cognitive-services/account:0.10.0' = {
   name: 'openai'
   scope: resourceGroup
   params: {
