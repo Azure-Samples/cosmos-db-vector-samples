@@ -6,8 +6,7 @@ targetScope = 'subscription'
 param environmentName string
 
 @minLength(1)
-@description('Location for the OpenAI resource')
-// https://learn.microsoft.com/azure/ai-services/openai/concepts/models?tabs=python-secure%2Cglobal-standard%2Cstandard-chat-completions#models-by-deployment-type
+@description('Location for all resources')
 @allowed([
   'eastus2'
   'swedencentral'
@@ -18,6 +17,21 @@ param environmentName string
   }
 })
 param location string
+
+@description('Location for Azure OpenAI resource (defaults to main location if not specified). Not all models are available in all regions.')
+// https://learn.microsoft.com/azure/ai-services/openai/concepts/models?tabs=python-secure%2Cglobal-standard%2Cstandard-chat-completions#models-by-deployment-type
+@allowed([
+  'eastus'
+  'eastus2'
+  'eastus3'
+  'westus'
+  'westus2'
+  'westus3'
+  'northeurope'
+  'swedencentral'
+])
+@metadata({ azd: { type: 'location' } })
+param openAiLocation string = location
 
 @description('Id of the principal to assign database and application roles.')
 param deploymentUserPrincipalId string = ''
@@ -75,7 +89,7 @@ module openAi 'br/public:avm/res/cognitive-services/account:0.10.0' = {
   scope: resourceGroup
   params: {
     name: openAiServiceName
-    location: location
+    location: openAiLocation
     tags: tags
     kind: 'OpenAI'
     sku: 'S0'
