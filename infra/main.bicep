@@ -40,20 +40,33 @@ var resourceToken = toLower(uniqueString(subscription().id, environmentName, loc
 var tags = { 'azd-env-name': environmentName }
 var prefix = '${environmentName}${resourceToken}'
 
-// Azure OpenAI model and configuration variables
+// Azure OpenAI model and configuration parameters
 // https://learn.microsoft.com/azure/ai-services/openai/concepts/models?tabs=python-secure%2Cglobal-standard%2Cstandard-chat-completions#models-by-deployment-type
-// To change deployment type, swap 'Standard' ↔ 'GlobalStandard' in the sku name variables below.
+// To change deployment type, swap 'Standard' ↔ 'GlobalStandard' in the sku name parameters below.
 // gpt-4o-mini Standard was deprecated 2026-03-31; use gpt-4.1-mini instead.
-var chatModelName = 'gpt-4.1-mini'
-var chatModelVersion = '2025-04-14'
+
+@description('Chat model name')
+param chatModelName string = 'gpt-4.1-mini'
+
+@description('Chat model version')
+param chatModelVersion string = '2025-04-14'
+
+@description('Chat model deployment type: Standard or GlobalStandard')
+param chatModelSkuName string = 'GlobalStandard'
+
 var chatModelApiVersion = '2024-08-01-preview'
-var chatModelSkuName = 'GlobalStandard'
 var chatModelCapacity = 50
 
-var embeddingModelName = 'text-embedding-3-small'
-var embeddingModelVersion = '1'
+@description('Embedding model name')
+param embeddingModelName string = 'text-embedding-3-small'
+
+@description('Embedding model version')
+param embeddingModelVersion string = '1'
+
+@description('Embedding model deployment type: Standard or GlobalStandard')
+param embeddingModelSkuName string = 'Standard'
+
 var embeddingModelApiVersion = '2024-08-01-preview'
-var embeddingModelSkuName = 'Standard'
 var embeddingModelCapacity = 10
 
 // Organize resources in a resource group
