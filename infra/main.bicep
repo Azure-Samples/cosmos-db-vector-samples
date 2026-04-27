@@ -52,7 +52,7 @@ param chatModelName string = 'gpt-4.1-mini'
 param chatModelVersion string = '2025-04-14'
 
 @description('Chat model deployment type: Standard or GlobalStandard')
-param chatModelSkuName string = 'GlobalStandard'
+param chatModelSkuName string = 'Standard'
 
 var chatModelApiVersion = '2024-08-01-preview'
 var chatModelCapacity = 50
