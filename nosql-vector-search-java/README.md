@@ -12,6 +12,9 @@ Java sample demonstrating Azure Cosmos DB NoSQL as a vector store, using the `co
 - **Algorithm selection** — DiskANN and QuantizedFlat via `VECTOR_ALGORITHM` environment variable
 - **Injection safety** — field name validation before query interpolation
 
+
+> [!IMPORTANT]
+> **Vector indexing policy must be configured at container creation time and cannot be modified after.** The infrastructure provisioned by `azd up` handles this automatically.
 ## Prerequisites
 
 - **Java 21** or later (`java --version`)

@@ -12,6 +12,9 @@ This quickstart uses three layers:
 
 All authentication uses Microsoft Entra ID via `DefaultAzureCredential` — no API keys or connection strings.
 
+
+> [!IMPORTANT]
+> **Vector indexing policy must be configured at container creation time and cannot be modified after.** The infrastructure provisioned by `azd up` handles this automatically.
 ## Prerequisites
 
 To complete this quickstart, you need:

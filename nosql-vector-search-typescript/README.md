@@ -347,6 +347,9 @@ resources.forEach(item => {
 });
 ```
 
+
+> [!IMPORTANT]
+> **Vector indexing policy must be configured at container creation time and cannot be modified after.** The infrastructure provisioned by `azd up` handles this automatically.
 ## Prerequisites
 
 - Node.js 22
@@ -491,7 +494,10 @@ A vector search query returns:
 
 The Azure Developer CLI (`azd`) provides a streamlined way to provision and deploy Azure resources with a single command.
 
-### Prerequisites
+#
+> [!IMPORTANT]
+> **Vector indexing policy must be configured at container creation time and cannot be modified after.** The infrastructure provisioned by `azd up` handles this automatically.
+## Prerequisites
 
 - [Azure Developer CLI (azd)](https://learn.microsoft.com/azure/developer/azure-developer-cli/install-azd) installed
 

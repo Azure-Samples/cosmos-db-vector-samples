@@ -100,6 +100,9 @@ azd env set AZURE_OPENAI_EMBEDDING_MODEL_TYPE Standard
 | `AZURE_OPENAI_EMBEDDING_MODEL_VERSION` | `1` | Embedding model version |
 | `AZURE_OPENAI_EMBEDDING_MODEL_TYPE` | `Standard` | Deployment SKU |
 
+
+> [!IMPORTANT]
+> **Vector indexing policy must be configured at container creation time and cannot be modified after.** The infrastructure provisioned by `azd up` handles this automatically.
 ## 📖 Key Concepts
 
 ### Vector Embeddings

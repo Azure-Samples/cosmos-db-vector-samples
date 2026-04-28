@@ -68,6 +68,9 @@ The script will:
 - **Configurable distance function**: cosine (default), euclidean, dotproduct
 - **Shared data file** with the TypeScript sample
 
+
+> [!IMPORTANT]
+> **Vector indexing policy must be configured at container creation time and cannot be modified after.** The infrastructure provisioned by `azd up` handles this automatically.
 ## 📋 Prerequisites
 
 - **Python 3.9+**

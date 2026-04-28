@@ -22,6 +22,9 @@ This sample demonstrates vector search using **Azure Cosmos DB NoSQL** (SQL API)
 - **Parameterized queries** with field-name validation to prevent injection
 - **Request-unit (RU) tracking** for inserts and queries
 
+
+> [!IMPORTANT]
+> **Vector indexing policy must be configured at container creation time and cannot be modified after.** The infrastructure provisioned by `azd up` handles this automatically.
 ## Prerequisites
 
 | Requirement | Version |
