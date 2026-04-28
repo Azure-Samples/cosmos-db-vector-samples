@@ -63,13 +63,42 @@ cd cosmos-db-vector-samples/nosql-vector-search-typescript
 # Install dependencies
 npm install
 
-# Set environment variables from provisioned infrstructure
+# Set environment variables from provisioned infrastructure
 azd env get-values > .env
 
 # Build and run
 npm run build
 npm run start:diskann
 ```
+
+### Configure OpenAI Settings (Optional)
+
+Before running `azd up`, you can customize the OpenAI deployment by setting environment variables. If not set, defaults are used.
+
+```bash
+# Set OpenAI location (can differ from resource group location)
+azd env set AZURE_OPENAI_LOCATION eastus2
+
+# Chat model configuration
+azd env set AZURE_OPENAI_CHAT_MODEL gpt-4.1-mini
+azd env set AZURE_OPENAI_CHAT_MODEL_VERSION 2025-04-14
+azd env set AZURE_OPENAI_CHAT_MODEL_TYPE Standard
+
+# Embedding model configuration
+azd env set AZURE_OPENAI_EMBEDDING_MODEL text-embedding-3-small
+azd env set AZURE_OPENAI_EMBEDDING_MODEL_VERSION 1
+azd env set AZURE_OPENAI_EMBEDDING_MODEL_TYPE Standard
+```
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `AZURE_OPENAI_LOCATION` | Same as `AZURE_LOCATION` | Region for OpenAI resources |
+| `AZURE_OPENAI_CHAT_MODEL` | `gpt-4.1-mini` | Chat completion model |
+| `AZURE_OPENAI_CHAT_MODEL_VERSION` | `2025-04-14` | Chat model version |
+| `AZURE_OPENAI_CHAT_MODEL_TYPE` | `Standard` | Deployment SKU (`Standard` or `GlobalStandard`) |
+| `AZURE_OPENAI_EMBEDDING_MODEL` | `text-embedding-3-small` | Embedding model |
+| `AZURE_OPENAI_EMBEDDING_MODEL_VERSION` | `1` | Embedding model version |
+| `AZURE_OPENAI_EMBEDDING_MODEL_TYPE` | `Standard` | Deployment SKU |
 
 ## 📖 Key Concepts
 
