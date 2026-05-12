@@ -17,7 +17,7 @@
   },
   "dependencies": {
     "@azure/cosmos": "^4.5.1",
-    "@azure/identity": "^4.11.1",
+    "@azure/identity": "^4.13.1",
     "openai": "^5.20.1"
   },
   "devDependencies": {
