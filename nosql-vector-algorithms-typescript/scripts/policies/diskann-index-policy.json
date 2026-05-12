@@ -1,0 +1,11 @@
+{
+  "indexingMode": "consistent",
+  "includedPaths": [{"path": "/*"}],
+  "excludedPaths": [{"path": "/DescriptionVector/*"}],
+  "vectorIndexes": [
+    {
+      "path": "/DescriptionVector",
+      "type": "diskANN"
+    }
+  ]
+}

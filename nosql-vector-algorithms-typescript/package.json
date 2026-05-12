@@ -1,0 +1,31 @@
+{
+  "name": "nosql-vector-algorithms-typescript",
+  "version": "1.0.0",
+  "main": "dist/index.js",
+  "type": "module",
+  "license": "MIT",
+  "scripts": {
+    "build": "tsc",
+    "start": "tsc && cross-env VECTOR_ALGORITHM=all VECTOR_DISTANCE_FUNCTION=cosine node --env-file .env dist/vector-algorithms.js",
+    "start:quantizedflat": "tsc && cross-env VECTOR_ALGORITHM=quantizedflat VECTOR_DISTANCE_FUNCTION=cosine node --env-file .env dist/vector-algorithms.js",
+    "start:diskann": "tsc && cross-env VECTOR_ALGORITHM=diskann VECTOR_DISTANCE_FUNCTION=cosine node --env-file .env dist/vector-algorithms.js",
+    "start:dotproduct": "tsc && cross-env VECTOR_ALGORITHM=all VECTOR_DISTANCE_FUNCTION=dotproduct node --env-file .env dist/vector-algorithms.js",
+    "start:euclidean": "tsc && cross-env VECTOR_ALGORITHM=all VECTOR_DISTANCE_FUNCTION=euclidean node --env-file .env dist/vector-algorithms.js",
+    "metrics": "tsc && node --env-file .env dist/other/query-metrics.js",
+    "verify": "tsc && node --env-file .env dist/other/verify-vector-setup.js",
+    "delete-data": "tsc && node --env-file .env dist/other/delete-all-documents.js"
+  },
+  "dependencies": {
+    "@azure/cosmos": "^4.5.1",
+    "@azure/identity": "^4.11.1",
+    "openai": "^5.20.1"
+  },
+  "devDependencies": {
+    "@types/node": "^24.3.0",
+    "cross-env": "^10.1.0",
+    "typescript": "^5.9.2"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
