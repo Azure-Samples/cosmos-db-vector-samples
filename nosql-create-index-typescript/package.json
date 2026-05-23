@@ -22,7 +22,7 @@
   "dependencies": {
     "@azure/arm-cosmosdb": "^16.2.0",
     "@azure/cosmos": "^4.0.0",
-    "@azure/identity": "^4.11.1",
+    "@azure/identity": "^4.13.1",
     "openai": "^5.20.1"
   },
   "engines": {
