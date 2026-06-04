@@ -1,0 +1,42 @@
+========================================================================
+Azure Cosmos DB for NoSQL - create and query vector indexes with Python
+========================================================================
+Database: Hotels
+Data file: C:\project-dina-data-ai\repos\public-azuresamples-cosmos-db-vector-samples\data\HotelsData_toCosmosDB_Vector.json
+Target containers: hotels_diskann, hotels_quantizedflat
+
+=== Verify embedding dimensions ===
+Deployment: text-embedding-3-small
+Model:      text-embedding-3-small
+Actual:     1536
+Expected:   1536
+
+=== Ingest documents: hotels_diskann ===
+Inserted 50/50 documents using transactional batches. RU: 6812.47
+
+=== Ingest documents: hotels_quantizedflat ===
+Inserted 50/50 documents using transactional batches. RU: 6810.92
+
+Query text: hotel near the ocean
+
+=== Query results: hotels_diskann (DiskANN) ===
+Activity ID: <activity-id>
+Request charge: 5.33 RUs
+1. HotelId=11 | HotelName=Royal Cottage Resort | score=0.4991 | Description=Your home away from home. Brand new fully equipped premium rooms, fast WiFi, full kitchen, washer & dryer...
+2. HotelId=47 | HotelName=Country Comfort Inn | score=0.4786 | Description=Situated conveniently at the north end of the village, the inn is just a short walk from the lake...
+3. HotelId=48 | HotelName=Nordick's Valley Motel | score=0.4635 | Description=Only 90 miles from the nation's capital and nearby most everything the historic valley has to offer...
+4. HotelId=19 | HotelName=Economy Universe Motel | score=0.4461 | Description=Local, family-run hotel in bustling downtown Redmond. We are a pet-friendly establishment...
+5. HotelId=7 | HotelName=Roach Motel | score=0.4388 | Description=Perfect Location on Main Street. Earn points while enjoying close proximity to the city's best shopping...
+
+=== Query results: hotels_quantizedflat (QuantizedFlat) ===
+Activity ID: <activity-id>
+Request charge: 5.35 RUs
+1. HotelId=11 | HotelName=Royal Cottage Resort | score=0.4991 | Description=Your home away from home. Brand new fully equipped premium rooms, fast WiFi, full kitchen, washer & dryer...
+2. HotelId=47 | HotelName=Country Comfort Inn | score=0.4786 | Description=Situated conveniently at the north end of the village, the inn is just a short walk from the lake...
+3. HotelId=48 | HotelName=Nordick's Valley Motel | score=0.4635 | Description=Only 90 miles from the nation's capital and nearby most everything the historic valley has to offer...
+4. HotelId=19 | HotelName=Economy Universe Motel | score=0.4461 | Description=Local, family-run hotel in bustling downtown Redmond. We are a pet-friendly establishment...
+5. HotelId=7 | HotelName=Roach Motel | score=0.4388 | Description=Perfect Location on Main Street. Earn points while enjoying close proximity to the city's best shopping...
+
+========================================================================
+Complete
+========================================================================

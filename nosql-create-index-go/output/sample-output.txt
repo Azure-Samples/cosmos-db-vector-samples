@@ -1,0 +1,15 @@
+Sample output placeholder
+
+Azure Cosmos DB vector index sample (Go)
+database=Hotels primaryContainer=hotels_diskann vectorAlgorithm=diskann dataFile=C:\...\data\HotelsData_toCosmosDB_Vector.json
+embeddingDeployment=text-embedding-3-small dimensions=1536 partitionKey=hotels
+
+=== hotels_diskann ===
+inserted=50 skipped=0 failed=0 total=50 writeRU=123.45
+1. HotelId=12 | HotelName=Ocean Breeze Suites | score=0.0834 | Description=Modern waterfront hotel near the beach and boardwalk...
+queryRU=3.21
+
+=== hotels_quantizedflat ===
+inserted=50 skipped=0 failed=0 total=50 writeRU=121.88
+1. HotelId=12 | HotelName=Ocean Breeze Suites | score=0.0834 | Description=Modern waterfront hotel near the beach and boardwalk...
+queryRU=3.47

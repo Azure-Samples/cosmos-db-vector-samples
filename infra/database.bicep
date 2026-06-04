@@ -6,88 +6,11 @@ param tags object = {}
 param managedIdentityPrincipalId string
 param deploymentUserPrincipalId string = ''
 param databaseName string
+param createIndexDatabaseName string = ''
 
 var database = {
-  name: databaseName // Database for application
+  name: databaseName // Database for existing vector-search samples
 }
-
-var containers = [
-  {
-    name: 'hotels_diskann'
-    partitionKeyPaths: [
-      '/HotelId'
-    ]
-    indexingPolicy: {
-      indexingMode: 'consistent'
-      automatic: true
-      includedPaths: [
-        {
-          path: '/*'
-        }
-      ]
-      excludedPaths: [
-        {
-          path: '/_etag/?'
-        }
-      ]
-      vectorIndexes: [
-        {
-          path: '/DescriptionVector'
-          type: 'diskANN'
-        }
-      ]
-    }
-    vectorEmbeddingPolicy: {
-      vectorEmbeddings: [
-        {
-          path: '/DescriptionVector'
-          dataType: 'float32'
-          dimensions: 1536
-          distanceFunction: 'cosine'
-        }
-      ]
-    }
-  }
-  {
-    name: 'hotels_quantizedflat'
-    partitionKeyPaths: [
-      '/HotelId'
-    ]
-    indexingPolicy: {
-      indexingMode: 'consistent'
-      automatic: true
-      includedPaths: [
-        {
-          path: '/*'
-        }
-      ]
-      excludedPaths: [
-        {
-          path: '/_etag/?'
-        }
-        {
-          path: '/DescriptionVector/*'
-        }
-      ]
-      vectorIndexes: [
-        {
-          path: '/DescriptionVector'
-          type: 'quantizedFlat'
-        }
-      ]
-    }
-    vectorEmbeddingPolicy: {
-      vectorEmbeddings: [
-        {
-          path: '/DescriptionVector'
-          dataType: 'float32'
-          dimensions: 1536
-          distanceFunction: 'cosine'
-        }
-      ]
-    }
-  }
-]
 
 
 
@@ -106,30 +29,54 @@ module cosmosDbAccount './cosmos-db/nosql/account.bicep' = {
 }
 
 module cosmosDbDatabase './cosmos-db/nosql/database.bicep' = {
-  name: 'cosmos-db-database'  
+  name: 'cosmos-db-database'
   params: {
-    name: database.name       
+    name: database.name
     parentAccountName: cosmosDbAccount.outputs.name
     tags: tags
     setThroughput: false
   }
 }
 
-module cosmosDbContainers './cosmos-db/nosql/container.bicep' = [
-  for (container, index) in containers: {
-    name: 'cosmos-db-container-${index}'  
-    params: {
-      name: container.name
-      parentAccountName: cosmosDbAccount.outputs.name
-      parentDatabaseName: cosmosDbDatabase.outputs.name
-      tags: tags
-      setThroughput: false
-      partitionKeyPaths: container.partitionKeyPaths
-      indexingPolicy: container.indexingPolicy
-      vectorEmbeddingPolicy: container.vectorEmbeddingPolicy
-    }
+module vectorSearchContainers './cosmos-db/nosql/vector-containers.bicep' = {
+  name: 'cosmos-db-vector-search-containers'
+  params: {
+    parentAccountName: cosmosDbAccount.outputs.name
+    parentDatabaseName: cosmosDbDatabase.outputs.name
+    tags: tags
+    setThroughput: false
+    partitionKeyPaths: [
+      '/HotelId'
+    ]
+    vectorPath: '/DescriptionVector'
+    vectorDimensions: 1536
   }
-]
+}
+
+module createIndexDatabase './cosmos-db/nosql/database.bicep' = if (!empty(createIndexDatabaseName)) {
+  name: 'cosmos-db-create-index-database'
+  params: {
+    name: createIndexDatabaseName
+    parentAccountName: cosmosDbAccount.outputs.name
+    tags: tags
+    setThroughput: false
+  }
+}
+
+module createIndexContainers './cosmos-db/nosql/vector-containers.bicep' = if (!empty(createIndexDatabaseName)) {
+  name: 'cosmos-db-create-index-containers'
+  params: {
+    parentAccountName: cosmosDbAccount.outputs.name
+    parentDatabaseName: createIndexDatabase!.outputs.name
+    tags: tags
+    setThroughput: false
+    partitionKeyPaths: [
+      '/PartitionKey'
+    ]
+    vectorPath: '/DescriptionVector'
+    vectorDimensions: 1536
+  }
+}
 
 // Access to data plane only
 // no access to control plane (e.g. creating databases, containers, etc.)
@@ -174,9 +121,13 @@ output accountName string = cosmosDbAccount.outputs.name
 output database object = {
   name: cosmosDbDatabase.outputs.name
 }
-output containers array = [
-  for (_, index) in containers: {
-    name: cosmosDbContainers[index].outputs.name
-  }
-]
+output containers array = vectorSearchContainers.outputs.containers
+output createIndexDatabase object = !empty(createIndexDatabaseName)
+  ? {
+      name: createIndexDatabase!.outputs.name
+    }
+  : {}
+output createIndexContainers array = !empty(createIndexDatabaseName)
+  ? createIndexContainers!.outputs.containers
+  : []
 
