@@ -20,6 +20,10 @@ Azure Cosmos DB provides integrated vector search capabilities for AI-powered se
   - DiskANN, Flat, and QuantizedFlat indexing algorithms
   - Managed identity authentication
   - Comprehensive documentation and examples
+- **[nosql-create-index-dotnet](./nosql-create-index-dotnet/)** - .NET sample for existing Cosmos DB NoSQL vector containers
+  - Data-plane only operations against pre-provisioned DiskANN and QuantizedFlat containers
+  - `DefaultAzureCredential` authentication and Azure OpenAI embeddings
+  - Bulk-friendly ingestion and `VectorDistance()` query examples
 
 ## 🚀 Features
 
