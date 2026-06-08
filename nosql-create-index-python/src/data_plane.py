@@ -161,16 +161,17 @@ def query_top_matches(
 ) -> QuerySummary:
     embedding_field = validate_field_name(config.embedding_field_name)
     query_text = (
-        "SELECT TOP {0} c.HotelId, c.HotelName, c.Description, "
-        "VectorDistance(c.{1}, @embedding) AS similarityScore "
+        "SELECT TOP @topK c.HotelId, c.HotelName, c.Description, "
+        "VectorDistance(c.{0}, @embedding) AS similarityScore "
         "FROM c WHERE c.PartitionKey = @partitionKey "
-        "ORDER BY VectorDistance(c.{1}, @embedding)"
-    ).format(config.top_count, embedding_field)
+        "ORDER BY VectorDistance(c.{0}, @embedding)"
+    ).format(embedding_field)
 
     raw_results = list(
         container.query_items(
             query=query_text,
             parameters=[
+                {"name": "@topK", "value": config.top_count},
                 {"name": "@embedding", "value": list(query_embedding)},
                 {"name": "@partitionKey", "value": config.partition_key_value},
             ],
