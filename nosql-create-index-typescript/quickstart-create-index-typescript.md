@@ -41,6 +41,9 @@ This sample is split into three layers.
 | Control plane | `src/control-plane.ts` | Uses `@azure/arm-cosmosdb` to create the container with a vector index and create data-plane RBAC. |
 | Data plane | `src/data-plane.ts` | Uses `@azure/cosmos` and the `openai` package to verify dimensions, bulk insert documents, and run a `VectorDistance()` query. |
 
+> [!NOTE]
+> Unlike the other language samples in this repository (which are data-plane only), this TypeScript sample includes a **control-plane** step that creates the container with its vector index via the Azure Resource Manager SDK. This approach demonstrates the full end-to-end lifecycle in a single sample.
+
 The sample supports `diskANN` and `quantizedFlat`. `DiskANN` is graph-based, and `QuantizedFlat` uses vector quantization techniques. Use `hotels_diskann` for `diskANN` and `hotels_quantizedflat` for `quantizedFlat`. If you need to compare with `Flat`, use it only for test or very small scenarios. For production workloads, use `DiskANN` or `QuantizedFlat`.
 
 ## Run the Azure CLI setup script
@@ -93,13 +96,24 @@ When the sample runs, the console shows five steps.
 
 ## Explore the code
 
-The sample is organized into three main files.
+The sample is organized into four main files.
 
-- **`src/index.ts`** loads configuration from environment variables, validates the required settings, creates a shared `DefaultAzureCredential`, and calls the control-plane and data-plane functions in order.
+- **`src/config.ts`** loads and validates environment variables, resolves the data file path, and exports the typed configuration object.
+- **`src/index.ts`** creates a shared `DefaultAzureCredential` and calls the control-plane and data-plane functions in order.
 - **`src/control-plane.ts`** creates the Azure Cosmos DB management client, creates the container with a vector index, and creates the SQL role definition and assignment for data-plane access.
 - **`src/data-plane.ts`** creates the Azure Cosmos DB client with the account endpoint and `DefaultAzureCredential`, creates the Azure OpenAI client, checks embedding dimensions, bulk inserts documents, and runs the vector query.
 
 The vector query validates the embedding field name before it injects that field into the SQL string. The query uses string interpolation for the field name because Azure Cosmos DB for NoSQL doesn't support parameter placeholders for field names in `VectorDistance()`.
+
+## Troubleshooting
+
+| Symptom | Cause | Fix |
+|---------|-------|-----|
+| `DefaultAzureCredential` authentication error | Not signed in to Azure CLI | Run `az login` before running the sample. |
+| 403 Forbidden on container creation | Identity lacks Cosmos DB account-level Contributor role | The setup script assigns roles; re-run it or manually assign **Cosmos DB Account Contributor**. |
+| 403 on document insert/query | Missing data-plane RBAC | The control-plane step creates a SQL role assignment. Verify it completed successfully. RBAC can take up to 5 minutes to propagate. |
+| Embedding dimensions mismatch | Deployment model doesn't match expected dimensions | Verify `AZURE_OPENAI_EMBEDDING_DEPLOYMENT` points to a `text-embedding-3-small` deployment (1536 dimensions). |
+| Container already exists error | Re-running after a previous successful run | Delete the container in the Azure portal or change the container name in `.env`. |
 
 ## Clean up resources
 
