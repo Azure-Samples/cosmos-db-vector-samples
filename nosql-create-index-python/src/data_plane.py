@@ -127,6 +127,7 @@ def ingest_documents(container: Any, container_name: str, documents: Sequence[Di
         )
 
     inserted_documents = 0
+    failed_documents = 0
     total_request_charge = 0.0
     for batch in _chunked(documents, BATCH_SIZE):
         operations = [("upsert", (document,)) for document in batch]
@@ -134,10 +135,24 @@ def ingest_documents(container: Any, container_name: str, documents: Sequence[Di
             batch_operations=operations,
             partition_key="hotels",
         )
-        inserted_documents += sum(
-            1 for result in results if int(result.get("statusCode", 0)) < 300
-        )
+        for result in results:
+            if int(result.get("statusCode", 0)) < 300:
+                inserted_documents += 1
+            else:
+                failed_documents += 1
         total_request_charge += _request_charge(container)
+
+    if failed_documents > 0:
+        print(
+            "WARNING: {0} of {1} documents failed to insert.".format(
+                failed_documents, len(documents)
+            )
+        )
+        raise RuntimeError(
+            "Batch ingestion incomplete: {0} documents failed in container '{1}'.".format(
+                failed_documents, container_name
+            )
+        )
 
     print(
         "Inserted {0}/{1} documents using transactional batches. RU: {2:.2f}".format(
