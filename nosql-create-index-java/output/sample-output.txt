@@ -1,0 +1,20 @@
+Using Azure OpenAI Embedding Deployment/Model: text-embedding-3-small
+Reading JSON file from ../data/HotelsData_toCosmosDB_Vector.json
+Loaded 50 documents
+Processing in batches of 50...
+  ✓ hotels_diskann: 50 upserted (6812.47 RUs)
+  ✓ hotels_quantizedflat: 50 upserted (6810.92 RUs)
+
+Query: "hotel near the ocean"
+Embedding generated (1536 dimensions)
+
+Running searches (top 5 results)...
+  ✓ hotels_diskann queried (5.33 RUs)
+  ✓ hotels_quantizedflat queried (5.35 RUs)
+
+| Algorithm      | Top 1 Result               | Score  | Top 2 Result               | Score  | Diff   |
+|----------------|----------------------------|--------|----------------------------|--------|--------|
+| DiskANN        | Royal Cottage Resort       | 0.4991 | Country Comfort Inn        | 0.4786 | 0.0205 |
+| QuantizedFlat  | Royal Cottage Resort       | 0.4991 | Country Comfort Inn        | 0.4786 | 0.0205 |
+
+Complete

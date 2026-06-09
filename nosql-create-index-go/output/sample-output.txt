@@ -1,0 +1,20 @@
+Using Azure OpenAI Embedding Deployment/Model: text-embedding-3-small
+Reading JSON file from ../data/HotelsData_toCosmosDB_Vector.json
+Loaded 50 documents
+Processing in batches of 50...
+  ✓ hotels_diskann: 50 inserted (3423.54 RUs)
+  ✓ hotels_quantizedflat: 50 inserted (3423.54 RUs)
+
+Query: "hotel near the ocean"
+Embedding generated (1536 dimensions)
+
+Running searches (top 5 results)...
+  ✓ hotels_diskann queried (6.40 RUs)
+  ✓ hotels_quantizedflat queried (6.40 RUs)
+
+| Algorithm      | Top 1 Result               | Score  | Top 2 Result               | Score  | Diff   |
+|----------------|----------------------------|--------|----------------------------|--------|--------|
+| DiskANN        | Windy Ocean Motel          | 0.5268 | Ocean Water Resort & Spa   | 0.5177 | 0.0091 |
+| QuantizedFlat  | Windy Ocean Motel          | 0.5268 | Ocean Water Resort & Spa   | 0.5177 | 0.0091 |
+
+Complete

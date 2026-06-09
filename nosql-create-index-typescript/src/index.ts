@@ -37,14 +37,12 @@ import {
 // Main
 // ---------------------------------------------------------------------------
 export async function main() {
-  console.log("=".repeat(70));
-  console.log(
-    "Azure Cosmos DB — Create Container with Vector Index via ARM SDK"
-  );
-  console.log("=".repeat(70));
-
   const config = loadConfigFromEnv();
   validateRequiredEnvironmentVariables(config);
+
+  console.log(`Using Azure OpenAI Embedding Deployment/Model: ${config.openai.embeddingDeployment}`);
+  console.log(`Container: ${config.cosmos.containerName}`);
+  console.log(`Index type: ${config.vectorIndexType}`);
 
   const credential = new DefaultAzureCredential();
 
@@ -68,9 +66,7 @@ export async function main() {
   await insertDocuments(container, config);
   await vectorQuery(container, openaiClient, config);
 
-  console.log("\n" + "=".repeat(70));
-  console.log("Complete — container, vector index, and RBAC created");
-  console.log("=".repeat(70));
+  console.log("\nComplete");
 }
 
 const isDirectExecution = process.argv[1]

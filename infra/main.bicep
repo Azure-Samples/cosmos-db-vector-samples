@@ -74,6 +74,7 @@ module managedIdentity 'br/public:avm/res/managed-identity/user-assigned-identit
 var dataFileWithVectors = '../data/HotelsData_toCosmosDB_Vector.json'
 var dataFileWithoutVectors = '../data/HotelsData_toCosmosDB.JSON'
 var databaseName = 'Hotels'
+var createIndexDatabaseName = 'HotelsCreateIndex'
 var fieldToEmbed = 'Description'
 var embeddedFieldName = 'DescriptionVector'
 var embeddingDimensions = '1536'
@@ -150,6 +151,7 @@ module database './database.bicep' = {
     managedIdentityPrincipalId: managedIdentity.outputs.principalId
     deploymentUserPrincipalId: deploymentUserPrincipalId
     databaseName: databaseName
+    createIndexDatabaseName: createIndexDatabaseName
   }
 }
 
@@ -175,6 +177,12 @@ output AZURE_OPENAI_EMBEDDING_API_VERSION string = embeddingModelApiVersion
 // Environment variables needed by utils.ts
 output AZURE_COSMOSDB_ENDPOINT string =  database.outputs.endpoint
 output AZURE_COSMOSDB_DATABASENAME string = databaseName
+output AZURE_COSMOSDB_CREATE_INDEX_DATABASENAME string = !empty(createIndexDatabaseName) ? createIndexDatabaseName : ''
+output AZURE_COSMOSDB_CREATE_INDEX_DISKANN_CONTAINER_NAME string = !empty(createIndexDatabaseName) ? database.outputs.createIndexContainers[0].name : ''
+output AZURE_COSMOSDB_CREATE_INDEX_QUANTIZEDFLAT_CONTAINER_NAME string = !empty(createIndexDatabaseName) ? database.outputs.createIndexContainers[1].name : ''
+output AZURE_COSMOSDB_CREATE_INDEX_EMBEDDED_FIELD string = 'DescriptionVector'
+output AZURE_COSMOSDB_CREATE_INDEX_PARTITION_KEY_PATH string = '/PartitionKey'
+output AZURE_COSMOSDB_CREATE_INDEX_EMBEDDING_DIMENSIONS string = '1536'
 
 // Configuration for embedding creation and vector search
 output DATA_FILE_WITH_VECTORS string = dataFileWithVectors
