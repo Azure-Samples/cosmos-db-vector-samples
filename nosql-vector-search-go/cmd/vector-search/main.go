@@ -24,8 +24,14 @@ func main() {
 		log.Fatalf("Configuration error: %v", err)
 	}
 
+	// Check for comparison mode
+	compareMetrics := strings.EqualFold(os.Getenv("COMPARE_DISTANCE_METRICS"), "true")
+
 	fmt.Println("\n📊 Vector Search Algorithm:", cfg.AlgorithmDisplay)
 	fmt.Println("📏 Distance Function:", cfg.DistanceFunction)
+	if compareMetrics {
+		fmt.Println("📊 Comparison Mode: All 3 metrics")
+	}
 	fmt.Println("📦 Container:", cfg.ContainerName)
 
 	// --- Initialize Azure clients (passwordless) ---
@@ -75,11 +81,19 @@ func main() {
 	fmt.Printf("Embedding generated (%d dimensions)\n", len(embedding))
 
 	// --- Execute vector search ---
-	results, requestCharge, err := query.ExecuteVectorSearch(ctx, container, embedding, cfg.EmbeddedField)
-	if err != nil {
-		log.Fatalf("Vector search failed: %v", err)
+	if compareMetrics {
+		results, charges, err := query.ExecuteMetricComparison(ctx, container, embedding, cfg.EmbeddedField)
+		if err != nil {
+			log.Fatalf("Metric comparison failed: %v", err)
+		}
+		query.PrintMetricComparison(results, charges)
+	} else {
+		results, requestCharge, err := query.ExecuteVectorSearch(ctx, container, embedding, cfg.EmbeddedField, cfg.DistanceFunction)
+		if err != nil {
+			log.Fatalf("Vector search failed: %v", err)
+		}
+		query.PrintSearchResults(results, requestCharge)
 	}
 
-	query.PrintSearchResults(results, requestCharge)
 	fmt.Println("Vector search completed successfully!")
 }

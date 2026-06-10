@@ -11,6 +11,7 @@ import com.azure.cosmos.models.SqlQuerySpec;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -22,6 +23,7 @@ import java.util.Set;
  * - Passwordless authentication with DefaultAzureCredential
  * - Bulk insert of hotel data with pre-computed embeddings
  * - Vector similarity search using VectorDistance() SQL function
+ * - Distance metric comparison (Cosine, Euclidean, DotProduct)
  * - DiskANN and QuantizedFlat algorithm selection via environment variable
  */
 public final class VectorSearch {
@@ -30,6 +32,7 @@ public final class VectorSearch {
             "quintessential lodging near running trails, eateries, retail";
 
     private static final Set<String> VALID_ALGORITHMS = Set.of("diskann", "quantizedflat");
+    private static final List<String> VALID_DISTANCE_FUNCTIONS = List.of("cosine", "euclidean", "dotproduct");
 
     private static final Map<String, String> ALGORITHM_CONTAINERS = Map.of(
             "diskann", "hotels_diskann",
@@ -59,12 +62,19 @@ public final class VectorSearch {
         var dataFile = Utils.requireEnv("DATA_FILE_WITH_VECTORS");
         var embeddedField = Utils.requireEnv("EMBEDDED_FIELD");
         var deployment = Utils.requireEnv("AZURE_OPENAI_EMBEDDING_MODEL");
-        var distanceFunction = Utils.envOrDefault("VECTOR_DISTANCE_FUNCTION", "cosine");
+        var distanceFunction = Utils.envOrDefault("VECTOR_DISTANCE_FUNCTION", "cosine").toLowerCase();
+        var compareMetrics = "true".equalsIgnoreCase(Utils.envOrDefault("COMPARE_DISTANCE_METRICS", "false"));
 
         if (!VALID_ALGORITHMS.contains(algorithm)) {
             throw new IllegalArgumentException(
                     "Invalid algorithm '" + algorithm + "'. Must be one of: " +
                     String.join(", ", VALID_ALGORITHMS));
+        }
+
+        if (!VALID_DISTANCE_FUNCTIONS.contains(distanceFunction)) {
+            throw new IllegalArgumentException(
+                    "Invalid distance function '" + distanceFunction + "'. Must be one of: " +
+                    String.join(", ", VALID_DISTANCE_FUNCTIONS));
         }
 
         var containerName = ALGORITHM_CONTAINERS.get(algorithm);
@@ -82,6 +92,9 @@ public final class VectorSearch {
             System.out.println("Connected to container: " + containerName);
             System.out.println("\n[Algorithm] Vector Search Algorithm: " + algorithmDisplay);
             System.out.println("[Distance]  Distance Function: " + distanceFunction);
+            if (compareMetrics) {
+                System.out.println("[Comparison] Mode: All 3 metrics");
+            }
 
             // Verify container exists
             container.read();
@@ -103,21 +116,81 @@ public final class VectorSearch {
                 embeddingDoubles.add(f.doubleValue());
             }
 
-            // ── Build & Execute Vector Search Query ─────────────────────
-            var safeField = Utils.validateFieldName(embeddedField);
-            var queryText = "SELECT TOP 5 c.HotelName, c.Description, c.Rating, " +
-                    "VectorDistance(c." + safeField + ", @embedding) AS SimilarityScore " +
-                    "FROM c " +
-                    "ORDER BY VectorDistance(c." + safeField + ", @embedding)";
+            if (compareMetrics) {
+                runMetricComparison(container, embeddingDoubles, embeddedField);
+            } else {
+                runSingleMetricQuery(container, embeddingDoubles, embeddedField, distanceFunction);
+            }
 
-            System.out.println("\n--- Executing Vector Search Query ---");
-            System.out.println("Query: " + queryText);
-            System.out.println("Parameters: @embedding (vector with " + embeddingDoubles.size() + " dimensions)");
-            System.out.println("--------------------------------------\n");
+            System.out.println("\nVector search completed successfully!");
+        } finally {
+            dbClient.close();
+        }
+    }
+
+    private void runSingleMetricQuery(
+            CosmosContainer container,
+            List<Double> embedding,
+            String embeddedField,
+            String distanceFunction) throws Exception {
+
+        var safeField = Utils.validateFieldName(embeddedField);
+        var queryText = "SELECT TOP 5 c.HotelName, c.Description, c.Rating, " +
+                "VectorDistance(c." + safeField + ", @embedding, \"" + distanceFunction + "\") AS SimilarityScore " +
+                "FROM c " +
+                "ORDER BY VectorDistance(c." + safeField + ", @embedding, \"" + distanceFunction + "\")";
+
+        System.out.println("\n--- Executing Vector Search Query ---");
+        System.out.println("Query: " + queryText);
+        System.out.println("Parameters: @embedding (vector with " + embedding.size() + " dimensions)");
+        System.out.println("--------------------------------------\n");
+
+        var sqlQuery = new SqlQuerySpec(
+                queryText,
+                List.of(new SqlParameter("@embedding", embedding))
+        );
+
+        var queryOptions = new CosmosQueryRequestOptions();
+
+        @SuppressWarnings("unchecked")
+        var resultPages = container.queryItems(sqlQuery, queryOptions, Map.class);
+
+        var results = new ArrayList<Map<String, Object>>();
+        var requestCharge = 0.0;
+
+        for (var page : resultPages.iterableByPage()) {
+            requestCharge += page.getRequestCharge();
+            for (var item : page.getResults()) {
+                @SuppressWarnings("unchecked")
+                var typedItem = (Map<String, Object>) item;
+                results.add(typedItem);
+            }
+        }
+
+        Utils.printSearchResults(results, requestCharge);
+    }
+
+    private void runMetricComparison(
+            CosmosContainer container,
+            List<Double> embedding,
+            String embeddedField) throws Exception {
+
+        var safeField = Utils.validateFieldName(embeddedField);
+        var resultMap = new HashMap<String, Map<String, Object>>();
+        var charges = new HashMap<String, Double>();
+
+        System.out.println("\n--- Comparing All Distance Metrics ---");
+
+        // Execute query for each distance function
+        for (var metric : VALID_DISTANCE_FUNCTIONS) {
+            var queryText = "SELECT TOP 5 c.HotelName, c.Description, c.Rating, " +
+                    "VectorDistance(c." + safeField + ", @embedding, \"" + metric + "\") AS Score " +
+                    "FROM c " +
+                    "ORDER BY VectorDistance(c." + safeField + ", @embedding, \"" + metric + "\")";
 
             var sqlQuery = new SqlQuerySpec(
                     queryText,
-                    List.of(new SqlParameter("@embedding", embeddingDoubles))
+                    List.of(new SqlParameter("@embedding", embedding))
             );
 
             var queryOptions = new CosmosQueryRequestOptions();
@@ -125,22 +198,55 @@ public final class VectorSearch {
             @SuppressWarnings("unchecked")
             var resultPages = container.queryItems(sqlQuery, queryOptions, Map.class);
 
-            var results = new ArrayList<Map<String, Object>>();
-            var requestCharge = 0.0;
+            var totalCharge = 0.0;
 
             for (var page : resultPages.iterableByPage()) {
-                requestCharge += page.getRequestCharge();
+                totalCharge += page.getRequestCharge();
                 for (var item : page.getResults()) {
                     @SuppressWarnings("unchecked")
                     var typedItem = (Map<String, Object>) item;
-                    results.add(typedItem);
+
+                    var hotelName = (String) typedItem.get("HotelName");
+                    var score = ((Number) typedItem.get("Score")).doubleValue();
+
+                    if (!resultMap.containsKey(hotelName)) {
+                        var result = new HashMap<String, Object>();
+                        result.put("HotelName", hotelName);
+                        result.put("Description", typedItem.get("Description"));
+                        result.put("Rating", typedItem.get("Rating"));
+                        result.put("Scores", new HashMap<String, Double>());
+                        resultMap.put(hotelName, result);
+                    }
+
+                    @SuppressWarnings("unchecked")
+                    var scores = (Map<String, Double>) resultMap.get(hotelName).get("Scores");
+                    scores.put(metric, score);
                 }
             }
 
-            Utils.printSearchResults(results, requestCharge);
-
-        } finally {
-            dbClient.close();
+            charges.put(metric, totalCharge);
         }
+
+        // Print comparison results
+        System.out.println("\nHotels ranked by each distance metric:");
+        int idx = 1;
+        for (var entry : resultMap.entrySet()) {
+            var result = entry.getValue();
+            System.out.println("\n" + idx + ". " + result.get("HotelName"));
+            @SuppressWarnings("unchecked")
+            var scores = (Map<String, Double>) result.get("Scores");
+            for (var metric : VALID_DISTANCE_FUNCTIONS) {
+                if (scores.containsKey(metric)) {
+                    System.out.printf("   %s: %.4f%n", metric, scores.get(metric));
+                }
+            }
+            idx++;
+        }
+
+        System.out.println("\n--- Request Charges per Metric ---");
+        for (var metric : VALID_DISTANCE_FUNCTIONS) {
+            System.out.printf("%s: %.2f RUs%n", metric, charges.getOrDefault(metric, 0.0));
+        }
+        System.out.println();
     }
 }

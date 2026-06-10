@@ -4,11 +4,16 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"regexp"
+	"strings"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/ai/azopenai"
 	"github.com/Azure/azure-sdk-for-go/sdk/data/azcosmos"
 )
+
+// Valid distance functions for Cosmos DB NoSQL
+var ValidDistanceFunctions = []string{"cosine", "euclidean", "dotproduct"}
 
 // QueryResult represents a single vector-search result row.
 type QueryResult struct {
@@ -16,6 +21,14 @@ type QueryResult struct {
 	Description     string  `json:"Description"`
 	Rating          float64 `json:"Rating"`
 	SimilarityScore float64 `json:"SimilarityScore"`
+}
+
+// MetricComparisonResult holds scores from all 3 distance metrics.
+type MetricComparisonResult struct {
+	HotelName   string                 `json:"HotelName"`
+	Description string                 `json:"Description"`
+	Rating      float64                `json:"Rating"`
+	Scores      map[string]interface{} `json:"Scores"`
 }
 
 // NOTE: The Go azcosmos SDK has limited cross-partition query support.
@@ -61,25 +74,40 @@ func GenerateEmbedding(ctx context.Context, client *azopenai.Client, text, deplo
 }
 
 // ExecuteVectorSearch builds and runs a VectorDistance SQL query against the
-// Cosmos DB container. Returns the result rows and the total request charge.
+// Cosmos DB container with the specified distance function.
+// Returns the result rows and the total request charge.
 func ExecuteVectorSearch(
 	ctx context.Context,
 	container *azcosmos.ContainerClient,
 	embedding []float32,
 	embeddedField string,
+	distanceFunction string,
 ) ([]QueryResult, float64, error) {
 	if err := ValidateFieldName(embeddedField); err != nil {
 		return nil, 0, err
+	}
+
+	// Validate distance function
+	validFunc := false
+	for _, fn := range ValidDistanceFunctions {
+		if strings.EqualFold(distanceFunction, fn) {
+			validFunc = true
+			distanceFunction = fn
+			break
+		}
+	}
+	if !validFunc {
+		return nil, 0, fmt.Errorf("invalid distance function: %s. Must be one of: %v", distanceFunction, ValidDistanceFunctions)
 	}
 
 	// Build the SQL query with VectorDistance.
 	// TOP + ORDER BY works here because all docs share a single partition key.
 	queryText := fmt.Sprintf(
 		"SELECT TOP 5 c.HotelName, c.Description, c.Rating, "+
-			"VectorDistance(c.%s, @embedding) AS SimilarityScore "+
+			"VectorDistance(c.%s, @embedding, \"%s\") AS SimilarityScore "+
 			"FROM c "+
-			"ORDER BY VectorDistance(c.%s, @embedding)",
-		embeddedField, embeddedField,
+			"ORDER BY VectorDistance(c.%s, @embedding, \"%s\")",
+		embeddedField, distanceFunction, embeddedField, distanceFunction,
 	)
 
 	// Serialize the embedding to a JSON array for the parameter value.
@@ -130,6 +158,91 @@ func ExecuteVectorSearch(
 	return results, totalCharge, nil
 }
 
+// ExecuteMetricComparison runs all 3 distance functions and returns side-by-side results.
+func ExecuteMetricComparison(
+	ctx context.Context,
+	container *azcosmos.ContainerClient,
+	embedding []float32,
+	embeddedField string,
+) ([]MetricComparisonResult, map[string]float64, error) {
+	if err := ValidateFieldName(embeddedField); err != nil {
+		return nil, nil, err
+	}
+
+	embeddingJSON, err := json.Marshal(embedding)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to marshal embedding: %w", err)
+	}
+
+	// Store results by hotel name for aggregation
+	resultMap := make(map[string]MetricComparisonResult)
+	charges := make(map[string]float64)
+
+	// Execute query for each distance function
+	for _, distFunc := range ValidDistanceFunctions {
+		queryText := fmt.Sprintf(
+			"SELECT TOP 5 c.HotelName, c.Description, c.Rating, "+
+				"VectorDistance(c.%s, @embedding, \"%s\") AS Score "+
+				"FROM c "+
+				"ORDER BY VectorDistance(c.%s, @embedding, \"%s\")",
+			embeddedField, distFunc, embeddedField, distFunc,
+		)
+
+		params := azcosmos.QueryOptions{
+			QueryParameters: []azcosmos.QueryParameter{
+				{Name: "@embedding", Value: json.RawMessage(embeddingJSON)},
+			},
+		}
+
+		pk := azcosmos.NewPartitionKey().AppendString(partitionKeyValue)
+		pager := container.NewQueryItemsPager(queryText, pk, &params)
+
+		for pager.More() {
+			resp, err := pager.NextPage(ctx)
+			if err != nil {
+				return nil, charges, fmt.Errorf("comparison query failed for %s: %w", distFunc, err)
+			}
+
+			charges[distFunc] += float64(resp.RequestCharge)
+
+			for _, raw := range resp.Items {
+				var row struct {
+					HotelName   string  `json:"HotelName"`
+					Description string  `json:"Description"`
+					Rating      float64 `json:"Rating"`
+					Score       float64 `json:"Score"`
+				}
+
+				if err := json.Unmarshal(raw, &row); err != nil {
+					continue
+				}
+
+				if result, exists := resultMap[row.HotelName]; exists {
+					result.Scores[distFunc] = row.Score
+					resultMap[row.HotelName] = result
+				} else {
+					resultMap[row.HotelName] = MetricComparisonResult{
+						HotelName:   row.HotelName,
+						Description: row.Description,
+						Rating:      row.Rating,
+						Scores: map[string]interface{}{
+							distFunc: row.Score,
+						},
+					}
+				}
+			}
+		}
+	}
+
+	// Convert map to slice, maintaining order
+	var results []MetricComparisonResult
+	for _, result := range resultMap {
+		results = append(results, result)
+	}
+
+	return results, charges, nil
+}
+
 // PrintSearchResults outputs the results to stdout in a human-readable format.
 func PrintSearchResults(results []QueryResult, requestCharge float64) {
 	fmt.Println("\n--- Search Results ---")
@@ -143,4 +256,33 @@ func PrintSearchResults(results []QueryResult, requestCharge float64) {
 	}
 
 	fmt.Printf("\nVector Search Request Charge: %.2f RUs\n\n", requestCharge)
+}
+
+// PrintMetricComparison outputs comparison results in a human-readable table format.
+func PrintMetricComparison(results []MetricComparisonResult, charges map[string]float64) {
+	fmt.Println("\n--- Metric Comparison Results ---")
+	if len(results) == 0 {
+		fmt.Println("No results found.")
+		return
+	}
+
+	fmt.Println("\nHotels ranked by each distance metric:")
+	for i, r := range results {
+		fmt.Printf("\n%d. %s\n", i+1, r.HotelName)
+		if len(r.Scores) > 0 {
+			for _, metric := range ValidDistanceFunctions {
+				if score, ok := r.Scores[metric]; ok {
+					fmt.Printf("   %s: %.4f\n", metric, score)
+				}
+			}
+		}
+	}
+
+	fmt.Println("\n--- Request Charges per Metric ---")
+	for _, metric := range ValidDistanceFunctions {
+		if charge, ok := charges[metric]; ok {
+			fmt.Printf("%s: %.2f RUs\n", metric, charge)
+		}
+	}
+	fmt.Println()
 }
