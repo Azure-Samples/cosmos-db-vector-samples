@@ -40,8 +40,18 @@ ALGORITHM_CONFIGS: dict[str, dict[str, str]] = {
 }
 
 
-def _build_config() -> dict[str, str | int]:
+VALID_DISTANCE_FUNCTIONS = ["cosine", "euclidean", "dotproduct"]
+
+
+def _build_config() -> dict[str, str | int | bool]:
     """Build runtime configuration from environment variables."""
+    distance_func = os.getenv("VECTOR_DISTANCE_FUNCTION", "cosine").strip().lower()
+    if distance_func not in VALID_DISTANCE_FUNCTIONS:
+        valid = ", ".join(VALID_DISTANCE_FUNCTIONS)
+        raise ValueError(
+            f"Invalid distance function '{distance_func}'. Must be one of: {valid}"
+        )
+    
     return {
         "query": "quintessential lodging near running trails, eateries, retail",
         "db_name": os.getenv("AZURE_COSMOSDB_DATABASENAME", "Hotels"),
@@ -50,7 +60,8 @@ def _build_config() -> dict[str, str | int]:
         "embedded_field": os.getenv("EMBEDDED_FIELD", "DescriptionVector"),
         "embedding_dimensions": int(os.getenv("EMBEDDING_DIMENSIONS", "1536")),
         "deployment": os.getenv("AZURE_OPENAI_EMBEDDING_MODEL", "text-embedding-3-small"),
-        "distance_function": os.getenv("VECTOR_DISTANCE_FUNCTION", "cosine"),
+        "distance_function": distance_func,
+        "compare_all_metrics": os.getenv("COMPARE_DISTANCE_METRICS", "false").lower() == "true",
     }
 
 
@@ -94,7 +105,6 @@ def main() -> None:
         container = database.get_container_client(container_name)
         print(f"Connected to container: {container_name}")
         print(f"\n📊 Vector Search Algorithm: {algo_cfg['algorithm_name']}")
-        print(f"📏 Distance Function: {config['distance_function']}")
 
         # Verify the container exists
         try:
@@ -120,45 +130,128 @@ def main() -> None:
         query_embedding = embedding_response.data[0].embedding
 
         safe_field = validate_field_name(config["embedded_field"])
-        query_text = (
+        
+        # Run comparison if enabled, otherwise single metric
+        if config["compare_all_metrics"]:
+            _run_metric_comparison(
+                container, safe_field, query_embedding, 
+                config["query"], query_embedding
+            )
+        else:
+            _run_single_metric_query(
+                container, safe_field, query_embedding,
+                config["distance_function"], config["query"]
+            )
+
+    except Exception as error:
+        print(f"App failed: {error}", file=sys.stderr)
+        sys.exit(1)
+
+
+def _run_single_metric_query(
+    container, safe_field: str, query_embedding: list, 
+    distance_function: str, query_text: str
+) -> None:
+    """Execute vector search with a single distance metric."""
+    print(f"📏 Distance Function: {distance_function}")
+    
+    query = (
+        f"SELECT TOP 5 c.HotelName, c.Description, c.Rating, "
+        f"VectorDistance(c.{safe_field}, @embedding, {{'distanceFunction': '{distance_function}'}}) AS SimilarityScore "
+        f"FROM c "
+        f"ORDER BY VectorDistance(c.{safe_field}, @embedding, {{'distanceFunction': '{distance_function}'}})"
+    )
+
+    print("\n--- Executing Vector Search Query ---")
+    print(f"Query: {query}")
+    print(
+        f"Parameters: @embedding (vector with {len(query_embedding)} dimensions)"
+    )
+    print("--------------------------------------\n")
+
+    results = list(
+        container.query_items(
+            query=query,
+            parameters=[{"name": "@embedding", "value": query_embedding}],
+            enable_cross_partition_query=True,
+        )
+    )
+
+    # Extract diagnostics
+    response_headers = container.client_connection.last_response_headers
+    activity_id = get_query_activity_id(response_headers)
+    if activity_id:
+        print(f"Query activity ID: {activity_id}")
+
+    request_charge_raw = response_headers.get("x-ms-request-charge", "0") if response_headers else "0"
+    try:
+        request_charge = float(request_charge_raw)
+    except (ValueError, TypeError):
+        request_charge = 0.0
+
+    print_search_results(results, request_charge)
+
+
+def _run_metric_comparison(
+    container, safe_field: str, query_embedding: list,
+    query_text: str, embedding: list
+) -> None:
+    """Execute vector search with all 3 distance metrics and display comparison."""
+    print("📏 Comparing all distance functions: Cosine, Euclidean, DotProduct\n")
+    
+    metrics = ["Cosine", "Euclidean", "DotProduct"]
+    all_results = {}
+    total_charge = 0.0
+    
+    for metric in metrics:
+        print(f"\n--- {metric} Distance Search ---")
+        
+        query = (
             f"SELECT TOP 5 c.HotelName, c.Description, c.Rating, "
-            f"VectorDistance(c.{safe_field}, @embedding) AS SimilarityScore "
+            f"VectorDistance(c.{safe_field}, @embedding, {{'distanceFunction': '{metric}'}}) AS SimilarityScore "
             f"FROM c "
-            f"ORDER BY VectorDistance(c.{safe_field}, @embedding)"
+            f"ORDER BY VectorDistance(c.{safe_field}, @embedding, {{'distanceFunction': '{metric}'}})"
         )
-
-        print("\n--- Executing Vector Search Query ---")
-        print(f"Query: {query_text}")
-        print(
-            f"Parameters: @embedding (vector with {len(query_embedding)} dimensions)"
-        )
-        print("--------------------------------------\n")
-
+        
         results = list(
             container.query_items(
-                query=query_text,
+                query=query,
                 parameters=[{"name": "@embedding", "value": query_embedding}],
                 enable_cross_partition_query=True,
             )
         )
-
+        
         # Extract diagnostics
         response_headers = container.client_connection.last_response_headers
-        activity_id = get_query_activity_id(response_headers)
-        if activity_id:
-            print(f"Query activity ID: {activity_id}")
-
         request_charge_raw = response_headers.get("x-ms-request-charge", "0") if response_headers else "0"
         try:
             request_charge = float(request_charge_raw)
         except (ValueError, TypeError):
             request_charge = 0.0
-
+        
+        total_charge += request_charge
+        all_results[metric] = {
+            "results": results,
+            "charge": request_charge
+        }
+        
         print_search_results(results, request_charge)
-
-    except Exception as error:
-        print(f"App failed: {error}", file=sys.stderr)
-        sys.exit(1)
+    
+    # Print comparison summary
+    print("\n" + "="*80)
+    print("📊 DISTANCE METRIC COMPARISON SUMMARY")
+    print("="*80)
+    
+    for metric in metrics:
+        charge = all_results[metric]["charge"]
+        print(f"\n{metric}:")
+        print(f"  Request Charge: {charge:.2f} RUs")
+        if all_results[metric]["results"]:
+            top_result = all_results[metric]["results"][0]
+            print(f"  Top Result: {top_result.get('HotelName', 'N/A')} (Score: {top_result.get('SimilarityScore', 'N/A'):.4f})")
+    
+    print(f"\nTotal Request Charge (all 3 metrics): {total_charge:.2f} RUs")
+    print("="*80)
 
 
 if __name__ == "__main__":

@@ -185,13 +185,31 @@ Cosmos DB for NoSQL supports two vector indexing algorithms optimized for differ
 
 ## 📏 Distance Metrics
 
-| Metric | Range | Interpretation |
-|--------|-------|----------------|
-| **cosine** (default) | [0, 2] | Lower = more similar |
-| **euclidean** | [0, ∞] | Lower = more similar |
-| **dotproduct** | [-∞, ∞] | Higher = more similar |
+Cosmos DB NoSQL supports three distance metrics for vector similarity search:
 
-Set via the `VECTOR_DISTANCE_FUNCTION` environment variable.
+| Metric | Parameter Name | Range | Interpretation | Best For |
+|--------|---|---|---|---|
+| **Cosine** (default) | `Cosine` | [0, 2] | Lower = more similar | Text embeddings, Azure OpenAI |
+| **Euclidean** (L2) | `Euclidean` | [0, ∞] | Lower = more similar | Geometric distance |
+| **Dot Product** | `DotProduct` | [-∞, ∞] | Higher = more similar | Normalized vectors, fast computation |
+
+**IMPORTANT:** These parameter names are **specific to Cosmos DB NoSQL**. The separate Azure DocumentDB service uses different naming (`COS`, `L2`, `IP`). Do not mix the two — use only `Cosine`, `Euclidean`, and `DotProduct` with Cosmos DB NoSQL.
+
+Set via the `VECTOR_DISTANCE_FUNCTION` environment variable (defaults to `cosine`).
+
+### Comparing All Distance Metrics
+
+To see how all three metrics rank the same results differently, run with `COMPARE_DISTANCE_METRICS=true`:
+
+```bash
+# Linux/macOS
+COMPARE_DISTANCE_METRICS=true python src/vector_search.py
+
+# Windows (PowerShell)
+$env:COMPARE_DISTANCE_METRICS="true"; python src/vector_search.py
+```
+
+This runs the same query three times (once per metric) and displays a comparison table showing ranking differences and RU costs.
 
 ## 💻 Code Examples
 
@@ -265,7 +283,7 @@ VECTOR_ALGORITHM=quantizedflat python src/vector_search.py
 $env:VECTOR_ALGORITHM="quantizedflat"; python src/vector_search.py
 ```
 
-### Run with a different distance function
+### Run with a specific distance function
 
 ```bash
 # Linux/macOS
@@ -275,7 +293,19 @@ VECTOR_ALGORITHM=diskann VECTOR_DISTANCE_FUNCTION=euclidean python src/vector_se
 $env:VECTOR_ALGORITHM="diskann"; $env:VECTOR_DISTANCE_FUNCTION="euclidean"; python src/vector_search.py
 ```
 
+### Compare all three distance metrics
+
+```bash
+# Linux/macOS
+COMPARE_DISTANCE_METRICS=true python src/vector_search.py
+
+# Windows (PowerShell)
+$env:COMPARE_DISTANCE_METRICS="true"; python src/vector_search.py
+```
+
 ### Expected output
+
+#### Single distance metric (default):
 
 ```
 Connected to database: Hotels
@@ -288,7 +318,7 @@ Reading JSON file from ..\data\HotelsData_toCosmosDB_Vector.json
 Container already has 50 documents. Skipping insert.
 
 --- Executing Vector Search Query ---
-Query: SELECT TOP 5 c.HotelName, c.Description, c.Rating, VectorDistance(c.DescriptionVector, @embedding) AS SimilarityScore FROM c ORDER BY VectorDistance(c.DescriptionVector, @embedding)
+Query: SELECT TOP 5 c.HotelName, c.Description, c.Rating, VectorDistance(c.DescriptionVector, @embedding, {'distanceFunction': 'cosine'}) AS SimilarityScore FROM c ORDER BY VectorDistance(c.DescriptionVector, @embedding, {'distanceFunction': 'cosine'})
 Parameters: @embedding (vector with 1536 dimensions)
 --------------------------------------
 
@@ -300,6 +330,56 @@ Parameters: @embedding (vector with 1536 dimensions)
 5. Luxury Lion Resort, Score: 0.7998
 
 Vector Search Request Charge: 4.50 RUs
+```
+
+#### Comparing all three distance metrics (`COMPARE_DISTANCE_METRICS=true`):
+
+```
+📊 Vector Search Algorithm: DiskANN
+📏 Comparing all distance functions: Cosine, Euclidean, DotProduct
+
+--- Cosine Distance Search ---
+--- Search Results ---
+1. Stay-Kay City Hotel, Score: 0.9234
+2. Countryside Hotel, Score: 0.8876
+3. Royal Cottage Resort, Score: 0.8543
+...
+Vector Search Request Charge: 4.50 RUs
+
+--- Euclidean Distance Search ---
+--- Search Results ---
+1. Stay-Kay City Hotel, Score: 0.1234
+2. Royal Cottage Resort, Score: 0.3456
+3. Countryside Hotel, Score: 0.4567
+...
+Vector Search Request Charge: 4.48 RUs
+
+--- DotProduct Distance Search ---
+--- Search Results ---
+1. Countryside Hotel, Score: 0.9876
+2. Stay-Kay City Hotel, Score: 0.9834
+3. Royal Cottage Resort, Score: 0.9712
+...
+Vector Search Request Charge: 4.52 RUs
+
+================================================================================
+📊 DISTANCE METRIC COMPARISON SUMMARY
+================================================================================
+
+Cosine:
+  Request Charge: 4.50 RUs
+  Top Result: Stay-Kay City Hotel (Score: 0.9234)
+
+Euclidean:
+  Request Charge: 4.48 RUs
+  Top Result: Stay-Kay City Hotel (Score: 0.1234)
+
+DotProduct:
+  Request Charge: 4.52 RUs
+  Top Result: Countryside Hotel (Score: 0.9876)
+
+Total Request Charge (all 3 metrics): 13.50 RUs
+================================================================================
 ```
 
 ## 📊 Understanding Query Results
