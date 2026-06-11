@@ -62,6 +62,13 @@ Calls control-plane, then
 
 The setup script creates the Azure resource group, Azure OpenAI resource, Cosmos DB account, and database, then writes a `.env` file with all configuration values needed by `src/index.ts`.
 
+**Option A — If you deployed with `azd up`:**
+
+```powershell
+azd env get-values > .env
+```
+
+**Option B — Otherwise**, use the standalone setup script:
 
 ```bash
 chmod +x scripts/create-resources.sh

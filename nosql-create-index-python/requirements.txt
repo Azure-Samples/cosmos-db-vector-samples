@@ -1,0 +1,4 @@
+azure-cosmos>=4.7.0
+azure-identity>=1.18.0
+openai>=1.57.0
+python-dotenv>=1.0.1

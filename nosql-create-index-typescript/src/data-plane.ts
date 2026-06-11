@@ -72,18 +72,12 @@ export async function verifyEmbeddingDimensions(
   openaiClient: AzureOpenAI,
   config: SampleConfig
 ) {
-  console.log("\n=== Step 3: Verify Embedding Dimensions ===");
-
   const embedding = await generateEmbedding(
     openaiClient,
     config.openai.embeddingDeployment,
     "dimension check"
   );
   const actual = embedding.length;
-
-  console.log(`  Model:    ${config.openai.embeddingDeployment}`);
-  console.log(`  Actual:   ${actual}`);
-  console.log(`  Expected: ${config.expectedDimensions}`);
 
   if (actual !== config.expectedDimensions) {
     throw new Error(
@@ -92,7 +86,6 @@ export async function verifyEmbeddingDimensions(
     );
   }
 
-  console.log("  Dimensions match");
   return actual;
 }
 
@@ -103,17 +96,12 @@ export async function insertDocuments(
   container: Container,
   config: SampleConfig
 ) {
-  console.log("\n=== Step 4: Insert Documents ===");
-
   // Load pre-vectorized hotel data from JSON file
   const filePath = resolve(__dirname, "..", config.dataFile);
-  console.log(`  Data file: ${filePath}`);
-
   const fileContent = await readFile(filePath, "utf-8");
   const data = JSON.parse(fileContent);
-  console.log(
-    `  Loaded ${data.length} documents (embeddings already included)`
-  );
+  console.log(`\nReading JSON file from ${filePath}`);
+  console.log(`Loaded ${data.length} documents`);
 
   // Check if container already has documents
   const { resources: countResult } = await container.items
@@ -122,12 +110,13 @@ export async function insertDocuments(
 
   if (countResult[0] > 0) {
     console.log(
-      `  Container already has ${countResult[0]} documents — skipping insert`
+      `  \u2713 ${config.cosmos.containerName}: ${countResult[0]} documents already exist (skipped)`
     );
     return { total: data.length, inserted: 0, skipped: countResult[0] };
   }
 
   // Build bulk operations — SDK handles batching and throttling
+  console.log(`Processing in batches of ${data.length}...`);
   const operations = data.map((item) => ({
     operationType: BulkOperationType.Create,
     resourceBody: {
@@ -137,13 +126,7 @@ export async function insertDocuments(
     partitionKey: [item.HotelId],
   }));
 
-  console.log(
-    `  Inserting ${operations.length} items using executeBulkOperations...`
-  );
-
-  const start = Date.now();
   const response = await container.items.executeBulkOperations(operations);
-  const elapsed = ((Date.now() - start) / 1000).toFixed(2);
 
   let inserted = 0;
   let failed = 0;
@@ -157,11 +140,9 @@ export async function insertDocuments(
       if (code && Number(code) >= 200 && Number(code) < 300) {
         inserted++;
       } else if (Number(code) === 409) {
-        // Already exists — treat as success
         inserted++;
       } else if (result.error) {
         failed++;
-        console.error(`  Failed: ${result.error.message}`);
       } else {
         inserted++;
       }
@@ -169,10 +150,7 @@ export async function insertDocuments(
     }
   }
 
-  console.log(`  Bulk insert completed in ${elapsed}s`);
-  console.log(
-    `  Inserted: ${inserted}/${data.length} | Failed: ${failed} | RU: ${totalRU.toFixed(2)}`
-  );
+  console.log(`  \u2713 ${config.cosmos.containerName}: ${inserted} inserted (${totalRU.toFixed(2)} RUs)`);
   return { total: data.length, inserted, failed };
 }
 
@@ -184,8 +162,6 @@ export async function vectorQuery(
   openaiClient: AzureOpenAI,
   config: SampleConfig
 ) {
-  console.log("\n=== Step 5: Vector Similarity Query ===");
-
   const embeddingField = config.embeddingField;
 
   // Cosmos DB SQL does not support parameter placeholders for field names,
@@ -201,9 +177,14 @@ export async function vectorQuery(
     queryText
   );
 
+  console.log(`\nQuery: "${queryText}"`);
+  console.log(`Embedding generated (${queryEmbedding.length} dimensions)`);
+  console.log(`\nRunning search (top 3 results)...`);
+
   const querySpec = {
     query: `SELECT TOP 3
               c.id,
+              c.HotelName,
               c.Description,
               VectorDistance(c.${embeddingField}, @embedding) AS similarity
             FROM c
@@ -211,22 +192,24 @@ export async function vectorQuery(
     parameters: [{ name: "@embedding", value: queryEmbedding }],
   };
 
-  const start = Date.now();
   const { resources, requestCharge } = await container.items
     .query(querySpec)
     .fetchAll();
-  const latency = Date.now() - start;
 
-  console.log(`  Query:   "${queryText}"`);
-  console.log(
-    `  Latency: ${latency}ms | RU: ${requestCharge.toFixed(2)} | Results: ${resources.length}`
-  );
+  console.log(`  \u2713 ${config.cosmos.containerName} queried (${requestCharge.toFixed(2)} RUs)`);
 
-  resources.forEach((resource, index) => {
-    console.log(
-      `    ${index + 1}. ${resource.Description} (similarity: ${resource.similarity.toFixed(4)})`
-    );
-  });
+  // --- Results table ---
+  console.log();
+  const label = config.vectorIndexType.charAt(0).toUpperCase() + config.vectorIndexType.slice(1);
+  console.log(`| ${"Algorithm".padEnd(14)} | ${"Top 1 Result".padEnd(26)} | ${"Score".padEnd(6)} | ${"Top 2 Result".padEnd(26)} | ${"Score".padEnd(6)} | ${"Diff".padEnd(6)} |`);
+  console.log(`|${"-".repeat(16)}|${"-".repeat(28)}|${"-".repeat(8)}|${"-".repeat(28)}|${"-".repeat(8)}|${"-".repeat(8)}|`);
 
-  return { success: resources.length > 0, latency, requestCharge };
+  const top1Name = resources.length > 0 ? (resources[0].HotelName || resources[0].Description || "").substring(0, 26) : "";
+  const top1Score = resources.length > 0 ? resources[0].similarity : 0;
+  const top2Name = resources.length > 1 ? (resources[1].HotelName || resources[1].Description || "").substring(0, 26) : "";
+  const top2Score = resources.length > 1 ? resources[1].similarity : 0;
+  const diff = top1Score - top2Score;
+  console.log(`| ${label.padEnd(14)} | ${top1Name.padEnd(26)} | ${top1Score.toFixed(4)} | ${top2Name.padEnd(26)} | ${top2Score.toFixed(4)} | ${diff.toFixed(4)} |`);
+
+  return { success: resources.length > 0, requestCharge };
 }
