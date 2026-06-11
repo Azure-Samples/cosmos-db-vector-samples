@@ -1,0 +1,28 @@
+Reading JSON file from .\data\HotelsData_toCosmosDB_Vector.json
+SLF4J: Failed to load class "org.slf4j.impl.StaticLoggerBinder".
+SLF4J: Defaulting to no-operation (NOP) logger implementation
+SLF4J: See http://www.slf4j.org/codes.html#StaticLoggerBinder for further details.
+Connected to database: Hotels
+
+Vector Search Algorithm: DiskANN
+Distance Function: cosine
+Comparison Mode: metrics across DiskANN and QuantizedFlat
+
+Comparing distance metrics across DiskANN and QuantizedFlat
+Container already has 100 documents. Skipping insert.
+Container already has 100 documents. Skipping insert.
+
+| Algorithm     | Metric | Top 1 Result            | Score  | Top 2 Result            | Score  |
+|---------------|--------|-------------------------|--------|-------------------------|--------|
+| DiskANN       | COS    | Royal Cottage Resort     | 0.4991 | Royal Cottage Resort     | 0.4991 |
+| DiskANN       | L2     | Royal Cottage Resort     | 1.0008 | Royal Cottage Resort     | 1.0008 |
+| DiskANN       | IP     | Royal Cottage Resort     | 0.4990 | Royal Cottage Resort     | 0.4990 |
+| QuantizedFlat | COS    | Royal Cottage Resort     | 0.4991 | Royal Cottage Resort     | 0.4991 |
+| QuantizedFlat | L2     | Royal Cottage Resort     | 1.0008 | Royal Cottage Resort     | 1.0008 |
+| QuantizedFlat | IP     | Royal Cottage Resort     | 0.4990 | Royal Cottage Resort     | 0.4990 |
+
+====================================================================================================
+Summary: Compared 2 algorithms x 3 metrics = 6 combinations
+====================================================================================================
+
+Vector search completed successfully!

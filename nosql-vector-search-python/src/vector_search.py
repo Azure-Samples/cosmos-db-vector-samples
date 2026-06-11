@@ -78,13 +78,6 @@ def main() -> None:
     db_client = clients["db_client"]
 
     try:
-        algorithm = config["algorithm"]
-        if algorithm not in ALGORITHM_CONFIGS:
-            valid = ", ".join(ALGORITHM_CONFIGS)
-            raise ValueError(
-                f"Invalid algorithm '{algorithm}'. Must be one of: {valid}"
-            )
-
         if not ai_client:
             raise RuntimeError(
                 "Azure OpenAI client is not configured. "
@@ -96,49 +89,55 @@ def main() -> None:
                 "Please check your environment variables."
             )
 
-        algo_cfg = ALGORITHM_CONFIGS[algorithm]
-        container_name = algo_cfg["container_name"]
-
         database = db_client.get_database_client(config["db_name"])
         print(f"Connected to database: {config['db_name']}")
-
-        container = database.get_container_client(container_name)
-        print(f"Connected to container: {container_name}")
-        print(f"\n📊 Vector Search Algorithm: {algo_cfg['algorithm_name']}")
-
-        # Verify the container exists
-        try:
-            container.read()
-        except Exception as e:
-            status_code = getattr(e, "status_code", None)
-            if status_code == 404:
-                raise RuntimeError(
-                    f"Container or database not found. Ensure database "
-                    f"'{config['db_name']}' and container '{container_name}' "
-                    f"exist before running this script."
-                ) from e
-            raise
-
-        data_path = Path(__file__).parent.parent / config["data_file"]
-        data = read_file_return_json(str(data_path))
-        insert_data(container, data)
 
         embedding_response = ai_client.embeddings.create(
             model=config["deployment"],
             input=[config["query"]],
         )
         query_embedding = embedding_response.data[0].embedding
-        print(f"\n📊 Embedding generated: type={type(query_embedding)}, length={len(query_embedding)}, first_3_elements={query_embedding[:3]}")
+        print(f"\nEmbedding generated: type={type(query_embedding)}, length={len(query_embedding)}, first_3_elements={query_embedding[:3]}")
 
         safe_field = validate_field_name(config["embedded_field"])
         
-        # Run comparison if enabled, otherwise single metric
+        # Run full comparison across all algorithms, or just single algorithm
         if config["compare_all_metrics"]:
-            _run_metric_comparison(
-                container, safe_field, query_embedding, 
-                config["query"], query_embedding
+            _run_algorithm_metric_comparison(
+                database, config["db_name"], safe_field, query_embedding, config
             )
         else:
+            # Single algorithm mode
+            algorithm = config["algorithm"]
+            if algorithm not in ALGORITHM_CONFIGS:
+                valid = ", ".join(ALGORITHM_CONFIGS)
+                raise ValueError(
+                    f"Invalid algorithm '{algorithm}'. Must be one of: {valid}"
+                )
+            
+            algo_cfg = ALGORITHM_CONFIGS[algorithm]
+            container_name = algo_cfg["container_name"]
+            container = database.get_container_client(container_name)
+            print(f"Connected to container: {container_name}")
+            print(f"\n📊 Vector Search Algorithm: {algo_cfg['algorithm_name']}")
+
+            # Verify the container exists
+            try:
+                container.read()
+            except Exception as e:
+                status_code = getattr(e, "status_code", None)
+                if status_code == 404:
+                    raise RuntimeError(
+                        f"Container or database not found. Ensure database "
+                        f"'{config['db_name']}' and container '{container_name}' "
+                        f"exist before running this script."
+                    ) from e
+                raise
+
+            data_path = Path(__file__).parent.parent / config["data_file"]
+            data = read_file_return_json(str(data_path))
+            insert_data(container, data)
+            
             _run_single_metric_query(
                 container, safe_field, query_embedding,
                 config["distance_function"], config["query"]
@@ -191,6 +190,91 @@ def _run_single_metric_query(
         request_charge = 0.0
 
     print_search_results(results, request_charge)
+
+
+def _run_algorithm_metric_comparison(
+    database, db_name: str, safe_field: str, query_embedding: list, config: dict
+) -> None:
+    """Execute comparison across all algorithms and all 3 distance metrics, showing results in a table."""
+    print("\n" + "="*100)
+    print("Compare All Algorithms x Metrics")
+    print("="*100)
+    print("6 combinations: DiskANN, QuantizedFlat x COS, L2, IP")
+    print("="*100 + "\n")
+    
+    algorithms = list(ALGORITHM_CONFIGS.keys())
+    metrics = ["cosine", "euclidean", "dotproduct"]
+    metric_labels = {"cosine": "COS", "euclidean": "L2", "dotproduct": "IP"}
+    
+    # Collect all results: {algo: {metric: results}}
+    all_results = {}
+    
+    for algorithm in algorithms:
+        algo_cfg = ALGORITHM_CONFIGS[algorithm]
+        container_name = algo_cfg["container_name"]
+        algo_label = algo_cfg["algorithm_name"]
+        
+        print(f"Querying {algo_label}...")
+        all_results[algorithm] = {}
+        
+        try:
+            container = database.get_container_client(container_name)
+            container.read()
+            
+            # Insert data if needed
+            data_path = Path(__file__).parent.parent / config["data_file"]
+            data = read_file_return_json(str(data_path))
+            insert_data(container, data)
+            
+            # Run queries for all 3 metrics
+            for metric in metrics:
+                query = (
+                    f'SELECT TOP 2 c.HotelName, c.Description, c.Rating, '
+                    f'VectorDistance(c.{safe_field}, @embedding, false, {{"distanceFunction": "{metric}"}}) AS SimilarityScore '
+                    f'FROM c '
+                    f'ORDER BY VectorDistance(c.{safe_field}, @embedding, false, {{"distanceFunction": "{metric}"}})'
+                )
+                
+                results = list(
+                    container.query_items(
+                        query=query,
+                        parameters=[{"name": "@embedding", "value": query_embedding}],
+                        enable_cross_partition_query=True,
+                    )
+                )
+                all_results[algorithm][metric] = results
+        
+        except Exception as e:
+            print(f"  Error querying {algo_label}: {e}")
+            all_results[algorithm] = {m: [] for m in metrics}
+    
+    # Print comparison table
+    print("\n| Algorithm | Metric | Top 1 Result            | Score  | Top 2 Result            | Score  |")
+    print("|-----------|--------|------------------------|--------|------------------------|--------|")
+    
+    for algorithm in algorithms:
+        algo_cfg = ALGORITHM_CONFIGS[algorithm]
+        algo_label = algo_cfg["algorithm_name"]
+        
+        for metric in metrics:
+            metric_label = metric_labels[metric]
+            results = all_results.get(algorithm, {}).get(metric, [])
+            
+            top1_name = results[0]["HotelName"] if len(results) > 0 else "N/A"
+            top1_score = f"{results[0]['SimilarityScore']:.4f}" if len(results) > 0 else "N/A"
+            
+            top2_name = results[1]["HotelName"] if len(results) > 1 else "N/A"
+            top2_score = f"{results[1]['SimilarityScore']:.4f}" if len(results) > 1 else "N/A"
+            
+            # Truncate names to fit table
+            top1_name_short = (top1_name[:20] + "..") if len(top1_name) > 20 else top1_name
+            top2_name_short = (top2_name[:20] + "..") if len(top2_name) > 20 else top2_name
+            
+            print(f"| {algo_label:<9} | {metric_label:<6} | {top1_name_short:<24} | {top1_score:>6} | {top2_name_short:<24} | {top2_score:>6} |")
+    
+    print("\n" + "="*100)
+    print(f"Summary: Compared {len(algorithms)} algorithms x {len(metrics)} metrics = {len(algorithms) * len(metrics)} combinations")
+    print("="*100)
 
 
 def _run_metric_comparison(

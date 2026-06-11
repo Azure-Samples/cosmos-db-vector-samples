@@ -1,5 +1,6 @@
+ import type { Container, SqlQuerySpec } from '@azure/cosmos';
  import path from 'path';
-import { readFileReturnJson, getClientsPasswordless, validateFieldName, insertData, printSearchResults, getQueryActivityId } from './utils.js';
+ import { readFileReturnJson, getClientsPasswordless, validateFieldName, insertData, printSearchResults, getQueryActivityId } from './utils.js';
 
 // ESM specific features - create __dirname equivalent
 import { fileURLToPath } from "node:url";
@@ -25,7 +26,19 @@ const algorithmConfigs: Record<VectorAlgorithm, AlgorithmConfig> = {
     }
 };
 
-const VALID_DISTANCE_FUNCTIONS = ['cosine', 'euclidean', 'dotproduct'];
+const ALGORITHM_ORDER: VectorAlgorithm[] = ['diskann', 'quantizedflat'];
+const VALID_DISTANCE_FUNCTIONS = ['cosine', 'euclidean', 'dotproduct'] as const;
+const METRIC_LABELS: Record<(typeof VALID_DISTANCE_FUNCTIONS)[number], string> = {
+    cosine: 'COS',
+    euclidean: 'L2',
+    dotproduct: 'IP'
+};
+
+interface ComparisonRow {
+    algorithmName: string;
+    metric: (typeof VALID_DISTANCE_FUNCTIONS)[number];
+    results: any[];
+}
 
 const config = {
     query: "quintessential lodging near running trails, eateries, retail",
@@ -39,21 +52,57 @@ const config = {
     compareMetrics: (process.env.COMPARE_DISTANCE_METRICS || 'false').toLowerCase() === 'true',
 };
 
-async function runSingleMetricQuery(container: any, embedding: number[], safeEmbeddedField: string, distanceFunction: string) {
-    const queryText = `SELECT TOP 5 c.HotelName, c.Description, c.Rating, VectorDistance(c.${safeEmbeddedField}, @embedding, false, {"distanceFunction": "${distanceFunction}"}) AS SimilarityScore FROM c ORDER BY VectorDistance(c.${safeEmbeddedField}, @embedding, false, {"distanceFunction": "${distanceFunction}"})`;
+function buildVectorQuerySpec(
+    embedding: number[],
+    safeEmbeddedField: string,
+    distanceFunction: string,
+    topK: number,
+    scoreAlias: string
+): SqlQuerySpec {
+    return {
+        query: `SELECT TOP ${topK} c.HotelName, c.Description, c.Rating, VectorDistance(c.${safeEmbeddedField}, @embedding, false, {"distanceFunction": "${distanceFunction}"}) AS ${scoreAlias} FROM c ORDER BY VectorDistance(c.${safeEmbeddedField}, @embedding, false, {"distanceFunction": "${distanceFunction}"})`,
+        parameters: [
+            { name: '@embedding', value: embedding }
+        ]
+    };
+}
+
+function truncateHotelName(name: string): string {
+    return name.length > 20 ? `${name.slice(0, 20)}..` : name;
+}
+
+function printComparisonTable(rows: ComparisonRow[]) {
+    console.log('\n| Algorithm     | Metric | Top 1 Result            | Score  | Top 2 Result            | Score  |');
+    console.log('|---------------|--------|-------------------------|--------|-------------------------|--------|');
+
+    for (const row of rows) {
+        const top1 = row.results[0];
+        const top2 = row.results[1];
+        const top1Name = top1?.HotelName ? truncateHotelName(top1.HotelName) : 'N/A';
+        const top2Name = top2?.HotelName ? truncateHotelName(top2.HotelName) : 'N/A';
+        const top1Score = typeof top1?.SimilarityScore === 'number' ? top1.SimilarityScore.toFixed(4) : 'N/A';
+        const top2Score = typeof top2?.SimilarityScore === 'number' ? top2.SimilarityScore.toFixed(4) : 'N/A';
+
+        console.log(
+            `| ${row.algorithmName.padEnd(13)} | ${METRIC_LABELS[row.metric].padEnd(6)} | ${top1Name.padEnd(24)} | ${top1Score.padStart(6)} | ${top2Name.padEnd(24)} | ${top2Score.padStart(6)} |`
+        );
+    }
+
+    console.log('\n====================================================================================================');
+    console.log('Summary: Compared 2 algorithms x 3 metrics = 6 combinations');
+    console.log('====================================================================================================');
+}
+
+async function runSingleMetricQuery(container: Container, embedding: number[], safeEmbeddedField: string, distanceFunction: string) {
+    const querySpec = buildVectorQuerySpec(embedding, safeEmbeddedField, distanceFunction, 5, 'SimilarityScore');
 
     console.log('\n--- Executing Vector Search Query ---');
-    console.log('Query:', queryText);
+    console.log('Query:', querySpec.query);
     console.log('Parameters: @embedding (vector with', embedding.length, 'dimensions)');
     console.log('--------------------------------------\n');
 
     const queryResponse = await container.items
-        .query({
-            query: queryText,
-            parameters: [
-                { name: "@embedding", value: embedding }
-            ]
-        })
+        .query(querySpec)
         .fetchAll();
 
     const activityId = getQueryActivityId(queryResponse);
@@ -65,59 +114,30 @@ async function runSingleMetricQuery(container: any, embedding: number[], safeEmb
     printSearchResults(resources, requestCharge);
 }
 
-async function runMetricComparison(container: any, embedding: number[], safeEmbeddedField: string) {
-    const resultMap = new Map<string, any>();
-    const charges: Record<string, number> = {};
+async function runMetricComparison(database: any, embedding: number[], safeEmbeddedField: string, data: any[]) {
+    const rows: ComparisonRow[] = [];
 
-    console.log('\n--- Comparing All Distance Metrics ---');
+    console.log('\nComparing distance metrics across DiskANN and QuantizedFlat');
 
-    // Execute query for each distance function
-    for (const metric of VALID_DISTANCE_FUNCTIONS) {
-        const queryText = `SELECT TOP 5 c.HotelName, c.Description, c.Rating, VectorDistance(c.${safeEmbeddedField}, @embedding, false, {"distanceFunction": "${metric}"}) AS Score FROM c ORDER BY VectorDistance(c.${safeEmbeddedField}, @embedding, false, {"distanceFunction": "${metric}"})`;
+    for (const algorithm of ALGORITHM_ORDER) {
+        const algorithmConfig = algorithmConfigs[algorithm];
+        const container = database.container(algorithmConfig.containerName);
+        await container.read();
+        await insertData(container, data);
 
-        const queryResponse = await container.items
-            .query({
-                query: queryText,
-                parameters: [
-                    { name: "@embedding", value: embedding }
-                ]
-            })
-            .fetchAll();
-
-        charges[metric] = (queryResponse.requestCharge || 0);
-
-        for (const item of queryResponse.resources) {
-            if (!resultMap.has(item.HotelName)) {
-                resultMap.set(item.HotelName, {
-                    HotelName: item.HotelName,
-                    Description: item.Description,
-                    Rating: item.Rating,
-                    Scores: {}
-                });
-            }
-            const result = resultMap.get(item.HotelName);
-            result.Scores[metric] = item.Score;
-        }
-    }
-
-    // Print comparison results
-    console.log('\nHotels ranked by each distance metric:');
-    let idx = 1;
-    for (const [, result] of resultMap) {
-        console.log(`\n${idx}. ${result.HotelName}`);
         for (const metric of VALID_DISTANCE_FUNCTIONS) {
-            if (result.Scores[metric] !== undefined) {
-                console.log(`   ${metric}: ${result.Scores[metric].toFixed(4)}`);
-            }
+            const querySpec = buildVectorQuerySpec(embedding, safeEmbeddedField, metric, 2, 'SimilarityScore');
+            const queryResponse = await container.items.query(querySpec).fetchAll();
+
+            rows.push({
+                algorithmName: algorithmConfig.algorithmName,
+                metric,
+                results: queryResponse.resources
+            });
         }
-        idx++;
     }
 
-    console.log('\n--- Request Charges per Metric ---');
-    for (const metric of VALID_DISTANCE_FUNCTIONS) {
-        console.log(`${metric}: ${charges[metric]?.toFixed(2) || '0.00'} RUs`);
-    }
-    console.log();
+    printComparisonTable(rows);
 }
 
 async function main() {
@@ -130,7 +150,7 @@ async function main() {
         }
 
         // Validate distance function
-        if (!VALID_DISTANCE_FUNCTIONS.includes(config.distanceFunction)) {
+        if (!VALID_DISTANCE_FUNCTIONS.includes(config.distanceFunction as (typeof VALID_DISTANCE_FUNCTIONS)[number])) {
             throw new Error(`Invalid distance function '${config.distanceFunction}'. Must be one of: ${VALID_DISTANCE_FUNCTIONS.join(', ')}`);
         }
 
@@ -147,20 +167,13 @@ async function main() {
         try {
             const database = dbClient.database(config.dbName);
             console.log(`Connected to database: ${config.dbName}`);
-
-            const container = database.container(collectionName);
-            console.log(`Connected to container: ${collectionName}`);
-            console.log(`\n📊 Vector Search Algorithm: ${algorithmConfig.algorithmName}`);
-            console.log(`📏 Distance Function: ${config.distanceFunction}`);
+            console.log(`\nVector Search Algorithm: ${algorithmConfig.algorithmName}`);
+            console.log(`Distance Function: ${config.distanceFunction}`);
             if (config.compareMetrics) {
-                console.log('📊 Comparison Mode: All 3 metrics');
+                console.log('Comparison Mode: metrics across DiskANN and QuantizedFlat');
             }
 
-            // Verify container exists by attempting a read
-            await container.read();
-
             const data = await readFileReturnJson(path.join(__dirname, "..", config.dataFile));
-            await insertData(container, data);
 
             const createEmbeddedForQueryResponse = await aiClient.embeddings.create({
                 model: config.deployment,
@@ -170,8 +183,12 @@ async function main() {
             const safeEmbeddedField = validateFieldName(config.embeddedField);
 
             if (config.compareMetrics) {
-                await runMetricComparison(container, createEmbeddedForQueryResponse.data[0].embedding, safeEmbeddedField);
+                await runMetricComparison(database, createEmbeddedForQueryResponse.data[0].embedding, safeEmbeddedField, data);
             } else {
+                const container = database.container(collectionName);
+                console.log(`Connected to container: ${collectionName}`);
+                await container.read();
+                await insertData(container, data);
                 await runSingleMetricQuery(container, createEmbeddedForQueryResponse.data[0].embedding, safeEmbeddedField, config.distanceFunction);
             }
 

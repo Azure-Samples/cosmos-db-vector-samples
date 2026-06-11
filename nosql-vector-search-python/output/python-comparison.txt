@@ -1,0 +1,33 @@
+Connected to database: Hotels
+
+Embedding generated: type=<class 'list'>, length=1536, first_3_elements=[-0.04559326171875, 0.0286712646484375, 0.0142364501953125]
+
+====================================================================================================
+Compare All Algorithms x Metrics
+====================================================================================================
+6 combinations: DiskANN, QuantizedFlat x COS, L2, IP
+====================================================================================================
+
+Querying DiskANN...
+Reading JSON file from C:\Temp\cosmos-db-samples\nosql-vector-search-python\..\data\HotelsData_toCosmosDB_Vector.json
+Container already has 100 documents. Skipping insert.
+Querying QuantizedFlat...
+Reading JSON file from C:\Temp\cosmos-db-samples\nosql-vector-search-python\..\data\HotelsData_toCosmosDB_Vector.json
+Inserting 50 items...
+Bulk insert completed in 4.40s
+
+Insert Request Charge: 3402.64 RUs
+
+
+| Algorithm | Metric | Top 1 Result            | Score  | Top 2 Result            | Score  |
+|-----------|--------|------------------------|--------|------------------------|--------|
+| DiskANN   | COS    | Royal Cottage Resort     | 0.4991 | Royal Cottage Resort     | 0.4991 |
+| DiskANN   | L2     | Royal Cottage Resort     | 1.0010 | Royal Cottage Resort     | 1.0010 |
+| DiskANN   | IP     | Royal Cottage Resort     | 0.4993 | Royal Cottage Resort     | 0.4993 |
+| QuantizedFlat | COS    | Royal Cottage Resort     | 0.4991 | Country Comfort Inn      | 0.4786 |
+| QuantizedFlat | L2     | Royal Cottage Resort     | 1.0010 | Country Comfort Inn      | 1.0213 |
+| QuantizedFlat | IP     | Royal Cottage Resort     | 0.4993 | Country Comfort Inn      | 0.4788 |
+
+====================================================================================================
+Summary: Compared 2 algorithms x 3 metrics = 6 combinations
+====================================================================================================

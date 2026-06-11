@@ -12,6 +12,7 @@ import com.azure.cosmos.models.SqlQuerySpec;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -33,6 +34,12 @@ public final class VectorSearch {
 
     private static final Set<String> VALID_ALGORITHMS = Set.of("diskann", "quantizedflat");
     private static final List<String> VALID_DISTANCE_FUNCTIONS = List.of("cosine", "euclidean", "dotproduct");
+    private static final List<String> COMPARISON_ALGORITHMS = List.of("diskann", "quantizedflat");
+    private static final Map<String, String> METRIC_LABELS = Map.of(
+            "cosine", "COS",
+            "euclidean", "L2",
+            "dotproduct", "IP"
+    );
 
     private static final Map<String, String> ALGORITHM_CONTAINERS = Map.of(
             "diskann", "hotels_diskann",
@@ -79,6 +86,9 @@ public final class VectorSearch {
 
         var containerName = ALGORITHM_CONTAINERS.get(algorithm);
         var algorithmDisplay = ALGORITHM_DISPLAY.get(algorithm);
+        var safeField = Utils.validateFieldName(embeddedField);
+        var dataPath = Path.of(dataFile);
+        var data = Utils.readJsonFile(dataPath);
 
         // ── Clients ─────────────────────────────────────────────────────
         OpenAIClient aiClient = Utils.createOpenAIClient();
@@ -87,22 +97,11 @@ public final class VectorSearch {
         try {
             var database = dbClient.getDatabase(dbName);
             System.out.println("Connected to database: " + dbName);
-
-            CosmosContainer container = database.getContainer(containerName);
-            System.out.println("Connected to container: " + containerName);
-            System.out.println("\n[Algorithm] Vector Search Algorithm: " + algorithmDisplay);
-            System.out.println("[Distance]  Distance Function: " + distanceFunction);
+            System.out.println("\nVector Search Algorithm: " + algorithmDisplay);
+            System.out.println("Distance Function: " + distanceFunction);
             if (compareMetrics) {
-                System.out.println("[Comparison] Mode: All 3 metrics");
+                System.out.println("Comparison Mode: metrics across DiskANN and QuantizedFlat");
             }
-
-            // Verify container exists
-            container.read();
-
-            // ── Load & Insert Data ──────────────────────────────────────
-            var dataPath = Path.of(dataFile);
-            var data = Utils.readJsonFile(dataPath);
-            Utils.insertData(container, data);
 
             // ── Generate Query Embedding ────────────────────────────────
             var embeddingOptions = new EmbeddingsOptions(List.of(SAMPLE_QUERY));
@@ -117,9 +116,13 @@ public final class VectorSearch {
             }
 
             if (compareMetrics) {
-                runMetricComparison(container, embeddingDoubles, embeddedField);
+                runMetricComparison(database, data, embeddingDoubles, safeField);
             } else {
-                runSingleMetricQuery(container, embeddingDoubles, embeddedField, distanceFunction);
+                CosmosContainer container = database.getContainer(containerName);
+                System.out.println("Connected to container: " + containerName);
+                container.read();
+                Utils.insertData(container, data);
+                runSingleMetricQuery(container, embeddingDoubles, safeField, distanceFunction);
             }
 
             System.out.println("\nVector search completed successfully!");
@@ -131,10 +134,8 @@ public final class VectorSearch {
     private void runSingleMetricQuery(
             CosmosContainer container,
             List<Double> embedding,
-            String embeddedField,
+            String safeField,
             String distanceFunction) throws Exception {
-
-        var safeField = Utils.validateFieldName(embeddedField);
         var queryText = "SELECT TOP 5 c.HotelName, c.Description, c.Rating, " +
                 "VectorDistance(c." + safeField + ", @embedding, false, {\"distanceFunction\": \"" + distanceFunction + "\"}) AS SimilarityScore " +
                 "FROM c " +
@@ -171,82 +172,95 @@ public final class VectorSearch {
     }
 
     private void runMetricComparison(
-            CosmosContainer container,
+            com.azure.cosmos.CosmosDatabase database,
+            List<Map<String, Object>> data,
             List<Double> embedding,
-            String embeddedField) throws Exception {
+            String safeField) throws Exception {
 
-        var safeField = Utils.validateFieldName(embeddedField);
-        var resultMap = new HashMap<String, Map<String, Object>>();
-        var charges = new HashMap<String, Double>();
+        var allResults = new LinkedHashMap<String, Map<String, List<Map<String, Object>>>>();
 
-        System.out.println("\n--- Comparing All Distance Metrics ---");
+        System.out.println("\nComparing distance metrics across DiskANN and QuantizedFlat");
 
-        // Execute query for each distance function
-        for (var metric : VALID_DISTANCE_FUNCTIONS) {
-            var queryText = "SELECT TOP 5 c.HotelName, c.Description, c.Rating, " +
-                    "VectorDistance(c." + safeField + ", @embedding, false, {\"distanceFunction\": \"" + metric + "\"}) AS Score " +
-                    "FROM c " +
-                    "ORDER BY VectorDistance(c." + safeField + ", @embedding, false, {\"distanceFunction\": \"" + metric + "\"})";
+        for (var algorithm : COMPARISON_ALGORITHMS) {
+            var containerName = ALGORITHM_CONTAINERS.get(algorithm);
+            var container = database.getContainer(containerName);
+            container.read();
+            Utils.insertData(container, data);
 
-            var sqlQuery = new SqlQuerySpec(
-                    queryText,
-                    List.of(new SqlParameter("@embedding", embedding))
-            );
-
-            var queryOptions = new CosmosQueryRequestOptions();
-
-            @SuppressWarnings("unchecked")
-            var resultPages = container.queryItems(sqlQuery, queryOptions, Map.class);
-
-            var totalCharge = 0.0;
-
-            for (var page : resultPages.iterableByPage()) {
-                totalCharge += page.getRequestCharge();
-                for (var item : page.getResults()) {
-                    @SuppressWarnings("unchecked")
-                    var typedItem = (Map<String, Object>) item;
-
-                    var hotelName = (String) typedItem.get("HotelName");
-                    var score = ((Number) typedItem.get("Score")).doubleValue();
-
-                    if (!resultMap.containsKey(hotelName)) {
-                        var result = new HashMap<String, Object>();
-                        result.put("HotelName", hotelName);
-                        result.put("Description", typedItem.get("Description"));
-                        result.put("Rating", typedItem.get("Rating"));
-                        result.put("Scores", new HashMap<String, Double>());
-                        resultMap.put(hotelName, result);
-                    }
-
-                    @SuppressWarnings("unchecked")
-                    var scores = (Map<String, Double>) resultMap.get(hotelName).get("Scores");
-                    scores.put(metric, score);
-                }
-            }
-
-            charges.put(metric, totalCharge);
-        }
-
-        // Print comparison results
-        System.out.println("\nHotels ranked by each distance metric:");
-        int idx = 1;
-        for (var entry : resultMap.entrySet()) {
-            var result = entry.getValue();
-            System.out.println("\n" + idx + ". " + result.get("HotelName"));
-            @SuppressWarnings("unchecked")
-            var scores = (Map<String, Double>) result.get("Scores");
+            var metricResults = new LinkedHashMap<String, List<Map<String, Object>>>();
             for (var metric : VALID_DISTANCE_FUNCTIONS) {
-                if (scores.containsKey(metric)) {
-                    System.out.printf("   %s: %.4f%n", metric, scores.get(metric));
+                var queryText = "SELECT TOP 2 c.HotelName, c.Description, c.Rating, " +
+                        "VectorDistance(c." + safeField + ", @embedding, false, {\"distanceFunction\": \"" + metric + "\"}) AS SimilarityScore " +
+                        "FROM c " +
+                        "ORDER BY VectorDistance(c." + safeField + ", @embedding, false, {\"distanceFunction\": \"" + metric + "\"})";
+
+                var sqlQuery = new SqlQuerySpec(
+                        queryText,
+                        List.of(new SqlParameter("@embedding", embedding))
+                );
+
+                var queryOptions = new CosmosQueryRequestOptions();
+
+                @SuppressWarnings("unchecked")
+                var resultPages = container.queryItems(sqlQuery, queryOptions, Map.class);
+                var results = new ArrayList<Map<String, Object>>();
+
+                for (var page : resultPages.iterableByPage()) {
+                    for (var item : page.getResults()) {
+                        @SuppressWarnings("unchecked")
+                        var typedItem = (Map<String, Object>) item;
+                        results.add(typedItem);
+                    }
                 }
+
+                metricResults.put(metric, results);
             }
-            idx++;
+
+            allResults.put(algorithm, metricResults);
         }
 
-        System.out.println("\n--- Request Charges per Metric ---");
-        for (var metric : VALID_DISTANCE_FUNCTIONS) {
-            System.out.printf("%s: %.2f RUs%n", metric, charges.getOrDefault(metric, 0.0));
+        printComparisonTable(allResults);
+    }
+
+    private void printComparisonTable(Map<String, Map<String, List<Map<String, Object>>>> allResults) {
+        System.out.println("\n| Algorithm     | Metric | Top 1 Result            | Score  | Top 2 Result            | Score  |");
+        System.out.println("|---------------|--------|-------------------------|--------|-------------------------|--------|");
+
+        for (var algorithm : COMPARISON_ALGORITHMS) {
+            var algorithmName = ALGORITHM_DISPLAY.get(algorithm);
+            var metricResults = allResults.getOrDefault(algorithm, Map.of());
+
+            for (var metric : VALID_DISTANCE_FUNCTIONS) {
+                var results = metricResults.getOrDefault(metric, List.of());
+
+                var top1Name = results.size() > 0 ? truncateHotelName(String.valueOf(results.get(0).get("HotelName"))) : "N/A";
+                var top1Score = results.size() > 0 ? formatScore(results.get(0).get("SimilarityScore")) : "N/A";
+                var top2Name = results.size() > 1 ? truncateHotelName(String.valueOf(results.get(1).get("HotelName"))) : "N/A";
+                var top2Score = results.size() > 1 ? formatScore(results.get(1).get("SimilarityScore")) : "N/A";
+
+                System.out.printf("| %-13s | %-6s | %-24s | %6s | %-24s | %6s |%n",
+                        algorithmName,
+                        METRIC_LABELS.get(metric),
+                        top1Name,
+                        top1Score,
+                        top2Name,
+                        top2Score);
+            }
         }
-        System.out.println();
+
+        System.out.println("\n====================================================================================================");
+        System.out.println("Summary: Compared 2 algorithms x 3 metrics = 6 combinations");
+        System.out.println("====================================================================================================");
+    }
+
+    private String truncateHotelName(String hotelName) {
+        return hotelName.length() > 20 ? hotelName.substring(0, 20) + ".." : hotelName;
+    }
+
+    private String formatScore(Object value) {
+        if (value instanceof Number number) {
+            return String.format("%.4f", number.doubleValue());
+        }
+        return "N/A";
     }
 }

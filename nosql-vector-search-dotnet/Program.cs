@@ -35,10 +35,17 @@ class Program
 
         try
         {
+            var compareMetrics = "true".Equals(Environment.GetEnvironmentVariable("COMPARE_DISTANCE_METRICS"), StringComparison.OrdinalIgnoreCase);
+            
             string? command;
             
+            // Check if COMPARE_DISTANCE_METRICS is set - if so, skip menu and run comparison
+            if (compareMetrics)
+            {
+                command = "compare";
+            }
             // Check if command provided as argument
-            if (args.Length > 0)
+            else if (args.Length > 0)
             {
                 command = args[0] switch
                 {
@@ -86,7 +93,7 @@ class Program
                 logger.LogInformation("Exiting application.");
                 return;
             }
-            
+             
             switch (command)
             {
                 case "embed":
@@ -94,6 +101,9 @@ class Program
                     break;
                 case "show-indexes":
                     await serviceProvider.GetRequiredService<CosmosDbService>().ShowAllIndexesAsync();
+                    break;
+                case "compare":
+                    await serviceProvider.GetRequiredService<VectorSearchService>().RunSearchAsync(VectorIndexType.DiskANN);
                     break;
                 case "flat":
                 case "quantized_flat":

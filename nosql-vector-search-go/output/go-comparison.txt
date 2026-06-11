@@ -1,0 +1,38 @@
+
+Vector Search Algorithm: DiskANN
+Distance Function: cosine
+Comparison Mode: metrics across DiskANN and QuantizedFlat
+Container: hotels_diskann
+
+Initializing Azure clients...
+Connected to database: Hotels
+Reading JSON file from ../data/HotelsData_toCosmosDB_Vector.json
+Loaded 50 hotel documents
+Generating embedding for query: "quintessential lodging near running trails, eateries, retail"
+Embedding generated (1536 dimensions)
+Connected to container: hotels_diskann
+Inserting 50 items (duplicates will be skipped)...
+
+Insert complete — inserted: 0, skipped: 50, failed: 0
+Insert Request Charge: 0.00 RUs
+
+Connected to container: hotels_quantizedflat
+Inserting 50 items (duplicates will be skipped)...
+
+Insert complete — inserted: 0, skipped: 50, failed: 0
+Insert Request Charge: 0.00 RUs
+
+
+| Algorithm     | Metric | Top 1 Result            | Score  | Top 2 Result            | Score  |
+|---------------|--------|-------------------------|--------|-------------------------|--------|
+| DiskANN       | COS    | Royal Cottage Resort     | 0.4991 | Country Comfort Inn      | 0.4786 |
+| DiskANN       | L2     | Royal Cottage Resort     | 1.0010 | Country Comfort Inn      | 1.0213 |
+| DiskANN       | IP     | Royal Cottage Resort     | 0.4993 | Country Comfort Inn      | 0.4788 |
+| QuantizedFlat | COS    | Royal Cottage Resort     | 0.4991 | Country Comfort Inn      | 0.4786 |
+| QuantizedFlat | L2     | Royal Cottage Resort     | 1.0010 | Country Comfort Inn      | 1.0213 |
+| QuantizedFlat | IP     | Royal Cottage Resort     | 0.4993 | Country Comfort Inn      | 0.4788 |
+
+====================================================================================================
+Summary: Compared 2 algorithms x 3 metrics = 6 combinations
+====================================================================================================
+Vector search completed successfully!

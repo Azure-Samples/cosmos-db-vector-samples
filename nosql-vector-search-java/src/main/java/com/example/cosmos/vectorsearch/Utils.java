@@ -191,6 +191,10 @@ public final class Utils {
         if (value == null || value.isBlank()) {
             throw new IllegalStateException("Required environment variable not set: " + key);
         }
+        // Strip surrounding quotes if present
+        if (value.length() >= 2 && value.startsWith("\"") && value.endsWith("\"")) {
+            value = value.substring(1, value.length() - 1);
+        }
         return value;
     }
 
