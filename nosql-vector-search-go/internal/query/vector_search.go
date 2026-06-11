@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os"
 	"regexp"
 	"strings"
 
@@ -104,9 +103,9 @@ func ExecuteVectorSearch(
 	// TOP + ORDER BY works here because all docs share a single partition key.
 	queryText := fmt.Sprintf(
 		"SELECT TOP 5 c.HotelName, c.Description, c.Rating, "+
-			"VectorDistance(c.%s, @embedding, \"%s\") AS SimilarityScore "+
+			"VectorDistance(c.%s, @embedding, false, {\"distanceFunction\": \"%s\"}) AS SimilarityScore "+
 			"FROM c "+
-			"ORDER BY VectorDistance(c.%s, @embedding, \"%s\")",
+			"ORDER BY VectorDistance(c.%s, @embedding, false, {\"distanceFunction\": \"%s\"})",
 		embeddedField, distanceFunction, embeddedField, distanceFunction,
 	)
 
@@ -182,9 +181,9 @@ func ExecuteMetricComparison(
 	for _, distFunc := range ValidDistanceFunctions {
 		queryText := fmt.Sprintf(
 			"SELECT TOP 5 c.HotelName, c.Description, c.Rating, "+
-				"VectorDistance(c.%s, @embedding, \"%s\") AS Score "+
+				"VectorDistance(c.%s, @embedding, false, {\"distanceFunction\": \"%s\"}) AS Score "+
 				"FROM c "+
-				"ORDER BY VectorDistance(c.%s, @embedding, \"%s\")",
+				"ORDER BY VectorDistance(c.%s, @embedding, false, {\"distanceFunction\": \"%s\"})",
 			embeddedField, distFunc, embeddedField, distFunc,
 		)
 

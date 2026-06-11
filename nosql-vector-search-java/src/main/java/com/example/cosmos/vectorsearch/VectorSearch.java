@@ -136,9 +136,9 @@ public final class VectorSearch {
 
         var safeField = Utils.validateFieldName(embeddedField);
         var queryText = "SELECT TOP 5 c.HotelName, c.Description, c.Rating, " +
-                "VectorDistance(c." + safeField + ", @embedding, \"" + distanceFunction + "\") AS SimilarityScore " +
+                "VectorDistance(c." + safeField + ", @embedding, false, {\"distanceFunction\": \"" + distanceFunction + "\"}) AS SimilarityScore " +
                 "FROM c " +
-                "ORDER BY VectorDistance(c." + safeField + ", @embedding, \"" + distanceFunction + "\")";
+                "ORDER BY VectorDistance(c." + safeField + ", @embedding, false, {\"distanceFunction\": \"" + distanceFunction + "\"})";
 
         System.out.println("\n--- Executing Vector Search Query ---");
         System.out.println("Query: " + queryText);
@@ -184,9 +184,9 @@ public final class VectorSearch {
         // Execute query for each distance function
         for (var metric : VALID_DISTANCE_FUNCTIONS) {
             var queryText = "SELECT TOP 5 c.HotelName, c.Description, c.Rating, " +
-                    "VectorDistance(c." + safeField + ", @embedding, \"" + metric + "\") AS Score " +
+                    "VectorDistance(c." + safeField + ", @embedding, false, {\"distanceFunction\": \"" + metric + "\"}) AS Score " +
                     "FROM c " +
-                    "ORDER BY VectorDistance(c." + safeField + ", @embedding, \"" + metric + "\")";
+                    "ORDER BY VectorDistance(c." + safeField + ", @embedding, false, {\"distanceFunction\": \"" + metric + "\"})";
 
             var sqlQuery = new SqlQuerySpec(
                     queryText,

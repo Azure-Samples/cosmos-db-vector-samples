@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 
 	"github.com/Azure/cosmos-db-vector-samples/nosql-vector-search-go/internal/client"
 	"github.com/Azure/cosmos-db-vector-samples/nosql-vector-search-go/internal/config"

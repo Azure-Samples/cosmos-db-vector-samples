@@ -40,7 +40,7 @@ const config = {
 };
 
 async function runSingleMetricQuery(container: any, embedding: number[], safeEmbeddedField: string, distanceFunction: string) {
-    const queryText = `SELECT TOP 5 c.HotelName, c.Description, c.Rating, VectorDistance(c.${safeEmbeddedField}, @embedding, "${distanceFunction}") AS SimilarityScore FROM c ORDER BY VectorDistance(c.${safeEmbeddedField}, @embedding, "${distanceFunction}")`;
+    const queryText = `SELECT TOP 5 c.HotelName, c.Description, c.Rating, VectorDistance(c.${safeEmbeddedField}, @embedding, false, {"distanceFunction": "${distanceFunction}"}) AS SimilarityScore FROM c ORDER BY VectorDistance(c.${safeEmbeddedField}, @embedding, false, {"distanceFunction": "${distanceFunction}"})`;
 
     console.log('\n--- Executing Vector Search Query ---');
     console.log('Query:', queryText);
@@ -73,7 +73,7 @@ async function runMetricComparison(container: any, embedding: number[], safeEmbe
 
     // Execute query for each distance function
     for (const metric of VALID_DISTANCE_FUNCTIONS) {
-        const queryText = `SELECT TOP 5 c.HotelName, c.Description, c.Rating, VectorDistance(c.${safeEmbeddedField}, @embedding, "${metric}") AS Score FROM c ORDER BY VectorDistance(c.${safeEmbeddedField}, @embedding, "${metric}")`;
+        const queryText = `SELECT TOP 5 c.HotelName, c.Description, c.Rating, VectorDistance(c.${safeEmbeddedField}, @embedding, false, {"distanceFunction": "${metric}"}) AS Score FROM c ORDER BY VectorDistance(c.${safeEmbeddedField}, @embedding, false, {"distanceFunction": "${metric}"})`;
 
         const queryResponse = await container.items
             .query({
