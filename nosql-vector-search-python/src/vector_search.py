@@ -128,6 +128,7 @@ def main() -> None:
             input=[config["query"]],
         )
         query_embedding = embedding_response.data[0].embedding
+        print(f"\n📊 Embedding generated: type={type(query_embedding)}, length={len(query_embedding)}, first_3_elements={query_embedding[:3]}")
 
         safe_field = validate_field_name(config["embedded_field"])
         
@@ -156,10 +157,10 @@ def _run_single_metric_query(
     print(f"📏 Distance Function: {distance_function}")
     
     query = (
-        f"SELECT TOP 5 c.HotelName, c.Description, c.Rating, "
-        f"VectorDistance(c.{safe_field}, @embedding, {{'distanceFunction': '{distance_function}'}}) AS SimilarityScore "
-        f"FROM c "
-        f"ORDER BY VectorDistance(c.{safe_field}, @embedding, {{'distanceFunction': '{distance_function}'}})"
+        f'SELECT TOP 5 c.HotelName, c.Description, c.Rating, '
+        f'VectorDistance(c.{safe_field}, @embedding, false, {{"distanceFunction": "{distance_function}"}}) AS SimilarityScore '
+        f'FROM c '
+        f'ORDER BY VectorDistance(c.{safe_field}, @embedding, false, {{"distanceFunction": "{distance_function}"}})'
     )
 
     print("\n--- Executing Vector Search Query ---")
@@ -197,21 +198,27 @@ def _run_metric_comparison(
     query_text: str, embedding: list
 ) -> None:
     """Execute vector search with all 3 distance metrics and display comparison."""
-    print("📏 Comparing all distance functions: Cosine, Euclidean, DotProduct\n")
+    print("📏 Comparing all distance functions: cosine, euclidean, dotproduct\n")
     
-    metrics = ["Cosine", "Euclidean", "DotProduct"]
+    metrics = ["cosine", "euclidean", "dotproduct"]
+    metric_display_names = {"cosine": "Cosine", "euclidean": "Euclidean", "dotproduct": "DotProduct"}
     all_results = {}
     total_charge = 0.0
     
     for metric in metrics:
-        print(f"\n--- {metric} Distance Search ---")
+        display_name = metric_display_names[metric]
+        print(f"\n--- {display_name} Distance Search ---")
         
         query = (
-            f"SELECT TOP 5 c.HotelName, c.Description, c.Rating, "
-            f"VectorDistance(c.{safe_field}, @embedding, {{'distanceFunction': '{metric}'}}) AS SimilarityScore "
-            f"FROM c "
-            f"ORDER BY VectorDistance(c.{safe_field}, @embedding, {{'distanceFunction': '{metric}'}})"
+            f'SELECT TOP 5 c.HotelName, c.Description, c.Rating, '
+            f'VectorDistance(c.{safe_field}, @embedding, false, {{"distanceFunction": "{metric}"}}) AS SimilarityScore '
+            f'FROM c '
+            f'ORDER BY VectorDistance(c.{safe_field}, @embedding, false, {{"distanceFunction": "{metric}"}})'
         )
+        
+        print(f"\n--- Query for {display_name} ---")
+        print(f"Query: {query}")
+        print(f"Embedding param type: {type(query_embedding)}, length: {len(query_embedding)}")
         
         results = list(
             container.query_items(
@@ -243,8 +250,9 @@ def _run_metric_comparison(
     print("="*80)
     
     for metric in metrics:
+        display_name = metric_display_names[metric]
         charge = all_results[metric]["charge"]
-        print(f"\n{metric}:")
+        print(f"\n{display_name}:")
         print(f"  Request Charge: {charge:.2f} RUs")
         if all_results[metric]["results"]:
             top_result = all_results[metric]["results"][0]

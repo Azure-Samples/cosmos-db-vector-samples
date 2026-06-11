@@ -99,9 +99,9 @@ public class VectorSearchService
         var queryText = $@"
             SELECT TOP @topK 
                 c AS Document, 
-                VectorDistance(c.{_config.Embedding.EmbeddedField}, @embedding, ""{distanceFunction}"") AS Score 
+                VectorDistance(c.{_config.Embedding.EmbeddedField}, @embedding, false, {{""distanceFunction"": ""{distanceFunction}""}}) AS Score 
             FROM c 
-            ORDER BY VectorDistance(c.{_config.Embedding.EmbeddedField}, @embedding, ""{distanceFunction}"")";
+            ORDER BY VectorDistance(c.{_config.Embedding.EmbeddedField}, @embedding, false, {{""distanceFunction"": ""{distanceFunction}""}})";
 
         var queryDef = new QueryDefinition(queryText)
             .WithParameter("@topK", _config.VectorSearch.TopK)
@@ -147,9 +147,9 @@ public class VectorSearchService
             var queryText = $@"
                 SELECT TOP @topK 
                     c AS Document, 
-                    VectorDistance(c.{_config.Embedding.EmbeddedField}, @embedding, ""{metric}"") AS Score 
+                    VectorDistance(c.{_config.Embedding.EmbeddedField}, @embedding, false, {{""distanceFunction"": ""{metric}""}}) AS Score 
                 FROM c 
-                ORDER BY VectorDistance(c.{_config.Embedding.EmbeddedField}, @embedding, ""{metric}"")";
+                ORDER BY VectorDistance(c.{_config.Embedding.EmbeddedField}, @embedding, false, {{""distanceFunction"": ""{metric}""}})";
 
             var queryDef = new QueryDefinition(queryText)
                 .WithParameter("@topK", _config.VectorSearch.TopK)
@@ -161,7 +161,7 @@ public class VectorSearchService
             while (iterator.HasMoreResults)
             {
                 var response = await iterator.ReadNextAsync();
-                totalCharge += response.RequestCharge ?? 0;
+                totalCharge += response.RequestCharge;
 
                 foreach (var result in response)
                 {
