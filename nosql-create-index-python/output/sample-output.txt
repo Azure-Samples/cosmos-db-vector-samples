@@ -12,9 +12,13 @@ Running searches (top 5 results)...
   ✓ hotels_diskann queried (5.33 RUs)
   ✓ hotels_quantizedflat queried (5.35 RUs)
 
-| Algorithm      | Top 1 Result               | Score  | Top 2 Result               | Score  | Diff   |
-|----------------|----------------------------|--------|----------------------------|--------|--------|
-| DiskANN        | Royal Cottage Resort       | 0.4991 | Country Comfort Inn        | 0.4786 | 0.0205 |
-| QuantizedFlat  | Royal Cottage Resort       | 0.4991 | Country Comfort Inn        | 0.4786 | 0.0205 |
+| Algorithm     | Metric | Top 1 Result            | Score  | Top 2 Result            | Score  |
+|---------------|--------|-------------------------|--------|-------------------------|--------|
+| DiskANN       | COS    | Royal Cottage Resort    | 0.4991 | Country Comfort Inn     | 0.4786 |
+| DiskANN       | L2     | Royal Cottage Resort    | 1.0010 | Country Comfort Inn     | 1.0213 |
+| DiskANN       | IP     | Royal Cottage Resort    | 0.4993 | Country Comfort Inn     | 0.4788 |
+| QuantizedFlat | COS    | Royal Cottage Resort    | 0.4991 | Country Comfort Inn     | 0.4786 |
+| QuantizedFlat | L2     | Royal Cottage Resort    | 1.0010 | Country Comfort Inn     | 1.0213 |
+| QuantizedFlat | IP     | Royal Cottage Resort    | 0.4993 | Country Comfort Inn     | 0.4788 |
 
 Complete
