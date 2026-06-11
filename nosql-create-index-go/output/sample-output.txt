@@ -12,9 +12,13 @@ Running searches (top 5 results)...
   ✓ hotels_diskann queried (6.40 RUs)
   ✓ hotels_quantizedflat queried (6.40 RUs)
 
-| Algorithm      | Top 1 Result               | Score  | Top 2 Result               | Score  | Diff   |
-|----------------|----------------------------|--------|----------------------------|--------|--------|
-| DiskANN        | Windy Ocean Motel          | 0.5268 | Ocean Water Resort & Spa   | 0.5177 | 0.0091 |
-| QuantizedFlat  | Windy Ocean Motel          | 0.5268 | Ocean Water Resort & Spa   | 0.5177 | 0.0091 |
+| Algorithm     | Metric | Top 1 Result            | Score  | Top 2 Result            | Score  |
+|---------------|--------|-------------------------|--------|-------------------------|--------|
+| DiskANN       | COS    | Windy Ocean Motel       | 0.5268 | Ocean Water Resort Spa  | 0.5177 |
+| DiskANN       | L2     | Windy Ocean Motel       | 0.9504 | Ocean Water Resort Spa  | 0.9623 |
+| DiskANN       | IP     | Windy Ocean Motel       | 0.5259 | Ocean Water Resort Spa  | 0.5168 |
+| QuantizedFlat | COS    | Windy Ocean Motel       | 0.5268 | Ocean Water Resort Spa  | 0.5177 |
+| QuantizedFlat | L2     | Windy Ocean Motel       | 0.9504 | Ocean Water Resort Spa  | 0.9623 |
+| QuantizedFlat | IP     | Windy Ocean Motel       | 0.5259 | Ocean Water Resort Spa  | 0.5168 |
 
 Complete

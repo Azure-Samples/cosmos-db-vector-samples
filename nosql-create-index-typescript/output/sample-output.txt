@@ -1,9 +1,10 @@
 Using Azure OpenAI Embedding Deployment/Model: text-embedding-3-small
 Reading JSON file from ../data/HotelsData_toCosmosDB_Vector.json
 Loaded 50 documents
+
 Processing in batches of 50...
-  ✓ hotels_diskann: 50 upserted (6812.47 RUs)
-  ✓ hotels_quantizedflat: 50 upserted (6810.92 RUs)
+  ✓ hotels_diskann: 50 inserted (6812.47 RUs)
+  ✓ hotels_quantizedflat: 50 inserted (6810.92 RUs)
 
 Query: "hotel near the ocean"
 Embedding generated (1536 dimensions)
@@ -15,10 +16,10 @@ Running searches (top 5 results)...
 | Algorithm     | Metric | Top 1 Result            | Score  | Top 2 Result            | Score  |
 |---------------|--------|-------------------------|--------|-------------------------|--------|
 | DiskANN       | COS    | Royal Cottage Resort    | 0.4991 | Country Comfort Inn     | 0.4786 |
-| DiskANN       | L2     | Royal Cottage Resort    | 1.0008 | Country Comfort Inn     | 1.0211 |
-| DiskANN       | IP     | Royal Cottage Resort    | 0.4990 | Country Comfort Inn     | 0.4787 |
+| DiskANN       | L2     | Royal Cottage Resort    | 1.0010 | Country Comfort Inn     | 1.0213 |
+| DiskANN       | IP     | Royal Cottage Resort    | 0.4993 | Country Comfort Inn     | 0.4788 |
 | QuantizedFlat | COS    | Royal Cottage Resort    | 0.4991 | Country Comfort Inn     | 0.4786 |
-| QuantizedFlat | L2     | Royal Cottage Resort    | 1.0008 | Country Comfort Inn     | 1.0211 |
-| QuantizedFlat | IP     | Royal Cottage Resort    | 0.4990 | Country Comfort Inn     | 0.4787 |
+| QuantizedFlat | L2     | Royal Cottage Resort    | 1.0010 | Country Comfort Inn     | 1.0213 |
+| QuantizedFlat | IP     | Royal Cottage Resort    | 0.4993 | Country Comfort Inn     | 0.4788 |
 
 Complete
