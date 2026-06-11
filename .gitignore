@@ -444,3 +444,5 @@ target/
 
 # Allow sample.env templates
 !**/sample.env
+
+*.exe
