@@ -16,6 +16,65 @@ import (
 	"github.com/Azure/cosmos-db-vector-samples/nosql-vector-search-go/internal/query"
 )
 
+var comparisonAlgorithmOrder = []string{"diskann", "quantizedflat"}
+
+var comparisonMetricOrder = []string{"cosine", "euclidean", "dotproduct"}
+
+var comparisonMetricLabels = map[string]string{
+	"cosine":     "COS",
+	"euclidean":  "L2",
+	"dotproduct": "IP",
+}
+
+func truncateHotelName(name string) string {
+	if len(name) > 20 {
+		return name[:20] + ".."
+	}
+	return name
+}
+
+func printComparisonTable(results map[string]map[string][]query.QueryResult) {
+	fmt.Println("\n| Algorithm     | Metric | Top 1 Result            | Score  | Top 2 Result            | Score  |")
+	fmt.Println("|---------------|--------|-------------------------|--------|-------------------------|--------|")
+
+	for _, algorithm := range comparisonAlgorithmOrder {
+		algoCfg := config.AlgorithmConfigs[algorithm]
+		metricResults := results[algorithm]
+
+		for _, metric := range comparisonMetricOrder {
+			rows := metricResults[metric]
+
+			top1Name := "N/A"
+			top1Score := "N/A"
+			if len(rows) > 0 {
+				top1Name = truncateHotelName(rows[0].HotelName)
+				top1Score = fmt.Sprintf("%.4f", rows[0].SimilarityScore)
+			}
+
+			top2Name := "N/A"
+			top2Score := "N/A"
+			if len(rows) > 1 {
+				top2Name = truncateHotelName(rows[1].HotelName)
+				top2Score = fmt.Sprintf("%.4f", rows[1].SimilarityScore)
+			}
+
+			fmt.Printf(
+				"| %-13s | %-6s | %-24s | %6s | %-24s | %6s |\n",
+				algoCfg.AlgorithmName,
+				comparisonMetricLabels[metric],
+				top1Name,
+				top1Score,
+				top2Name,
+				top2Score,
+			)
+		}
+	}
+
+	fmt.Println("\n====================================================================================================")
+	fmt.Println("Summary: Compared 2 algorithms x 3 metrics = 6 combinations")
+	fmt.Println("====================================================================================================")
+}
+
 func main() {
 	ctx := context.Background()
 
@@ -28,12 +87,12 @@ func main() {
 	// Check for comparison mode
 	compareMetrics := strings.EqualFold(os.Getenv("COMPARE_DISTANCE_METRICS"), "true")
 
-	fmt.Println("\n📊 Vector Search Algorithm:", cfg.AlgorithmDisplay)
-	fmt.Println("📏 Distance Function:", cfg.DistanceFunction)
+	fmt.Println("\nVector Search Algorithm:", cfg.AlgorithmDisplay)
+	fmt.Println("Distance Function:", cfg.DistanceFunction)
 	if compareMetrics {
-		fmt.Println("📊 Comparison Mode: All 3 metrics")
+		fmt.Println("Comparison Mode: metrics across DiskANN and QuantizedFlat")
 	}
-	fmt.Println("📦 Container:", cfg.ContainerName)
+	fmt.Println("Container:", cfg.ContainerName)
 
 	// --- Initialize Azure clients (passwordless) ---
 	fmt.Println("\nInitializing Azure clients...")
@@ -56,21 +115,10 @@ func main() {
 	}
 	fmt.Printf("Connected to database: %s\n", cfg.DbName)
 
-	container, err := database.NewContainer(cfg.ContainerName)
-	if err != nil {
-		log.Fatalf("Failed to get container %q: %v", cfg.ContainerName, err)
-	}
-	fmt.Printf("Connected to container: %s\n", cfg.ContainerName)
-
 	// --- Load and insert hotel data ---
 	hotels, err := data.LoadHotelsJSON(cfg.DataFile)
 	if err != nil {
 		log.Fatalf("Failed to load hotel data: %v", err)
-	}
-
-	_, err = data.InsertData(ctx, container, hotels)
-	if err != nil {
-		log.Fatalf("Failed to insert data: %v", err)
 	}
 
 	// --- Generate embedding for the search query ---
@@ -83,12 +131,41 @@ func main() {
 
 	// --- Execute vector search ---
 	if compareMetrics {
-		results, charges, err := query.ExecuteMetricComparison(ctx, container, embedding, cfg.EmbeddedField)
-		if err != nil {
-			log.Fatalf("Metric comparison failed: %v", err)
+		allResults := make(map[string]map[string][]query.QueryResult)
+
+		for _, algorithm := range comparisonAlgorithmOrder {
+			algoCfg := config.AlgorithmConfigs[algorithm]
+			container, err := database.NewContainer(algoCfg.ContainerName)
+			if err != nil {
+				log.Fatalf("Failed to get container %q: %v", algoCfg.ContainerName, err)
+			}
+
+			fmt.Printf("Connected to container: %s\n", algoCfg.ContainerName)
+
+			if _, err = data.InsertData(ctx, container, hotels); err != nil {
+				log.Fatalf("Failed to insert data into %q: %v", algoCfg.ContainerName, err)
+			}
+
+			results, _, err := query.ExecuteMetricComparison(ctx, container, embedding, cfg.EmbeddedField)
+			if err != nil {
+				log.Fatalf("Metric comparison failed for %s: %v", algoCfg.AlgorithmName, err)
+			}
+
+			allResults[algorithm] = results
 		}
-		query.PrintMetricComparison(results, charges)
+
+		printComparisonTable(allResults)
 	} else {
+		container, err := database.NewContainer(cfg.ContainerName)
+		if err != nil {
+			log.Fatalf("Failed to get container %q: %v", cfg.ContainerName, err)
+		}
+		fmt.Printf("Connected to container: %s\n", cfg.ContainerName)
+
+		if _, err = data.InsertData(ctx, container, hotels); err != nil {
+			log.Fatalf("Failed to insert data: %v", err)
+		}
+
 		results, requestCharge, err := query.ExecuteVectorSearch(ctx, container, embedding, cfg.EmbeddedField, cfg.DistanceFunction)
 		if err != nil {
 			log.Fatalf("Vector search failed: %v", err)

@@ -1,0 +1,11 @@
+| Algorithm     | Metric | Top 1 Result            | Score  | Top 2 Result            | Score  |
+|---------------|--------|-------------------------|--------|-------------------------|--------|
+| DiskANN       | COS    | Royal Cottage Resort     | 0.4991 | Royal Cottage Resort     | 0.4991 |
+| DiskANN       | L2     | Royal Cottage Resort     | 1.0010 | Royal Cottage Resort     | 1.0010 |
+| DiskANN       | IP     | Royal Cottage Resort     | 0.4993 | Royal Cottage Resort     | 0.4993 |
+| QuantizedFlat | COS    | Royal Cottage Resort     | 0.4991 | Royal Cottage Resort     | 0.4991 |
+| QuantizedFlat | L2     | Royal Cottage Resort     | 1.0010 | Royal Cottage Resort     | 1.0010 |
+| QuantizedFlat | IP     | Royal Cottage Resort     | 0.4993 | Royal Cottage Resort     | 0.4993 |
+
+==================================================================================================== 
+Summary: Compared 2 algorithms x 3 metrics = 6 combinations
