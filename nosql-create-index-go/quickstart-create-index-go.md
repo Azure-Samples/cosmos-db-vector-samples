@@ -30,6 +30,9 @@ The full source code is available on GitHub: [cosmos-db-vector-samples/nosql-cre
   - **Cognitive Services OpenAI User** on the Azure OpenAI resource
 - An Azure OpenAI resource with a `text-embedding-3-small` deployment.
 
+> [!NOTE]
+> **RBAC roles:** Data-plane RBAC role definitions and assignments are created by `azd up` via Bicep templates. You can also create them programmatically using the management SDK — see [`SqlResources.BeginCreateUpdateSqlRoleDefinitionAsync`](https://learn.microsoft.com/dotnet/api/azure.resourcemanager.cosmosdb.sqlresources.begincreateupdate-sqlroledefinitionasync) (.NET) or [`SqlResources.BeginCreateUpdateSqlRoleDefinition`](https://pkg.go.dev/github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/cosmosdb/armcosmosdb#SqlResourcesClient.BeginCreateUpdateSqlRoleDefinition) (Go).
+
 > [!IMPORTANT]
 > This sample targets the **`HotelsCreateIndex`** database with partition key `/PartitionKey` (value: `"hotels"`). It is **not** the `Hotels` database that uses `/HotelId` as the partition key. The Go sample uses concurrent individual inserts where every document shares the same partition key value.
 

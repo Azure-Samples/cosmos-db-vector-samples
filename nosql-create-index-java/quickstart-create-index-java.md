@@ -50,6 +50,9 @@ Azure Cosmos DB for NoSQL follows an infra-first pattern for vector indexes:
 
 The Java code does **not** create containers or indexes. Vector indexes for Azure Cosmos DB for NoSQL are provisioned when the containers are created.
 
+> [!NOTE]
+> **RBAC roles:** Data-plane RBAC role definitions and assignments are created by `azd up` via Bicep templates. You can also create them programmatically using the management SDK — see [`SqlResources.BeginCreateUpdateSqlRoleDefinitionAsync`](https://learn.microsoft.com/dotnet/api/azure.resourcemanager.cosmosdb.sqlresources.begincreateupdate-sqlroledefinitionasync) (.NET) or [`SqlResources.createUpdateSqlRoleDefinition`](https://learn.microsoft.com/java/api/com.azure.resourcemanager.cosmos.models.sqlresources.createupdatesqlroledefinition) (Java).
+
 ## Configure environment variables
 
 1. Configure environment variables.

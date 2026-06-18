@@ -38,24 +38,34 @@ This sample is split into three layers.
 | Layer | File or tool | What it does |
 |---|---|---|
 | Azure CLI setup | `scripts/create-resources.sh` | Creates the resource group, Azure OpenAI resource, Azure Cosmos DB account, database, and `.env` file. |
-| Control plane | `src/control-plane.ts` | Uses `@azure/arm-cosmosdb` to create the container with a vector index and create data-plane RBAC. |
+| Control plane | `src/control-plane.ts` | Uses `@azure/arm-cosmosdb` to create the container with a vector index. RBAC roles are created by `azd up` (Bicep templates). |
 | Data plane | `src/data-plane.ts` | Uses `@azure/cosmos` and the `openai` package to verify dimensions, bulk insert documents, and run a `VectorDistance()` query. |
 
 > [!NOTE]
 > Unlike the other language samples in this repository (which are data-plane only), this TypeScript sample includes a **control-plane** step that creates the container with its vector index via the Azure Resource Manager SDK. This approach demonstrates the full end-to-end lifecycle in a single sample.
+>
+> **RBAC roles:** Data-plane RBAC role definitions and assignments are created by `azd up` via Bicep templates. You can also create them programmatically using the management SDK — see [`SqlResources.BeginCreateUpdateSqlRoleDefinitionAsync`](https://learn.microsoft.com/dotnet/api/azure.resourcemanager.cosmosdb.sqlresources.begincreateupdate-sqlroledefinitionasync) (.NET) or [`SqlResources.beginCreateUpdateSqlRoleDefinition`](https://learn.microsoft.com/en-us/javascript/api/@azure/arm-cosmosdb/sqlresources?view=azure-node-latest#@azure-arm-cosmosdb-sqlresources-begincreateupdate-sqlroledefinition) (JavaScript/TypeScript).
 
 The sample supports `diskANN` and `quantizedFlat`. `DiskANN` is graph-based, and `QuantizedFlat` uses vector quantization techniques. Use `hotels_diskann` for `diskANN` and `hotels_quantizedflat` for `quantizedFlat`. If you need to compare with `Flat`, use it only for test or very small scenarios. For production workloads, use `DiskANN` or `QuantizedFlat`.
 
-## Run the Azure CLI setup script
+## Create Azure resources
 
-Run the setup script to create the Azure resources that the TypeScript sample uses.
+Create the Azure resources that the TypeScript sample uses.
+
+**Option 1: Use the setup script**
 
 ```bash
 chmod +x scripts/create-resources.sh
 ./scripts/create-resources.sh my-vector-rg eastus2
 ```
 
-The script writes a `.env` file for the sample. By default, it sets `VECTOR_INDEX_TYPE="diskANN"` and `AZURE_COSMOSDB_CONTAINER_NAME="hotels_diskann"`.
+**Option 2: If you deployed with `azd up`**
+
+```bash
+azd env get-values > .env
+```
+
+The `.env` file contains the sample configuration. By default, it sets `VECTOR_INDEX_TYPE="diskANN"` and `AZURE_COSMOSDB_CONTAINER_NAME="hotels_diskann"`. If you used the `create-resources.sh` script, the `.env` file is automatically created.
 
 To use `quantizedFlat`, update the `.env` file before you run the sample:
 

@@ -3,7 +3,6 @@ export interface SampleConfig {
     subscriptionId?: string;
     resourceGroup?: string;
     location: string;
-    userPrincipalId?: string;
   };
   cosmos: {
     accountName?: string;
@@ -30,7 +29,6 @@ export function loadConfigFromEnv(
       subscriptionId: env.AZURE_SUBSCRIPTION_ID,
       resourceGroup: env.AZURE_RESOURCE_GROUP,
       location: env.AZURE_LOCATION || "eastus2",
-      userPrincipalId: env.AZURE_USER_PRINCIPAL_ID,
     },
     cosmos: {
       accountName: env.AZURE_COSMOSDB_ACCOUNT_NAME,
@@ -55,9 +53,6 @@ export function loadConfigFromEnv(
 
 export function getMissingEnvironmentVariables(config: SampleConfig): string[] {
   const required: Array<[string, string | undefined]> = [
-    ["AZURE_SUBSCRIPTION_ID", config.azure.subscriptionId],
-    ["AZURE_RESOURCE_GROUP", config.azure.resourceGroup],
-    ["AZURE_COSMOSDB_ACCOUNT_NAME", config.cosmos.accountName],
     ["AZURE_COSMOSDB_ENDPOINT", config.cosmos.endpoint],
     ["AZURE_OPENAI_ENDPOINT", config.openai.endpoint],
   ];
@@ -74,6 +69,6 @@ export function validateRequiredEnvironmentVariables(config: SampleConfig): void
 
   throw new Error(
     `Missing required environment variables: ${missing.join(", ")}. ` +
-      "Run scripts/create-resources.sh first, or populate .env manually."
+      "Run 'azd up' first, or populate .env manually with 'azd env get-values > .env'."
   );
 }

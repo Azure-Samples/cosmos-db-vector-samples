@@ -30,6 +30,9 @@ Find the sample code on GitHub in [`nosql-create-index-dotnet`](https://github.c
   - **Cognitive Services OpenAI User**
 - An Azure OpenAI resource with a `text-embedding-3-small` deployment.
 
+> [!NOTE]
+> **RBAC roles:** Data-plane RBAC role definitions and assignments are created by `azd up` via Bicep templates. You can also create them programmatically using the management SDK — see [`SqlResources.CreateUpdateSqlRoleDefinitionAsync`](https://learn.microsoft.com/dotnet/api/azure.resourcemanager.cosmosdb.sqlresources.createupdatesqlroledefinitionasync) (.NET) or [`SqlResourcesClient.BeginCreateUpdateSqlRoleDefinition`](https://pkg.go.dev/github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/cosmosdb/armcosmosdb#SqlResourcesClient.BeginCreateUpdateSqlRoleDefinition) (Go).
+
 > [!IMPORTANT]
 > This scenario is data-plane only. Do not add `CreateDatabaseIfNotExistsAsync`, `CreateContainerIfNotExistsAsync`, or any management-plane SDK calls. The sample expects the database and vector containers to already exist.
 

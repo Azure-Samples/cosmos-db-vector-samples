@@ -30,6 +30,9 @@ Find the sample code on GitHub in [`nosql-create-index-python`](https://github.c
   - **Cognitive Services OpenAI User**
 - An Azure OpenAI resource with a `text-embedding-3-small` deployment.
 
+> [!NOTE]
+> **RBAC roles:** Data-plane RBAC role definitions and assignments are created by `azd up` via Bicep templates. You can also create them programmatically using the management SDK — see [`SqlResources.BeginCreateUpdateSqlRoleDefinitionAsync`](https://learn.microsoft.com/dotnet/api/azure.resourcemanager.cosmosdb.sqlresources.begincreateupdate-sqlroledefinitionasync) (.NET) or [`SqlResourcesOperations.begin_create_update_sql_role_definition`](https://learn.microsoft.com/python/api/azure-mgmt-cosmosdb/azure.mgmt.cosmosdb.operations.sqlresourcesoperations) (Python).
+
 > [!IMPORTANT]
 > This scenario is data-plane only. Do not add `create_database_if_not_exists`, `create_container_if_not_exists`, or any management-plane SDK calls. The sample expects the database and vector containers to already exist.
 >

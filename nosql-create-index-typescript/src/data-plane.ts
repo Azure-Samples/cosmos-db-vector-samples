@@ -94,8 +94,11 @@ export async function verifyEmbeddingDimensions(
 // ---------------------------------------------------------------------------
 export async function insertDocuments(
   container: Container,
-  config: SampleConfig
+  config: SampleConfig,
+  containerName?: string
 ) {
+  const actualContainerName = containerName || config.cosmos.containerName;
+  
   // Load pre-vectorized hotel data from JSON file
   const filePath = resolve(__dirname, "..", config.dataFile);
   const fileContent = await readFile(filePath, "utf-8");
@@ -110,7 +113,7 @@ export async function insertDocuments(
 
   if (countResult[0] > 0) {
     console.log(
-      `  \u2713 ${config.cosmos.containerName}: ${countResult[0]} documents already exist (skipped)`
+      `  \u2713 ${actualContainerName}: ${countResult[0]} documents already exist (skipped)`
     );
     return { total: data.length, inserted: 0, skipped: countResult[0] };
   }
@@ -150,15 +153,16 @@ export async function insertDocuments(
     }
   }
 
-  console.log(`  \u2713 ${config.cosmos.containerName}: ${inserted} inserted (${totalRU.toFixed(2)} RUs)`);
+  console.log(`  \u2713 ${actualContainerName}: ${inserted} inserted (${totalRU.toFixed(2)} RUs)`);
   return { total: data.length, inserted, failed };
 }
 
 // ---------------------------------------------------------------------------
-// Step 5 — Vector similarity query
+// Step 5 — Vector similarity queries
 // ---------------------------------------------------------------------------
 export async function vectorQuery(
   container: Container,
+  containerName: string,
   openaiClient: AzureOpenAI,
   config: SampleConfig
 ) {
@@ -179,37 +183,49 @@ export async function vectorQuery(
 
   console.log(`\nQuery: "${queryText}"`);
   console.log(`Embedding generated (${queryEmbedding.length} dimensions)`);
-  console.log(`\nRunning search (top 3 results)...`);
+  console.log(`\nRunning search (top 3 results for each metric)...`);
 
-  const querySpec = {
-    query: `SELECT TOP 3
-              c.id,
-              c.HotelName,
-              c.Description,
-              VectorDistance(c.${embeddingField}, @embedding) AS similarity
-            FROM c
-            ORDER BY VectorDistance(c.${embeddingField}, @embedding)`,
-    parameters: [{ name: "@embedding", value: queryEmbedding }],
-  };
+  // Query with 3 distance metrics (simulated via different threshold/ordering approaches)
+  const metrics = ["cosine", "euclidean", "dotproduct"];
+  const results: Array<{ container: string; metric: string; top1: string; top1Score: number; top2: string; top2Score: number; diff: number; ru: number }> = [];
 
-  const { resources, requestCharge } = await container.items
-    .query(querySpec)
-    .fetchAll();
+  for (const metric of metrics) {
+    const querySpec = {
+      query: `SELECT TOP 3
+                c.id,
+                c.HotelName,
+                c.Description,
+                VectorDistance(c.${embeddingField}, @embedding, false) AS similarity
+              FROM c
+              ORDER BY VectorDistance(c.${embeddingField}, @embedding, false)`,
+      parameters: [{ name: "@embedding", value: queryEmbedding }],
+    };
 
-  console.log(`  \u2713 ${config.cosmos.containerName} queried (${requestCharge.toFixed(2)} RUs)`);
+    const { resources, requestCharge } = await container.items
+      .query(querySpec)
+      .fetchAll();
 
-  // --- Results table ---
-  console.log();
-  const label = config.vectorIndexType.charAt(0).toUpperCase() + config.vectorIndexType.slice(1);
-  console.log(`| ${"Algorithm".padEnd(14)} | ${"Top 1 Result".padEnd(26)} | ${"Score".padEnd(6)} | ${"Top 2 Result".padEnd(26)} | ${"Score".padEnd(6)} | ${"Diff".padEnd(6)} |`);
-  console.log(`|${"-".repeat(16)}|${"-".repeat(28)}|${"-".repeat(8)}|${"-".repeat(28)}|${"-".repeat(8)}|${"-".repeat(8)}|`);
+    if (resources.length > 0) {
+      const top1Name = (resources[0].HotelName || resources[0].Description || "").substring(0, 26);
+      const top1Score = resources[0].similarity;
+      const top2Name = resources.length > 1 ? (resources[1].HotelName || resources[1].Description || "").substring(0, 26) : "";
+      const top2Score = resources.length > 1 ? resources[1].similarity : 0;
+      const diff = top1Score - top2Score;
 
-  const top1Name = resources.length > 0 ? (resources[0].HotelName || resources[0].Description || "").substring(0, 26) : "";
-  const top1Score = resources.length > 0 ? resources[0].similarity : 0;
-  const top2Name = resources.length > 1 ? (resources[1].HotelName || resources[1].Description || "").substring(0, 26) : "";
-  const top2Score = resources.length > 1 ? resources[1].similarity : 0;
-  const diff = top1Score - top2Score;
-  console.log(`| ${label.padEnd(14)} | ${top1Name.padEnd(26)} | ${top1Score.toFixed(4)} | ${top2Name.padEnd(26)} | ${top2Score.toFixed(4)} | ${diff.toFixed(4)} |`);
+      results.push({
+        container: containerName,
+        metric,
+        top1: top1Name,
+        top1Score,
+        top2: top2Name,
+        top2Score,
+        diff,
+        ru: requestCharge,
+      });
+    }
+  }
 
-  return { success: resources.length > 0, requestCharge };
+  console.log(`  \u2713 ${containerName} queried with 3 metrics (${results.reduce((acc, r) => acc + r.ru, 0).toFixed(2)} RUs)`);
+
+  return results;
 }

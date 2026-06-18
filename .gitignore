@@ -432,6 +432,10 @@ FodyWeavers.xsd
 # Compiled executables
 *.exe
 
+# Go binaries
+app
+*.out
+
 # TypeScript
 dist/
 build/
@@ -444,5 +448,3 @@ target/
 
 # Allow sample.env templates
 !**/sample.env
-
-*.exe
