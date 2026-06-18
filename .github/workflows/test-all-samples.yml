@@ -1,0 +1,106 @@
+name: Test All Samples
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'nosql-*/**'
+      - 'infra/**'
+      - '.github/scripts/test-all-samples.ps1'
+      - '.github/workflows/test-all-samples.yml'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'nosql-*/**'
+      - 'infra/**'
+
+jobs:
+  test:
+    name: Test All Samples
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+      
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+      
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.21'
+      
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      
+      - name: Setup Azure CLI
+        uses: azure/setup-azure-cli@v3
+        with:
+          version: latest
+      
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+      
+      - name: Test All Samples
+        shell: pwsh
+        run: |
+          .github/scripts/test-all-samples.ps1 -OutputDir ./test-results
+      
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: test-results
+          path: test-results/
+          retention-days: 30
+      
+      - name: Comment PR with results
+        if: github.event_name == 'pull_request' && always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+            
+            const resultsDir = './test-results';
+            let comment = '## 🧪 Sample Test Results\n\n';
+            
+            if (fs.existsSync(resultsDir)) {
+              const files = fs.readdirSync(resultsDir);
+              files.forEach(file => {
+                if (file.endsWith('-output.log')) {
+                  const content = fs.readFileSync(path.join(resultsDir, file), 'utf8');
+                  const sampleName = file.replace('-output.log', '');
+                  comment += `<details>\n<summary>${sampleName}</summary>\n\n\`\`\`\n${content.substring(0, 500)}\n\`\`\`\n\n</details>\n\n`;
+                }
+              });
+            } else {
+              comment += 'No test results found.\n';
+            }
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
