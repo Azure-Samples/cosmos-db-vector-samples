@@ -81,9 +81,19 @@ Leave `AZURE_COSMOSDB_CONTAINER_NAME` and `VECTOR_ALGORITHM` empty to run both c
 
 ## Install dependencies and run the sample
 
-Install the required packages:
+Create a virtual environment and install the required packages:
 
 ```bash
+# Create a virtual environment
+python -m venv .venv
+
+# Activate the virtual environment
+# On Windows:
+.\.venv\Scripts\Activate.ps1
+# On macOS/Linux:
+source .venv/bin/activate
+
+# Install the required packages
 pip install -r requirements.txt
 ```
 
