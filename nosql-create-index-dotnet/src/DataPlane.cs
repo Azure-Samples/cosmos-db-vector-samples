@@ -139,7 +139,7 @@ public static partial class DataPlane
     {
         var embeddingFieldName = ValidateEmbeddingFieldName(config.EmbeddingFieldName);
         var queryDefinition = new QueryDefinition(
-                $"SELECT TOP @topK c.HotelId, c.HotelName, c.Description, VectorDistance(c.{embeddingFieldName}, @embedding, false, {{distanceFunction: \"{distanceFunction}\"}}) AS SimilarityScore FROM c ORDER BY VectorDistance(c.{embeddingFieldName}, @embedding, false, {{distanceFunction: \"{distanceFunction}\"}})")
+                $"SELECT TOP @topK c.HotelId, c.HotelName, c.Description, VectorDistance(c.{embeddingFieldName}, @embedding, false, {{distanceFunction: '{distanceFunction}'}}) AS SimilarityScore FROM c ORDER BY VectorDistance(c.{embeddingFieldName}, @embedding, false, {{distanceFunction: '{distanceFunction}'}})")
             .WithParameter("@topK", config.TopCount)
             .WithParameter("@embedding", queryEmbedding);
 

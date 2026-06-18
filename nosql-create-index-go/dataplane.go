@@ -236,9 +236,9 @@ func QueryTopHotels(ctx context.Context, container *azcosmos.ContainerClient, em
 		c.HotelId,
 		c.HotelName,
 		c.Description,
-		VectorDistance(c.%s, @embedding, false, {distanceFunction: "%s"}) AS score
+		VectorDistance(c.%s, @embedding, false, {distanceFunction: '%s'}) AS score
 	FROM c
-	ORDER BY VectorDistance(c.%s, @embedding, false, {distanceFunction: "%s"})`, embeddingField, distanceFunction, embeddingField, distanceFunction)
+	ORDER BY VectorDistance(c.%s, @embedding, false, {distanceFunction: '%s'})`, embeddingField, distanceFunction, embeddingField, distanceFunction)
 
 	options := azcosmos.QueryOptions{
 		QueryParameters: []azcosmos.QueryParameter{{

@@ -195,9 +195,9 @@ export async function vectorQuery(
                 c.id,
                 c.HotelName,
                 c.Description,
-                VectorDistance(c.${embeddingField}, @embedding, false, {distanceFunction: "${distanceFunction}"}) AS similarity
+                VectorDistance(c.${embeddingField}, @embedding, false, {distanceFunction: '${distanceFunction}'}) AS similarity
               FROM c
-              ORDER BY VectorDistance(c.${embeddingField}, @embedding, false, {distanceFunction: "${distanceFunction}"})`,
+              ORDER BY VectorDistance(c.${embeddingField}, @embedding, false, {distanceFunction: '${distanceFunction}'})`,
       parameters: [{ name: "@embedding", value: queryEmbedding }],
     };
 
