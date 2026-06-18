@@ -21,8 +21,8 @@ fi
 echo "📦 Downloading Go dependencies..."
 go mod download
 
-# Build the application
+# Build the application (compile all .go files in directory)
 echo "🏗️  Building application..."
-go build -o dist/app ./main.go
+go build -o dist/app .
 
 echo "✅ Go sample built successfully: dist/app"

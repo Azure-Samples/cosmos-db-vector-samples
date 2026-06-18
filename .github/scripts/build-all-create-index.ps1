@@ -66,7 +66,7 @@ function Build-Python {
         }
         
         Write-Host "📦 Installing Python dependencies..." -ForegroundColor Cyan
-        & ".\venv\Scripts\pip.exe" install -q -r requirements.txt
+        & ".\.venv\Scripts\pip.exe" install -q -r requirements.txt
         
         Write-Host "🏗️  Checking Python syntax..." -ForegroundColor Cyan
         python -m py_compile src/index.py src/data_plane.py
@@ -168,7 +168,7 @@ function Build-TypeScript {
         npm install --silent
         
         Write-Host "🏗️  Building TypeScript..." -ForegroundColor Cyan
-        npm run build
+        npx tsc
         
         Write-Host "✅ TypeScript sample built successfully" -ForegroundColor Green
         return $true

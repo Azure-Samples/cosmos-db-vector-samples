@@ -24,7 +24,11 @@ if [ ! -d ".venv" ]; then
 fi
 
 # Activate virtual environment
-source .venv/bin/activate || . .venv/Scripts/activate
+if [ -f ".venv/bin/activate" ]; then
+    source .venv/bin/activate
+else
+    . .venv/Scripts/activate
+fi
 
 # Install dependencies
 echo "📦 Installing Python dependencies..."

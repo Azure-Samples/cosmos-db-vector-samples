@@ -27,8 +27,8 @@ fi
 echo "📦 Installing Node.js dependencies..."
 npm install --silent
 
-# Build TypeScript
+# Build TypeScript (compile to dist/)
 echo "🏗️  Building TypeScript..."
-npm run build
+npx tsc
 
 echo "✅ TypeScript sample built successfully"
