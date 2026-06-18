@@ -1,7 +1,5 @@
 package com.azure.cosmos.createindex;
 
-import io.github.cdimascio.dotenv.Dotenv;
-
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
@@ -25,25 +23,23 @@ public final class Config {
     }
 
     public static SampleConfig load() {
-        Dotenv dotenv = Dotenv.configure().ignoreIfMissing().load();
-
-        String databaseName = read(dotenv, "AZURE_COSMOSDB_CREATE_INDEX_DATABASENAME", DEFAULT_DATABASE_NAME);
-        String containerName = read(dotenv, "AZURE_COSMOSDB_CONTAINER_NAME", null);
-        String vectorAlgorithm = read(dotenv, "VECTOR_ALGORITHM", null);
+        String databaseName = read("AZURE_COSMOSDB_CREATE_INDEX_DATABASENAME", DEFAULT_DATABASE_NAME);
+        String containerName = read("AZURE_COSMOSDB_CONTAINER_NAME", null);
+        String vectorAlgorithm = read("VECTOR_ALGORITHM", null);
         if (vectorAlgorithm != null) {
             vectorAlgorithm = vectorAlgorithm.toLowerCase();
         }
 
         Path sampleRoot = Path.of("").toAbsolutePath().normalize();
-        Path dataFile = sampleRoot.resolve(read(dotenv, "DATA_FILE_WITH_VECTORS", DEFAULT_DATA_FILE)).normalize();
+        Path dataFile = sampleRoot.resolve(read("DATA_FILE_WITH_VECTORS", DEFAULT_DATA_FILE)).normalize();
 
         return new SampleConfig(
-                read(dotenv, "AZURE_COSMOSDB_ENDPOINT", null),
+                read("AZURE_COSMOSDB_ENDPOINT", null),
                 databaseName,
                 containerName,
-                read(dotenv, "AZURE_OPENAI_EMBEDDING_ENDPOINT", null),
-                read(dotenv, "AZURE_OPENAI_EMBEDDING_DEPLOYMENT", null),
-                read(dotenv, "AZURE_OPENAI_EMBEDDING_API_VERSION", DEFAULT_API_VERSION),
+                read("AZURE_OPENAI_EMBEDDING_ENDPOINT", null),
+                read("AZURE_OPENAI_EMBEDDING_DEPLOYMENT", null),
+                read("AZURE_OPENAI_EMBEDDING_API_VERSION", DEFAULT_API_VERSION),
                 vectorAlgorithm,
                 dataFile,
                 DEFAULT_QUERY_TEXT,
@@ -103,11 +99,8 @@ public final class Config {
         };
     }
 
-    private static String read(Dotenv dotenv, String name, String defaultValue) {
+    private static String read(String name, String defaultValue) {
         String value = System.getenv(name);
-        if (value == null || value.isBlank()) {
-            value = dotenv.get(name);
-        }
         if (value == null || value.isBlank()) {
             return defaultValue;
         }

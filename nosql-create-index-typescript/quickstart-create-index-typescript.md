@@ -67,9 +67,9 @@ azd env get-values > .env
 
 The `.env` file contains the sample configuration. By default, it sets `VECTOR_INDEX_TYPE="diskANN"` and `AZURE_COSMOSDB_CONTAINER_NAME="hotels_diskann"`. If you used the `create-resources.sh` script, the `.env` file is automatically created.
 
-To use `quantizedFlat`, update the `.env` file before you run the sample:
+To use `quantizedFlat`, set these environment variables before you run the sample:
 
-```dotenv
+```bash
 VECTOR_INDEX_TYPE="quantizedFlat"
 AZURE_COSMOSDB_CONTAINER_NAME="hotels_quantizedflat"
 ```

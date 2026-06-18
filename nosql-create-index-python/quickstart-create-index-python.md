@@ -105,7 +105,7 @@ python -m src.index
 
 The sample performs these steps:
 
-1. Loads configuration from `.env` using `python-dotenv`.
+1. Loads configuration from environment variables.
 1. Validates required environment variables.
 1. Authenticates with `DefaultAzureCredential`.
 1. Connects to the existing `HotelsCreateIndex` database and target containers.
@@ -140,7 +140,7 @@ nosql-create-index-python/
 
 ### Load configuration and validate
 
-`config.py` loads `.env` via `python-dotenv` and validates that all required variables are present:
+`config.py` loads configuration from environment variables and validates that all required variables are present:
 
 ```python
 config = load_config()

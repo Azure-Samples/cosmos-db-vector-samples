@@ -100,7 +100,7 @@ mvn exec:java
 
 The sample performs these steps:
 
-1. Loads configuration from `.env` and validates required values.
+1. Loads configuration from environment variables and validates required values.
 1. Creates one `DefaultAzureCredential` and passes it directly to `CosmosClient`.
 1. Reads `..\data\HotelsData_toCosmosDB_Vector.json`.
 1. Bulk-upserts documents into `hotels_diskann` and `hotels_quantizedflat`.
@@ -129,7 +129,7 @@ nosql-create-index-java/
 
 ### Config.java
 
-`Config.java` loads environment variables from the shell or `.env`, resolves the shared dataset path, and maps `VECTOR_ALGORITHM` values to the existing container names.
+`Config.java` loads environment variables from the shell, resolves the shared dataset path, and maps `VECTOR_ALGORITHM` values to the existing container names.
 
 ### DataPlane.java
 

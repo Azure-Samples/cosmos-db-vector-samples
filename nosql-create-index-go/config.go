@@ -7,8 +7,6 @@ import (
 	"runtime"
 	"sort"
 	"strings"
-
-	"github.com/joho/godotenv"
 )
 
 const (
@@ -45,7 +43,6 @@ type Config struct {
 }
 
 func LoadConfig() (*Config, error) {
-	_ = godotenv.Load()
 	return LoadConfigFromEnv(func(key string) string {
 		return os.Getenv(key)
 	})

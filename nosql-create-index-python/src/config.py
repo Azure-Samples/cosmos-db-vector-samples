@@ -7,8 +7,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Mapping, Optional, Sequence
 
-from dotenv import load_dotenv
-
 KNOWN_CONTAINERS = {
     "diskann": "hotels_diskann",
     "quantizedflat": "hotels_quantizedflat",
@@ -80,7 +78,6 @@ def missing_environment_variables(env: Optional[Mapping[str, str]] = None) -> Se
 
 
 def load_config(env: Optional[Mapping[str, str]] = None) -> SampleConfig:
-    load_dotenv()
     environment = env or os.environ
 
     data_file_value = _clean(environment.get("DATA_FILE_WITH_VECTORS"))

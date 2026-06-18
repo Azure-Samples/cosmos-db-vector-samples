@@ -89,7 +89,7 @@ go run .
 
 ## The sample performs these steps
 
-1. Loads configuration from `.env` using `godotenv`.
+1. Loads configuration from environment variables.
 1. Validates required environment variables and container names.
 1. Authenticates with `DefaultAzureCredential`.
 1. Creates an Azure Cosmos DB client and accesses the existing database.
@@ -122,10 +122,10 @@ nosql-create-index-go/
 
 | File | Purpose |
 |------|---------|
-| `config.go` | Loads and validates environment variables from `.env`. |
+| `config.go` | Loads and validates environment variables. |
 | `dataplane.go` | Implements document ingestion, embedding generation, and vector queries. |
 | `main.go` | Entry point; orchestrates configuration, ingestion, and queries. |
-| `go.mod` | Module definition; declares `azidentity`, `azcosmos`, and `godotenv` dependencies. |
+| `go.mod` | Module definition; declares `azidentity` and `azcosmos` dependencies. |
 
 ## Key implementation details
 

@@ -93,7 +93,7 @@ dotnet run --project .\nosql-create-index-dotnet.csproj
 
 The sample performs these steps:
 
-1. Loads configuration from `.env`.
+1. Loads configuration from `appsettings.json`.
 1. Authenticates with `DefaultAzureCredential`.
 1. Connects to the existing `Hotels` database and target containers.
 1. Reads `..\data\HotelsData_toCosmosDB_Vector.json` by using `System.Text.Json`.
@@ -124,7 +124,7 @@ nosql-create-index-dotnet/
 
 ### Load configuration and validate target containers
 
-`Config.cs` loads `.env`, resolves the shared data file path, and validates the supported container names:
+`Config.cs` loads configuration from `appsettings.json`, resolves the shared data file path, and validates the supported container names:
 
 ```csharp
 var config = Config.Load();
