@@ -183,21 +183,21 @@ export async function vectorQuery(
 
   console.log(`\nQuery: "${queryText}"`);
   console.log(`Embedding generated (${queryEmbedding.length} dimensions)`);
-  console.log(`\nRunning search (top 3 results for each metric)...`);
+  console.log(`\nRunning search (top 3 results for each distance function)...`);
 
-  // Query with 3 distance metrics (simulated via different threshold/ordering approaches)
-  const metrics = ["cosine", "euclidean", "dotproduct"];
+  // Query with 3 distance functions using VectorDistance() options parameter
+  const distanceFunctions = ["Cosine", "DotProduct", "Euclidean"];
   const results: Array<{ container: string; metric: string; top1: string; top1Score: number; top2: string; top2Score: number; diff: number; ru: number }> = [];
 
-  for (const metric of metrics) {
+  for (const distanceFunction of distanceFunctions) {
     const querySpec = {
       query: `SELECT TOP 3
                 c.id,
                 c.HotelName,
                 c.Description,
-                VectorDistance(c.${embeddingField}, @embedding, false) AS similarity
+                VectorDistance(c.${embeddingField}, @embedding, false, {distanceFunction: "${distanceFunction}"}) AS similarity
               FROM c
-              ORDER BY VectorDistance(c.${embeddingField}, @embedding, false)`,
+              ORDER BY VectorDistance(c.${embeddingField}, @embedding, false, {distanceFunction: "${distanceFunction}"})`,
       parameters: [{ name: "@embedding", value: queryEmbedding }],
     };
 
@@ -214,7 +214,7 @@ export async function vectorQuery(
 
       results.push({
         container: containerName,
-        metric,
+        metric: distanceFunction,
         top1: top1Name,
         top1Score,
         top2: top2Name,
@@ -225,7 +225,7 @@ export async function vectorQuery(
     }
   }
 
-  console.log(`  \u2713 ${containerName} queried with 3 metrics (${results.reduce((acc, r) => acc + r.ru, 0).toFixed(2)} RUs)`);
+  console.log(`  ✓ ${containerName} queried with 3 distance functions (${results.reduce((acc, r) => acc + r.ru, 0).toFixed(2)} RUs)`);
 
   return results;
 }

@@ -52,34 +52,34 @@ public final class App {
             List<Float> queryEmbedding = DataPlane.generateEmbedding(openAiClient, config, config.queryText());
             System.out.println("\nQuery: \"" + config.queryText() + "\"");
             System.out.println("Embedding generated (" + queryEmbedding.size() + " dimensions)");
-            System.out.println("\nRunning searches (top " + config.topCount() + " results for each metric)...");
+            System.out.println("\nRunning searches (top " + config.topCount() + " results for each distance function)...");
 
-            List<String> metrics = List.of("cosine", "euclidean", "dotproduct");
+            List<String> distanceFunctions = List.of("Cosine", "DotProduct", "Euclidean");
             List<Object[]> allResults = new java.util.ArrayList<>();
             for (String containerName : Config.targetContainers(config)) {
                 var container = database.getContainer(containerName);
-                for (String metric : metrics) {
-                    QuerySummary summary = DataPlane.queryTopMatches(container, containerName, config, queryEmbedding, metric);
+                for (String distanceFunction : distanceFunctions) {
+                    QuerySummary summary = DataPlane.queryTopMatches(container, containerName, config, queryEmbedding, distanceFunction);
                     String label = Config.algorithmLabel(containerName);
                     System.out.printf("  \u2713 %s queried (%.2f RUs)%n", containerName, summary.requestCharge());
-                    allResults.add(new Object[]{label, metric, summary});
+                    allResults.add(new Object[]{label, distanceFunction, summary});
                 }
             }
 
             // --- Comparison table ---
             System.out.println();
-            System.out.printf("| %-14s | %-11s | %-26s | %-6s | %-26s | %-6s | %-6s |%n", "Index Type", "Metric", "Top 1 Result", "Score", "Top 2 Result", "Score", "Diff");
-            System.out.printf("|%s|%s|%s|%s|%s|%s|%s|%n", "-".repeat(16), "-".repeat(13), "-".repeat(28), "-".repeat(8), "-".repeat(28), "-".repeat(8), "-".repeat(8));
+            System.out.printf("| %-14s | %-17s | %-26s | %-6s | %-26s | %-6s | %-6s |%n", "Index Type", "Distance Function", "Top 1 Result", "Score", "Top 2 Result", "Score", "Diff");
+            System.out.printf("|%s|%s|%s|%s|%s|%s|%s|%n", "-".repeat(16), "-".repeat(19), "-".repeat(28), "-".repeat(8), "-".repeat(28), "-".repeat(8), "-".repeat(8));
             for (Object[] entry : allResults) {
                 String label = (String) entry[0];
-                String metric = (String) entry[1];
+                String distanceFunction = (String) entry[1];
                 QuerySummary summary = (QuerySummary) entry[2];
                 String top1Name = summary.results().size() > 0 ? truncate(summary.results().get(0).hotelName(), 26) : "";
                 double top1Score = summary.results().size() > 0 ? summary.results().get(0).score() : 0.0;
                 String top2Name = summary.results().size() > 1 ? truncate(summary.results().get(1).hotelName(), 26) : "";
                 double top2Score = summary.results().size() > 1 ? summary.results().get(1).score() : 0.0;
                 double diff = top1Score - top2Score;
-                System.out.printf("| %-14s | %-11s | %-26s | %.4f | %-26s | %.4f | %.4f |%n", label, metric, top1Name, top1Score, top2Name, top2Score, diff);
+                System.out.printf("| %-14s | %-17s | %-26s | %.4f | %-26s | %.4f | %.4f |%n", label, distanceFunction, top1Name, top1Score, top2Name, top2Score, diff);
             }
 
             System.out.println("\nComplete");

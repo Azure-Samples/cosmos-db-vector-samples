@@ -71,7 +71,7 @@ func main() {
 
 	fmt.Printf("\nQuery: %q\n", cfg.QueryText)
 	fmt.Printf("Embedding generated (%d dimensions)\n", len(embedding))
-	fmt.Println("\nRunning search (top 3 results for each metric)...")
+	fmt.Println("\nRunning search (top 3 results for each distance function)...")
 
 	type metricResult struct {
 		containerName string
@@ -80,7 +80,7 @@ func main() {
 		ru            float64
 	}
 	var allResults []metricResult
-	metrics := []string{"cosine", "euclidean", "dotproduct"}
+	distanceFunctions := []string{"Cosine", "DotProduct", "Euclidean"}
 
 	for _, containerName := range cfg.ContainerNames {
 		containerClient, err := databaseClient.NewContainer(containerName)
@@ -88,15 +88,15 @@ func main() {
 			log.Fatalf("failed to access container %q: %v", containerName, err)
 		}
 
-		for _, metric := range metrics {
-			results, ru, err := QueryTopHotels(ctx, containerClient, embedding, cfg.EmbeddingFieldName, metric)
+		for _, distanceFunction := range distanceFunctions {
+			results, ru, err := QueryTopHotels(ctx, containerClient, embedding, cfg.EmbeddingFieldName, distanceFunction)
 			if err != nil {
 				log.Fatalf("container %q query failed: %v", containerName, err)
 			}
 			fmt.Printf("  ✓ %s queried (%.2f RUs)\n", containerName, ru)
 			allResults = append(allResults, metricResult{
 				containerName: containerName,
-				metric:        metric,
+				metric:        distanceFunction,
 				results:       results,
 				ru:            ru,
 			})

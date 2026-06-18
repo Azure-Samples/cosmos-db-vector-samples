@@ -157,15 +157,15 @@ def query_top_matches(
     container_name: str,
     config: SampleConfig,
     query_embedding: Sequence[float],
-    metric: str = "cosine",
+    distance_function: str = "Cosine",
 ) -> QuerySummary:
     embedding_field = validate_field_name(config.embedding_field_name)
     query_text = (
         "SELECT TOP @topK c.HotelId, c.HotelName, c.Description, "
-        "VectorDistance(c.{0}, @embedding, false) AS similarityScore "
+        'VectorDistance(c.{0}, @embedding, false, {{distanceFunction: "{1}"}}) AS similarityScore '
         "FROM c WHERE c.PartitionKey = @partitionKey "
-        "ORDER BY VectorDistance(c.{0}, @embedding, false)"
-    ).format(embedding_field)
+        'ORDER BY VectorDistance(c.{0}, @embedding, false, {{distanceFunction: "{1}"}})'
+    ).format(embedding_field, distance_function)
 
     raw_results = list(
         container.query_items(

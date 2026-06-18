@@ -60,38 +60,38 @@ def main() -> None:
         )
         print("\nQuery: \"{0}\"".format(config.query_text))
         print("Embedding generated ({0} dimensions)".format(len(query_embedding)))
-        print("\nRunning searches (top {0} results for each metric)...".format(config.top_count))
+        print("\nRunning searches (top {0} results for each distance function)...".format(config.top_count))
 
-        metrics = ["cosine", "euclidean", "dotproduct"]
+        distance_functions = ["Cosine", "DotProduct", "Euclidean"]
         all_results = []
         for container_name in target_containers(config):
             container = database.get_container_client(container_name)
-            for metric in metrics:
+            for distance_function in distance_functions:
                 summary = query_top_matches(
                     container=container,
                     container_name=container_name,
                     config=config,
                     query_embedding=query_embedding,
-                    metric=metric,
+                    distance_function=distance_function,
                 )
                 label = algorithm_label(container_name)
                 print("  ✓ {0} queried ({1:.2f} RUs)".format(container_name, summary.request_charge))
-                all_results.append((label, metric, summary))
+                all_results.append((label, distance_function, summary))
 
         # --- Comparison table ---
         print()
         print("| {0:<14} | {1:<11} | {2:<26} | {3:<6} | {4:<26} | {5:<6} | {6:<6} |".format(
-            "Index Type", "Metric", "Top 1 Result", "Score", "Top 2 Result", "Score", "Diff"))
+            "Index Type", "Distance Function", "Top 1 Result", "Score", "Top 2 Result", "Score", "Diff"))
         print("|{0}|{1}|{2}|{3}|{4}|{5}|{6}|".format(
-            "-" * 16, "-" * 13, "-" * 28, "-" * 8, "-" * 28, "-" * 8, "-" * 8))
-        for label, metric, summary in all_results:
+            "-" * 16, "-" * 19, "-" * 28, "-" * 8, "-" * 28, "-" * 8, "-" * 8))
+        for label, distance_function, summary in all_results:
             top1_name = summary.results[0].hotel_name if len(summary.results) > 0 else ""
             top1_score = summary.results[0].score if len(summary.results) > 0 else 0.0
             top2_name = summary.results[1].hotel_name if len(summary.results) > 1 else ""
             top2_score = summary.results[1].score if len(summary.results) > 1 else 0.0
             diff = top1_score - top2_score
-            print("| {0:<14} | {1:<11} | {2:<26} | {3:.4f} | {4:<26} | {5:.4f} | {6:.4f} |".format(
-                label, metric, top1_name[:26], top1_score, top2_name[:26], top2_score, diff))
+            print("| {0:<14} | {1:<17} | {2:<26} | {3:.4f} | {4:<26} | {5:.4f} | {6:.4f} |".format(
+                label, distance_function, top1_name[:26], top1_score, top2_name[:26], top2_score, diff))
 
         print("\nComplete")
     except Exception as error:  # pragma: no cover - integration error path
