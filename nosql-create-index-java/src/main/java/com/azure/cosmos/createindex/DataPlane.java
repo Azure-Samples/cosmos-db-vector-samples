@@ -125,11 +125,12 @@ public final class DataPlane {
             CosmosContainer container,
             String containerName,
             SampleConfig config,
-            List<Float> queryEmbedding) {
+            List<Float> queryEmbedding,
+            String metric) {
         String embeddingField = validateFieldName(config.embeddingFieldName());
         String queryText = "SELECT TOP @topK c.HotelId, c.HotelName, c.Description, "
-                + "VectorDistance(c." + embeddingField + ", @embedding) AS SimilarityScore "
-                + "FROM c ORDER BY VectorDistance(c." + embeddingField + ", @embedding)";
+                + "VectorDistance(c." + embeddingField + ", @embedding, false) AS SimilarityScore "
+                + "FROM c ORDER BY VectorDistance(c." + embeddingField + ", @embedding, false)";
 
         SqlQuerySpec querySpec = new SqlQuerySpec(
                 queryText,

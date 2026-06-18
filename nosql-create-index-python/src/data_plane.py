@@ -157,13 +157,14 @@ def query_top_matches(
     container_name: str,
     config: SampleConfig,
     query_embedding: Sequence[float],
+    metric: str = "cosine",
 ) -> QuerySummary:
     embedding_field = validate_field_name(config.embedding_field_name)
     query_text = (
         "SELECT TOP @topK c.HotelId, c.HotelName, c.Description, "
-        "VectorDistance(c.{0}, @embedding) AS similarityScore "
+        "VectorDistance(c.{0}, @embedding, false) AS similarityScore "
         "FROM c WHERE c.PartitionKey = @partitionKey "
-        "ORDER BY VectorDistance(c.{0}, @embedding)"
+        "ORDER BY VectorDistance(c.{0}, @embedding, false)"
     ).format(embedding_field)
 
     raw_results = list(
@@ -223,6 +224,33 @@ def validate_field_name(field_name: str) -> str:
             "Invalid embedding field name: {0}".format(field_name)
         )
     return field_name
+
+
+def diagnose_resources(cosmos_client: CosmosClient, config: SampleConfig) -> None:
+    """Diagnose whether database and containers exist."""
+    print("\n=== Diagnostic Check ===")
+    print("Cosmos DB Endpoint: {0}".format(config.cosmos_endpoint))
+    print("Database name: {0}".format(config.database_name))
+    
+    try:
+        database = cosmos_client.get_database_client(config.database_name)
+        # Try to list containers
+        containers = list(database.list_containers())
+        print("✓ Database '{0}' exists".format(config.database_name))
+        print("  Containers found: {0}".format(len(containers)))
+        for container in containers:
+            print("    - {0}".format(container["id"]))
+        
+        if len(containers) == 0:
+            print("  ⚠ WARNING: Database exists but has NO containers.")
+    except CosmosHttpResponseError as e:
+        if e.status_code == 404:
+            print("✗ Database '{0}' NOT FOUND (404)".format(config.database_name))
+            print("  Create the database with: azd provision")
+        else:
+            print("✗ Error accessing database: {0} ({1})".format(e.message, e.status_code))
+    except Exception as e:
+        print("✗ Unexpected error checking database: {0}".format(str(e)))
 
 
 def wrap_runtime_error(error: Exception) -> RuntimeError:

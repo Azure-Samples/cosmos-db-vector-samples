@@ -134,11 +134,12 @@ public static partial class DataPlane
         string containerName,
         SampleConfig config,
         IReadOnlyList<float> queryEmbedding,
+        string metric,
         CancellationToken cancellationToken)
     {
         var embeddingFieldName = ValidateEmbeddingFieldName(config.EmbeddingFieldName);
         var queryDefinition = new QueryDefinition(
-                $"SELECT TOP @topK c.HotelId, c.HotelName, c.Description, VectorDistance(c.{embeddingFieldName}, @embedding) AS SimilarityScore FROM c ORDER BY VectorDistance(c.{embeddingFieldName}, @embedding)")
+                $"SELECT TOP @topK c.HotelId, c.HotelName, c.Description, VectorDistance(c.{embeddingFieldName}, @embedding, false) AS SimilarityScore FROM c ORDER BY VectorDistance(c.{embeddingFieldName}, @embedding, false)")
             .WithParameter("@topK", config.TopCount)
             .WithParameter("@embedding", queryEmbedding);
 

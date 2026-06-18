@@ -222,7 +222,7 @@ func InsertDocuments(ctx context.Context, container *azcosmos.ContainerClient, d
 	return stats, nil
 }
 
-func QueryTopHotels(ctx context.Context, container *azcosmos.ContainerClient, embedding []float32, embeddingField string) ([]VectorSearchResult, float64, error) {
+func QueryTopHotels(ctx context.Context, container *azcosmos.ContainerClient, embedding []float32, embeddingField, metric string) ([]VectorSearchResult, float64, error) {
 	if !validIdentifier.MatchString(embeddingField) {
 		return nil, 0, fmt.Errorf("invalid embedding field name: %q", embeddingField)
 	}
@@ -236,9 +236,9 @@ func QueryTopHotels(ctx context.Context, container *azcosmos.ContainerClient, em
 		c.HotelId,
 		c.HotelName,
 		c.Description,
-		VectorDistance(c.%s, @embedding) AS score
+		VectorDistance(c.%s, @embedding, false) AS score
 	FROM c
-	ORDER BY VectorDistance(c.%s, @embedding)`, embeddingField, embeddingField)
+	ORDER BY VectorDistance(c.%s, @embedding, false)`, embeddingField, embeddingField)
 
 	options := azcosmos.QueryOptions{
 		QueryParameters: []azcosmos.QueryParameter{{
@@ -276,7 +276,7 @@ func RunContainerScenario(ctx context.Context, container *azcosmos.ContainerClie
 		return nil, err
 	}
 
-	results, requestCharge, err := QueryTopHotels(ctx, container, embedding, embeddingField)
+	results, requestCharge, err := QueryTopHotels(ctx, container, embedding, embeddingField, "cosine")
 	if err != nil {
 		return nil, err
 	}
