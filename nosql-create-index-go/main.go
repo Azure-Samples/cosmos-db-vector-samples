@@ -71,15 +71,16 @@ func main() {
 
 	fmt.Printf("\nQuery: %q\n", cfg.QueryText)
 	fmt.Printf("Embedding generated (%d dimensions)\n", len(embedding))
-	fmt.Println("\nRunning searches (top 5 results)...")
+	fmt.Println("\nRunning search (top 3 results for each metric)...")
 
-	type containerResult struct {
-		name    string
-		label   string
-		results []VectorSearchResult
-		ru      float64
+	type metricResult struct {
+		containerName string
+		metric        string
+		results       []VectorSearchResult
+		ru            float64
 	}
-	var allResults []containerResult
+	var allResults []metricResult
+	metrics := []string{"cosine", "euclidean", "dotproduct"}
 
 	for _, containerName := range cfg.ContainerNames {
 		containerClient, err := databaseClient.NewContainer(containerName)
@@ -87,34 +88,40 @@ func main() {
 			log.Fatalf("failed to access container %q: %v", containerName, err)
 		}
 
-		results, ru, err := QueryTopHotels(ctx, containerClient, embedding, cfg.EmbeddingFieldName)
-		if err != nil {
-			log.Fatalf("container %q query failed: %v", containerName, err)
+		for _, metric := range metrics {
+			results, ru, err := QueryTopHotels(ctx, containerClient, embedding, cfg.EmbeddingFieldName, metric)
+			if err != nil {
+				log.Fatalf("container %q query failed: %v", containerName, err)
+			}
+			fmt.Printf("  ✓ %s queried (%.2f RUs)\n", containerName, ru)
+			allResults = append(allResults, metricResult{
+				containerName: containerName,
+				metric:        metric,
+				results:       results,
+				ru:            ru,
+			})
 		}
-		label := algorithmLabel(containerName)
-		fmt.Printf("  ✓ %s queried (%.2f RUs)\n", containerName, ru)
-		allResults = append(allResults, containerResult{name: containerName, label: label, results: results, ru: ru})
 	}
 
-	// --- Comparison table ---
+	// --- Comparison table (before cleanup) ---
 	fmt.Println()
-	fmt.Printf("| %-14s | %-26s | %-6s | %-26s | %-6s | %-6s |\n", "Algorithm", "Top 1 Result", "Score", "Top 2 Result", "Score", "Diff")
-	fmt.Printf("|%s|%s|%s|%s|%s|%s|\n", dashes(16), dashes(28), dashes(8), dashes(28), dashes(8), dashes(8))
-	for _, cr := range allResults {
+	fmt.Printf("| %-20s | %-10s | %-26s | %-6s | %-26s | %-6s | %-6s |\n", "Container", "Metric", "Top 1 Result", "Score", "Top 2 Result", "Score", "Diff")
+	fmt.Printf("|%s|%s|%s|%s|%s|%s|%s|\n", dashes(22), dashes(12), dashes(28), dashes(8), dashes(28), dashes(8), dashes(8))
+	for _, mr := range allResults {
 		top1Name := ""
 		top1Score := 0.0
 		top2Name := ""
 		top2Score := 0.0
-		if len(cr.results) > 0 {
-			top1Name = cr.results[0].HotelName
-			top1Score = cr.results[0].Score
+		if len(mr.results) > 0 {
+			top1Name = mr.results[0].HotelName
+			top1Score = mr.results[0].Score
 		}
-		if len(cr.results) > 1 {
-			top2Name = cr.results[1].HotelName
-			top2Score = cr.results[1].Score
+		if len(mr.results) > 1 {
+			top2Name = mr.results[1].HotelName
+			top2Score = mr.results[1].Score
 		}
 		diff := top1Score - top2Score
-		fmt.Printf("| %-14s | %-26s | %.4f | %-26s | %.4f | %.4f |\n", cr.label, truncate(top1Name, 26), top1Score, truncate(top2Name, 26), top2Score, diff)
+		fmt.Printf("| %-20s | %-10s | %-26s | %.4f | %-26s | %.4f | %.4f |\n", truncate(mr.containerName, 20), mr.metric, truncate(top1Name, 26), top1Score, truncate(top2Name, 26), top2Score, diff)
 	}
 
 	fmt.Println("\nComplete")

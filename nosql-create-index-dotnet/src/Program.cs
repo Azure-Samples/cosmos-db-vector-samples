@@ -41,30 +41,34 @@ try
     var queryEmbedding = await DataPlane.GenerateEmbeddingAsync(azureOpenAIClient, config, config.QueryText, cancellationToken);
     Console.WriteLine($"\nQuery: \"{config.QueryText}\"");
     Console.WriteLine($"Embedding generated ({queryEmbedding.Length} dimensions)");
-    Console.WriteLine($"\nRunning searches (top 5 results)...");
+    Console.WriteLine($"\nRunning searches (top {config.TopCount} results for each metric)...");
 
-    var allResults = new List<(string Label, DataPlane.QuerySummary Summary)>();
+    var metrics = new[] { "cosine", "euclidean", "dotproduct" };
+    var allResults = new List<(string Label, string Metric, DataPlane.QuerySummary Summary)>();
     foreach (var containerName in Config.TargetContainers(config))
     {
         var container = database.GetContainer(containerName);
-        var summary = await DataPlane.QueryTopMatchesAsync(container, containerName, config, queryEmbedding, cancellationToken);
-        var label = Config.AlgorithmLabel(containerName);
-        Console.WriteLine($"  \u2713 {containerName} queried ({summary.RequestCharge:F2} RUs)");
-        allResults.Add((label, summary));
+        foreach (var metric in metrics)
+        {
+            var summary = await DataPlane.QueryTopMatchesAsync(container, containerName, config, queryEmbedding, metric, cancellationToken);
+            var label = Config.AlgorithmLabel(containerName);
+            Console.WriteLine($"  ✓ {containerName} queried ({summary.RequestCharge:F2} RUs)");
+            allResults.Add((label, metric, summary));
+        }
     }
 
     // --- Comparison table ---
     Console.WriteLine();
-    Console.WriteLine($"| {"Algorithm",-14} | {"Top 1 Result",-26} | {"Score",-6} | {"Top 2 Result",-26} | {"Score",-6} | {"Diff",-6} |");
-    Console.WriteLine($"|{new string('-', 16)}|{new string('-', 28)}|{new string('-', 8)}|{new string('-', 28)}|{new string('-', 8)}|{new string('-', 8)}|");
-    foreach (var (label, summary) in allResults)
+    Console.WriteLine($"| {"Index Type",-14} | {"Metric",-11} | {"Top 1 Result",-26} | {"Score",-6} | {"Top 2 Result",-26} | {"Score",-6} | {"Diff",-6} |");
+    Console.WriteLine($"|{new string('-', 16)}|{new string('-', 13)}|{new string('-', 28)}|{new string('-', 8)}|{new string('-', 28)}|{new string('-', 8)}|{new string('-', 8)}|");
+    foreach (var (label, metric, summary) in allResults)
     {
         var top1Name = summary.Results.Count > 0 ? Shorten(summary.Results[0].HotelName, 26) : "";
         var top1Score = summary.Results.Count > 0 ? summary.Results[0].SimilarityScore : 0.0;
         var top2Name = summary.Results.Count > 1 ? Shorten(summary.Results[1].HotelName, 26) : "";
         var top2Score = summary.Results.Count > 1 ? summary.Results[1].SimilarityScore : 0.0;
         var diff = top1Score - top2Score;
-        Console.WriteLine($"| {label,-14} | {top1Name,-26} | {top1Score:F4} | {top2Name,-26} | {top2Score:F4} | {diff:F4} |");
+        Console.WriteLine($"| {label,-14} | {metric,-11} | {top1Name,-26} | {top1Score:F4} | {top2Name,-26} | {top2Score:F4} | {diff:F4} |");
     }
 
     Console.WriteLine("\nComplete");
