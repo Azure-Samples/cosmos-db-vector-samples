@@ -280,6 +280,32 @@ Each language implementation MUST have these modules:
 | **Data Plane** | Ingestion + queries | `data_plane.py` / `data-plane.ts` / `data_plane.go` / `DataPlane.java` / `DataPlane.cs` |
 | **Main Orchestration** | Lifecycle: diagnostic → create → ingest → query → cleanup | `index.py` / `index.ts` / `index.go` / `Index.java` / `Program.cs` |
 
+### 5.3a Control Plane: Partition Key Strategy
+
+**Decision:** Sample code (Control Plane) owns container creation and sets partition key to `/Region`.
+
+**Rationale:**
+- Samples demonstrate full container creation lifecycle with correct partition key strategy (region-based batching)
+- Allows each language to set up containers without hardcoding partition key in infrastructure
+- Aligns with the region-based batch ingestion pattern (Section 4.3)
+
+**Control Plane Responsibility:**
+```
+Phase 1 - Container Creation:
+1. Create HotelsCreateIndex database (if not exists)
+2. Create hotels_diskann container:
+   - Partition key path: /Region (not /HotelId)
+   - Vector embedding path: /embedding
+   - Vector index type: DiskANN
+3. Create hotels_quantizedflat container:
+   - Partition key path: /Region (not /HotelId)
+   - Vector embedding path: /embedding
+   - Vector index type: QuantizedFlat
+4. Return container references to Data Plane
+```
+
+**Important:** Do NOT let infrastructure (bicep) pre-create these containers. The samples must own creation to demonstrate the complete lifecycle.
+
 ### 5.4 Execution Phases
 
 **Phase 0: Diagnostics**
@@ -295,6 +321,8 @@ Each language implementation MUST have these modules:
 For each index type (DiskANN, QuantizedFlat):
   - Delete existing container (idempotent)
   - Create new container with vector index (immutable spec)
+  - Set partition key to /Region
+  - Set vector embedding path to /embedding
   - Verify index creation successful
   - Note: Vector index cannot be modified after creation
 ```
