@@ -46,16 +46,37 @@ public static partial class DataPlane
         var documents = await JsonSerializer.DeserializeAsync<List<HotelDocument>>(stream, JsonOptions, cancellationToken)
             ?? throw new InvalidOperationException("The shared hotel dataset must be a JSON array.");
 
-        foreach (var document in documents)
+        var validRegions = new HashSet<string> { "Northeast", "Midwest", "South", "West" };
+        var regionsFound = new HashSet<string>();
+
+        for (int idx = 0; idx < documents.Count; idx++)
         {
+            var document = documents[idx];
             if (string.IsNullOrWhiteSpace(document.HotelId))
             {
                 throw new InvalidOperationException("Each hotel document must include a non-empty HotelId.");
             }
 
+            // Validate Region property
+            if (string.IsNullOrWhiteSpace(document.Region))
+            {
+                throw new InvalidOperationException(
+                    $"Document at index {idx} (HotelId={document.HotelId}) missing Region property");
+            }
+            if (!validRegions.Contains(document.Region))
+            {
+                throw new InvalidOperationException(
+                    $"Document at index {idx} (HotelId={document.HotelId}) has unexpected Region '{document.Region}'");
+            }
+            regionsFound.Add(document.Region);
+
             document.Id = document.HotelId;
-            document.HotelId = "hotels";  // Partition key value (uniform for all docs)
+            // Do NOT overwrite Region — keep it as-is for partition key
         }
+
+        // Log region distribution
+        var regions = regionsFound.OrderBy(r => r).ToList();
+        Console.WriteLine($"✓ Region validation passed. Found regions: {string.Join(", ", regions)}");
 
         return documents;
     }
@@ -98,9 +119,15 @@ public static partial class DataPlane
         {
             try
             {
+                // Extract Region from document for partition key
+                if (string.IsNullOrWhiteSpace(document.Region))
+                {
+                    throw new InvalidOperationException($"Document {document.HotelId} missing Region property");
+                }
+
                 var response = await container.CreateItemAsync(
                     document,
-                    new PartitionKey(document.HotelId),
+                    new PartitionKey(document.Region),  // Use Region as partition key
                     new ItemRequestOptions { EnableContentResponseOnWrite = false },
                     cancellationToken);
 

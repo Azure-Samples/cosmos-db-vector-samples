@@ -20,6 +20,9 @@ public sealed class HotelDocument
     [JsonPropertyName("DescriptionVector")]
     public float[]? DescriptionVector { get; set; }
 
+    [JsonPropertyName("Region")]
+    public string Region { get; set; } = string.Empty;
+
     [JsonExtensionData]
     public Dictionary<string, JsonElement>? AdditionalProperties { get; set; }
 }
