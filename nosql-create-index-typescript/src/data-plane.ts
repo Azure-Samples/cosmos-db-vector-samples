@@ -92,6 +92,55 @@ export async function verifyEmbeddingDimensions(
 // ---------------------------------------------------------------------------
 // Step 4 — Insert documents from data file (bulk)
 // ---------------------------------------------------------------------------
+
+/**
+ * Validate that all documents have a Region property and it's one of the expected regions.
+ */
+function validateRegionProperty(documents: any[]): void {
+  const expectedRegions = new Set(["Northeast", "Midwest", "South", "West"]);
+  const regionsFound = new Set<string>();
+
+  for (let idx = 0; idx < documents.length; idx++) {
+    const doc = documents[idx];
+    if (!doc.Region) {
+      throw new Error(
+        `Document at index ${idx} (HotelId=${doc.HotelId || "unknown"}) missing Region property`
+      );
+    }
+    const region = doc.Region;
+    regionsFound.add(region);
+    if (!expectedRegions.has(region)) {
+      throw new Error(
+        `Document at index ${idx} has unexpected Region '${region}'. Expected one of: ${Array.from(expectedRegions).join(", ")}`
+      );
+    }
+  }
+
+  console.log(`✓ Region validation passed. Found regions: ${Array.from(regionsFound).sort().join(", ")}`);
+}
+
+/**
+ * Group documents by Region partition key.
+ */
+function groupByRegion(documents: any[]): Map<string, any[]> {
+  const docsByRegion = new Map<string, any[]>();
+
+  for (const doc of documents) {
+    const region = doc.Region;
+    if (!docsByRegion.has(region)) {
+      docsByRegion.set(region, []);
+    }
+    docsByRegion.get(region)!.push(doc);
+  }
+
+  // Log region grouping summary
+  for (const [region, docs] of Array.from(docsByRegion.entries()).sort()) {
+    console.log(`  Region '${region}': ${docs.length} documents`);
+  }
+
+  return docsByRegion;
+}
+
 export async function insertDocuments(
   container: Container,
   config: SampleConfig,
@@ -118,40 +167,48 @@ export async function insertDocuments(
     return { total: data.length, inserted: 0, skipped: countResult[0] };
   }
 
-  // Build bulk operations — SDK handles batching and throttling
-  console.log(`Processing in batches of ${data.length}...`);
-  const operations = data.map((item) => ({
-    operationType: BulkOperationType.Create,
-    resourceBody: {
-      id: item.HotelId,
-      ...item,
-      HotelId: "hotels",  // Partition key value (uniform for all docs in sample)
-    },
-    partitionKey: ["hotels"],
-  }));
+  // Validate Region property and group by region
+  validateRegionProperty(data);
+  const docsByRegion = groupByRegion(data);
 
-  const response = await container.items.executeBulkOperations(operations);
-
+  console.log(`Processing by region...`);
   let inserted = 0;
   let failed = 0;
   let totalRU = 0;
 
-  if (response) {
-    for (const result of response) {
-      const code = result.response?.statusCode ?? result.error?.code;
-      const ru = result.response?.requestCharge ?? 0;
+  // Batch ingest by region (one batch per region)
+  for (const [region, regionDocs] of docsByRegion) {
+    const operations = regionDocs.map((item) => ({
+      operationType: BulkOperationType.Create,
+      resourceBody: item,  // Keep original document structure, including Region and id (HotelId)
+      partitionKey: [region],
+    }));
 
-      if (code && Number(code) >= 200 && Number(code) < 300) {
-        inserted++;
-      } else if (Number(code) === 409) {
-        inserted++;
-      } else if (result.error) {
-        failed++;
-      } else {
-        inserted++;
+    const response = await container.items.executeBulkOperations(operations);
+
+    if (response) {
+      for (const result of response) {
+        const code = result.response?.statusCode ?? result.error?.code;
+        const ru = result.response?.requestCharge ?? 0;
+
+        if (code && Number(code) >= 200 && Number(code) < 300) {
+          inserted++;
+        } else if (Number(code) === 409) {
+          inserted++;
+        } else if (result.error) {
+          failed++;
+        } else {
+          inserted++;
+        }
+        totalRU += ru;
       }
-      totalRU += ru;
     }
+  }
+
+  if (failed > 0) {
+    throw new Error(
+      `Batch ingestion incomplete: ${failed} documents failed in container '${actualContainerName}'.`
+    );
   }
 
   console.log(`  \u2713 ${actualContainerName}: ${inserted} inserted (${totalRU.toFixed(2)} RUs)`);
@@ -233,11 +290,11 @@ export async function vectorQuery(
 
 /**
  * Delete all sample-inserted documents from a container.
- * Uses a query to find all documents and delete them in bulk.
+ * Uses a query to find all documents and delete them in bulk by Region.
  */
 export async function clearContainerData(container: Container): Promise<void> {
   const querySpec = {
-    query: "SELECT c.id FROM c",
+    query: "SELECT c.id, c.Region FROM c",
   };
 
   const { resources: itemsToDelete } = await container.items.query(querySpec).fetchAll();
@@ -249,7 +306,7 @@ export async function clearContainerData(container: Container): Promise<void> {
   const operations = itemsToDelete.map((item: any) => ({
     operationType: BulkOperationType.Delete,
     id: item.id,
-    partitionKey: [item.id],
+    partitionKey: [item.Region],  // Use Region as partition key
   }));
 
   await container.items.bulk(operations);
