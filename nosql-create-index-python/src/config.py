@@ -22,7 +22,7 @@ REQUIRED_ENV_VARS = (
 DEFAULT_QUERY_TEXT = "hotel near the ocean"
 DEFAULT_EMBEDDING_API_VERSION = "2024-08-01-preview"
 DEFAULT_EMBEDDING_MODEL = "text-embedding-3-small"
-DEFAULT_EMBEDDING_FIELD = "DescriptionVector"
+DEFAULT_EMBEDDING_FIELD = "embedding"
 DEFAULT_PARTITION_KEY_VALUE = "hotels"
 DEFAULT_TOP_COUNT = 5
 EXPECTED_DIMENSIONS = 1536
@@ -82,7 +82,7 @@ def load_config(env: Optional[Mapping[str, str]] = None) -> SampleConfig:
 
     data_file_value = _clean(environment.get("DATA_FILE_WITH_VECTORS"))
     if not data_file_value:
-        data_file_value = "./data/HotelsData_toCosmosDB_Vector.json"
+        data_file_value = "./data/HotelsData_toCosmosDB_Vector_byRegion.json"
 
     return SampleConfig(
         cosmos_endpoint=_clean(environment.get("AZURE_COSMOSDB_ENDPOINT")) or "",

@@ -31,9 +31,9 @@ public sealed record SampleConfig(
 public static class Config
 {
     private const string ProjectFileName = "nosql-create-index-dotnet.csproj";
-    private const string DefaultDataFile = "./data/HotelsData_toCosmosDB_Vector.json";
+    private const string DefaultDataFile = "./data/HotelsData_toCosmosDB_Vector_byRegion.json";
     private const string DefaultQueryText = "hotel near the ocean";
-    private const string DefaultEmbeddingFieldName = "DescriptionVector";
+    private const string DefaultEmbeddingFieldName = "embedding";
     private const string DefaultOpenAIEmbeddingApiVersion = "2024-08-01-preview";
 
     public static SampleConfig Load()

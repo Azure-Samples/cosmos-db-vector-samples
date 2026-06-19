@@ -14,8 +14,8 @@ public final class Config {
     private static final String DEFAULT_DATABASE_NAME = "HotelsCreateIndex";
     private static final String DEFAULT_API_VERSION = "2024-08-01-preview";
     private static final String DEFAULT_QUERY_TEXT = "hotel near the ocean";
-    private static final String DEFAULT_DATA_FILE = "./data/HotelsData_toCosmosDB_Vector.json";
-    private static final String DEFAULT_EMBEDDING_FIELD = "DescriptionVector";
+    private static final String DEFAULT_DATA_FILE = "./data/HotelsData_toCosmosDB_Vector_byRegion.json";
+    private static final String DEFAULT_EMBEDDING_FIELD = "embedding";
     private static final int DEFAULT_TOP_COUNT = 5;
     private static final int EXPECTED_DIMENSIONS = 1536;
 

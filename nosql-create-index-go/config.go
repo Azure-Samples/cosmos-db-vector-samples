@@ -12,9 +12,9 @@ import (
 const (
 	diskANNContainer                = "hotels_diskann"
 	quantizedFlatContainer          = "hotels_quantizedflat"
-	embeddingFieldName              = "DescriptionVector"
+	embeddingFieldName              = "embedding"
 	embeddingDimensions             = 1536
-	partitionKeyFieldName           = "HotelId"
+	partitionKeyFieldName           = "Region"
 	partitionKeyFieldValue          = "hotels"
 	defaultQueryText                = "hotel near the ocean"
 	azureOpenAIEmbeddingsAPIVersion = "2024-02-01"
@@ -79,7 +79,7 @@ func LoadConfigFromEnv(getenv func(string) string) (*Config, error) {
 		cfg.DatabaseName = "HotelsCreateIndex"
 	}
 	if cfg.DataFileWithVectors == "" {
-		cfg.DataFileWithVectors = filepath.Join(".", "data", "HotelsData_toCosmosDB_Vector.json")
+		cfg.DataFileWithVectors = filepath.Join(".", "data", "HotelsData_toCosmosDB_Vector_byRegion.json")
 	}
 
 	if err := validateConfig(cfg); err != nil {
