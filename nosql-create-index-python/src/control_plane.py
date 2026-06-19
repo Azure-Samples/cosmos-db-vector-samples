@@ -109,7 +109,7 @@ def create_containers(credential: DefaultAzureCredential, config: SampleConfig) 
         # Build container payload with vector index
         container_payload = _build_container_payload(
             container_name=container_config["container_name"],
-            partition_key_path="/HotelId",
+            partition_key_path="/Region",
             embedding_field=embedding_path,
             dimensions=config.expected_dimensions,
             index_type=container_config["type"]

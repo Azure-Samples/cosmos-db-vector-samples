@@ -82,7 +82,7 @@ export async function createContainer(
         resource: {
           id: indexConfig.containerName,
           partitionKey: {
-            paths: ["/HotelId"],
+            paths: ["/Region"],
             kind: "MultiHash",
             version: 2,
           },
