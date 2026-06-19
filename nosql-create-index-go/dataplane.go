@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"os"
 	"regexp"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -71,17 +72,40 @@ func LoadDocuments(path string) ([]map[string]any, error) {
 		return nil, fmt.Errorf("parse data file: %w", err)
 	}
 
+	// Validate Region property and prepare documents
+	validRegions := map[string]bool{"Northeast": true, "Midwest": true, "South": true, "West": true}
+	regionsFound := make(map[string]bool)
+
 	prepared := make([]map[string]any, 0, len(documents))
-	for _, doc := range documents {
+	for idx, doc := range documents {
 		hotelID, _ := doc["HotelId"].(string)
 		if strings.TrimSpace(hotelID) == "" {
 			return nil, errors.New("every document must include a non-empty HotelId")
 		}
+
+		// Validate Region property
+		region, ok := doc["Region"].(string)
+		if !ok || strings.TrimSpace(region) == "" {
+			return nil, fmt.Errorf("document at index %d (HotelId=%s) missing or invalid Region property", idx, hotelID)
+		}
+		if !validRegions[region] {
+			return nil, fmt.Errorf("document at index %d (HotelId=%s) has unexpected Region '%s'", idx, hotelID, region)
+		}
+		regionsFound[region] = true
+
 		preparedDoc := cloneDocument(doc)
 		preparedDoc["id"] = hotelID
-		preparedDoc[partitionKeyFieldName] = partitionKeyFieldValue
+		// Do NOT overwrite Region — keep it as-is for partition key
 		prepared = append(prepared, preparedDoc)
 	}
+
+	// Log region distribution
+	regions := make([]string, 0, len(regionsFound))
+	for r := range regionsFound {
+		regions = append(regions, r)
+	}
+	sort.Strings(regions)
+	fmt.Printf("✓ Region validation passed. Found regions: %s\n", strings.Join(regions, ", "))
 
 	return prepared, nil
 }
@@ -160,7 +184,6 @@ func GenerateEmbedding(ctx context.Context, httpClient *http.Client, credential 
 
 func InsertDocuments(ctx context.Context, container *azcosmos.ContainerClient, documents []map[string]any) (InsertStats, error) {
 	stats := InsertStats{Total: len(documents)}
-	partitionKey := azcosmos.NewPartitionKey().AppendString(partitionKeyFieldValue)
 	semaphore := make(chan struct{}, maxInsertConcurrency)
 	var mu sync.Mutex
 	var wg sync.WaitGroup
@@ -172,6 +195,16 @@ func InsertDocuments(ctx context.Context, container *azcosmos.ContainerClient, d
 			defer wg.Done()
 			semaphore <- struct{}{}
 			defer func() { <-semaphore }()
+
+			// Extract Region from document for partition key
+			region, ok := document["Region"].(string)
+			if !ok {
+				mu.Lock()
+				stats.Failed++
+				mu.Unlock()
+				return
+			}
+			partitionKey := azcosmos.NewPartitionKey().AppendString(region)
 
 			body, err := json.Marshal(document)
 			if err != nil {
@@ -248,27 +281,46 @@ func QueryTopHotels(ctx context.Context, container *azcosmos.ContainerClient, em
 		}},
 	}
 
-	partitionKey := azcosmos.NewPartitionKey().AppendString(partitionKeyFieldValue)
-	pager := container.NewQueryItemsPager(queryText, partitionKey, &options)
+	// Query each region separately and combine results
+	regions := []string{"Northeast", "Midwest", "South", "West"}
+	allResults := make([]VectorSearchResult, 0, 50)
+	var totalRequestCharge float64
 
-	results := make([]VectorSearchResult, 0, 5)
-	var requestCharge float64
-	for pager.More() {
-		page, err := pager.NextPage(ctx)
-		if err != nil {
-			return nil, requestCharge, fmt.Errorf("query vector results: %w", err)
-		}
-		requestCharge += float64(page.RequestCharge)
-		for _, item := range page.Items {
-			var result VectorSearchResult
-			if err := json.Unmarshal(item, &result); err != nil {
-				return nil, requestCharge, fmt.Errorf("parse vector search result: %w", err)
+	for _, region := range regions {
+		partitionKey := azcosmos.NewPartitionKey().AppendString(region)
+		pager := container.NewQueryItemsPager(queryText, partitionKey, &options)
+
+		for pager.More() {
+			page, err := pager.NextPage(ctx)
+			if err != nil {
+				// If region has no documents, continue to next region
+				continue
 			}
-			results = append(results, result)
+			totalRequestCharge += float64(page.RequestCharge)
+			for _, item := range page.Items {
+				var result VectorSearchResult
+				if err := json.Unmarshal(item, &result); err != nil {
+					return nil, totalRequestCharge, fmt.Errorf("parse vector search result: %w", err)
+				}
+				allResults = append(allResults, result)
+			}
 		}
 	}
 
-	return results, requestCharge, nil
+	// Sort results by score (descending) and return top 5
+	// Sort by score descending
+	for i := 0; i < len(allResults) && i < 5; i++ {
+		for j := i + 1; j < len(allResults); j++ {
+			if allResults[j].Score > allResults[i].Score {
+				allResults[i], allResults[j] = allResults[j], allResults[i]
+			}
+		}
+	}
+	if len(allResults) > 5 {
+		allResults = allResults[:5]
+	}
+
+	return allResults, totalRequestCharge, nil
 }
 
 func RunContainerScenario(ctx context.Context, container *azcosmos.ContainerClient, containerName string, documents []map[string]any, embedding []float32, embeddingField string) (*ContainerRunResult, error) {
