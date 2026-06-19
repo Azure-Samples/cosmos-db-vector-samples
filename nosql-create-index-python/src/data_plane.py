@@ -115,14 +115,20 @@ def ingest_documents(container: Any, container_name: str, documents: Sequence[Di
             request_charge=0.0,
         )
 
+    # Validate Region property and group by region
+    _validate_region_property(documents)
+    docs_by_region = _group_by_region(documents)
+    
     inserted_documents = 0
     failed_documents = 0
     total_request_charge = 0.0
-    for batch in _chunked(documents, BATCH_SIZE):
-        operations = [("upsert", (document,)) for document in batch]
+    
+    # Batch ingest by region (one batch per region)
+    for region, region_docs in docs_by_region.items():
+        operations = [("upsert", (document,)) for document in region_docs]
         results = container.execute_item_batch(
             batch_operations=operations,
-            partition_key="hotels",
+            partition_key=region,
         )
         for result in results:
             if int(result.get("statusCode", 0)) < 300:
@@ -265,15 +271,16 @@ def wrap_runtime_error(error: Exception) -> RuntimeError:
 
 
 def _document_count(container: Any) -> int:
-    query = "SELECT VALUE COUNT(1) FROM c WHERE c.HotelId = @hotelId"
-    results = list(
-        container.query_items(
-            query=query,
-            parameters=[{"name": "@hotelId", "value": "hotels"}],
-            partition_key="hotels",
-        )
-    )
-    return int(results[0]) if results else 0
+    """Check if container already has documents (by checking any partition)."""
+    # Since we use Region as partition key, we'll check a simple count
+    # If the container has any documents, we assume it was already populated
+    try:
+        query = "SELECT VALUE COUNT(1) FROM c OFFSET 0 LIMIT 1"
+        results = list(container.query_items(query=query))
+        return int(results[0]) if results else 0
+    except Exception:
+        # If query fails, assume container is empty or needs initialization
+        return 0
 
 
 def _chunked(values: Sequence[Dict[str, Any]], size: int) -> Iterable[Sequence[Dict[str, Any]]]:
@@ -290,6 +297,42 @@ def _request_charge(container: Any) -> float:
         return 0.0
 
 
+def _validate_region_property(documents: Sequence[Dict[str, Any]]) -> None:
+    """Validate that all documents have Region property."""
+    expected_regions = {"Northeast", "Midwest", "South", "West"}
+    regions_found = set()
+    
+    for idx, doc in enumerate(documents):
+        if "Region" not in doc:
+            raise ValueError(
+                f"Document at index {idx} (HotelId={doc.get('HotelId', 'unknown')}) missing Region property"
+            )
+        region = doc["Region"]
+        regions_found.add(region)
+        if region not in expected_regions:
+            raise ValueError(
+                f"Document at index {idx} has unexpected Region '{region}'. Expected one of: {expected_regions}"
+            )
+    
+    print(f"✓ Region validation passed. Found regions: {sorted(regions_found)}")
+
+
+def _group_by_region(documents: Sequence[Dict[str, Any]]) -> Dict[str, List[Dict[str, Any]]]:
+    """Group documents by Region partition key."""
+    docs_by_region = {}
+    for doc in documents:
+        region = doc.get("Region")
+        if region not in docs_by_region:
+            docs_by_region[region] = []
+        docs_by_region[region].append(doc)
+    
+    # Log region grouping summary
+    for region, docs in sorted(docs_by_region.items()):
+        print(f"  Region '{region}': {len(docs)} documents")
+    
+    return docs_by_region
+
+
 def _shorten(value: str, limit: int = 110) -> str:
     if len(value) <= limit:
         return value
@@ -299,10 +342,12 @@ def _shorten(value: str, limit: int = 110) -> str:
 def clear_container_data(container: Any) -> None:
     """Delete all sample-inserted documents from a container."""
     try:
-        query = "SELECT c.id FROM c"
-        items_to_delete = list(container.query_items(query=query, partition_key="hotels"))
+        query = "SELECT c.id, c.Region FROM c"
+        items_to_delete = list(container.query_items(query=query))
         
         for item in items_to_delete:
-            container.delete_item(item["id"], partition_key="hotels")
+            region = item.get("Region")
+            if region:
+                container.delete_item(item["id"], partition_key=region)
     except Exception as e:
         raise RuntimeError("Failed to clear container data: {0}".format(str(e)))
