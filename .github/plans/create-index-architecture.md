@@ -5,6 +5,7 @@
 **Applies to:** All 5 language implementations (Python, TypeScript, Go, Java, .NET)  
 **Branch:** `diberry/article-2`  
 **Implementation Target:** 5 organized commits  
+**Data File:** `HotelsData_toCosmosDB_Vector_byRegion.json` (50 documents, Region-partitioned)
 
 ---
 
@@ -125,14 +126,15 @@ Cosmos DB transactional batch operations require all items in the batch to share
 2. **Production Scalability:** Each region is a logical partition that can grow independently (10 GB, 10,000 RU/s per partition)
 3. **Realistic Query Patterns:** Queries naturally filter by region (WHERE Region = @region)
 
-**Data Distribution:**
+**Data Distribution (Actual - 50 Hotel Documents):**
 ```
-Region: Northeast  → Documents 1-12  (batch 1)
-Region: Midwest    → Documents 13-25 (batch 2)
-Region: South      → Documents 26-38 (batch 3)
-Region: West       → Documents 39-50 (batch 4)
+File: data/HotelsData_toCosmosDB_Vector_byRegion.json
+Region: Northeast  → 10 documents (New York, Boston, Philadelphia, Washington)
+Region: Midwest    → 10 documents (Chicago, Denver)
+Region: South      → 14 documents (Dallas, Houston, Austin, Miami, New Orleans, Atlanta, Nashville)
+Region: West       → 16 documents (Seattle, Los Angeles, San Francisco, Phoenix, Las Vegas, Portland, San Diego)
 
-Total: 4 batch operations
+Total: 4 batch operations (one per region)
 ```
 
 **Implementation:**
@@ -229,7 +231,37 @@ Account name: db-dib-cos-4bpmnkpp4662v4
 Pattern: https://{account-name}.documents.azure.com:443/
 ```
 
-### 5.2 Code Module Structure
+### 5.2 Data File Specification
+
+**Required Data File:**
+```
+File Name: HotelsData_toCosmosDB_Vector_byRegion.json
+Location: ../data/HotelsData_toCosmosDB_Vector_byRegion.json (relative to sample src/)
+Format: JSON array of 50 hotel documents
+Region Distribution: Pre-partitioned by region (Northeast, Midwest, South, West)
+Required Properties: Each document MUST have:
+  - HotelId (string) — unique identifier
+  - HotelName (string)
+  - Region (string) — "Northeast" | "Midwest" | "South" | "West"
+  - embedding (array of 1536 floats) — pre-generated vector from Azure OpenAI
+  - All other properties: Address, Rooms, Tags, Rating, etc.
+```
+
+**Region Breakdown (Actual Distribution):**
+```
+Northeast: 10 documents (cities: New York, Boston, Philadelphia, Washington)
+Midwest:   10 documents (cities: Chicago, Denver)
+South:     14 documents (cities: Dallas, Houston, Austin, Miami, New Orleans, Atlanta, Nashville)
+West:      16 documents (cities: Seattle, Los Angeles, San Francisco, Phoenix, Las Vegas, Portland, San Diego)
+```
+
+**Usage in Code:**
+- Load this file at the start of Phase 2 (Ingestion)
+- Do NOT compute regions dynamically — use the Region property as-is
+- Group loaded documents by Region for batch ingestion
+- Verify all documents have the Region property before processing
+
+### 5.3 Code Module Structure
 
 Each language implementation MUST have these modules:
 
@@ -240,7 +272,7 @@ Each language implementation MUST have these modules:
 | **Data Plane** | Ingestion + queries | `data_plane.py` / `data-plane.ts` / `data_plane.go` / `DataPlane.java` / `DataPlane.cs` |
 | **Main Orchestration** | Lifecycle: diagnostic → create → ingest → query → cleanup | `index.py` / `index.ts` / `index.go` / `Index.java` / `Program.cs` |
 
-### 5.3 Execution Phases
+### 5.4 Execution Phases
 
 **Phase 0: Diagnostics**
 ```
@@ -261,7 +293,8 @@ For each index type (DiskANN, QuantizedFlat):
 
 **Phase 2: Ingestion (Batch by Region)**
 ```
-Load JSON file (50 hotel documents with Region field)
+Load JSON file: ../data/HotelsData_toCosmosDB_Vector_byRegion.json (50 hotel documents with Region field)
+Verify Region property exists on each document
 Group documents by Region (Northeast, Midwest, South, West)
 For each container:
   For each region:
