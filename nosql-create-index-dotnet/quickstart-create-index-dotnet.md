@@ -43,6 +43,20 @@ git clone https://github.com/Azure-Samples/cosmos-db-vector-samples.git
 cd cosmos-db-vector-samples/nosql-create-index-dotnet
 ```
 
+## Set up the data directory
+
+The sample requires `HotelsData_toCosmosDB_Vector.json` to be in a local `data/` subdirectory:
+
+```bash
+# Create the data directory if it doesn't exist
+mkdir -p ./data
+
+# Copy the data file from the shared location
+cp ../HotelsData_toCosmosDB_Vector.json ./data/
+```
+
+The sample expects the data file at: `./data/HotelsData_toCosmosDB_Vector.json`
+
 ## Configure environment variables
 
 1. Configure environment variables.
@@ -69,7 +83,7 @@ cd cosmos-db-vector-samples/nosql-create-index-dotnet
    AZURE_OPENAI_EMBEDDING_DEPLOYMENT="text-embedding-3-small"
    AZURE_OPENAI_EMBEDDING_API_VERSION="2024-08-01-preview"
    VECTOR_ALGORITHM=""
-   DATA_FILE_WITH_VECTORS="..\data\HotelsData_toCosmosDB_Vector.json"
+   DATA_FILE_WITH_VECTORS="./data/HotelsData_toCosmosDB_Vector.json"
    ```
 
 Leave `AZURE_COSMOSDB_CONTAINER_NAME` and `VECTOR_ALGORITHM` empty to run both containers. If you set `VECTOR_ALGORITHM`, use one of these values:

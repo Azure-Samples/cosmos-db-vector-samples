@@ -43,6 +43,20 @@ git clone https://github.com/Azure-Samples/cosmos-db-vector-samples.git
 cd cosmos-db-vector-samples/nosql-create-index-go
 ```
 
+## Set up the data directory
+
+The sample requires `HotelsData_toCosmosDB_Vector.json` to be in a local `data/` subdirectory:
+
+```bash
+# Create the data directory if it doesn't exist
+mkdir -p ./data
+
+# Copy the data file from the shared location
+cp ../HotelsData_toCosmosDB_Vector.json ./data/
+```
+
+The sample expects the data file at: `./data/HotelsData_toCosmosDB_Vector.json`
+
 ## Configure environment variables
 
 Configure environment variables.
@@ -68,7 +82,7 @@ AZURE_COSMOSDB_CONTAINER_NAME=
 AZURE_OPENAI_EMBEDDING_ENDPOINT=https://YOUR-AOAI-RESOURCE.openai.azure.com/
 AZURE_OPENAI_EMBEDDING_DEPLOYMENT=text-embedding-3-small
 VECTOR_ALGORITHM=
-DATA_FILE_WITH_VECTORS=data/HotelsData_toCosmosDB_Vector.json
+DATA_FILE_WITH_VECTORS=./data/HotelsData_toCosmosDB_Vector.json
 ```
 
 Set `VECTOR_ALGORITHM` to `diskann`, `quantizedflat`, or leave it empty to run against both containers. When `AZURE_COSMOSDB_CONTAINER_NAME` and `VECTOR_ALGORITHM` are both empty, the sample iterates over both known containers (`hotels_diskann` and `hotels_quantizedflat`).

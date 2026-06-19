@@ -39,6 +39,20 @@ git clone https://github.com/Azure-Samples/cosmos-db-vector-samples.git
 cd cosmos-db-vector-samples/nosql-create-index-java
 ```
 
+## Set up the data directory
+
+The sample requires `HotelsData_toCosmosDB_Vector.json` to be in a local `data/` subdirectory:
+
+```bash
+# Create the data directory if it doesn't exist
+mkdir -p ./data
+
+# Copy the data file from the shared location
+cp ../HotelsData_toCosmosDB_Vector.json ./data/
+```
+
+The sample expects the data file at: `./data/HotelsData_toCosmosDB_Vector.json`
+
 ## Understand what the sample does
 
 Azure Cosmos DB for NoSQL follows an infra-first pattern for vector indexes:
@@ -79,7 +93,7 @@ The Java code does **not** create containers or indexes. Vector indexes for Azur
    AZURE_OPENAI_EMBEDDING_DEPLOYMENT="text-embedding-3-small"
    AZURE_OPENAI_EMBEDDING_API_VERSION="2024-08-01-preview"
    VECTOR_ALGORITHM=""
-   DATA_FILE_WITH_VECTORS="..\\data\\HotelsData_toCosmosDB_Vector.json"
+   DATA_FILE_WITH_VECTORS="./data/HotelsData_toCosmosDB_Vector.json"
    ```
 
 Leave `AZURE_COSMOSDB_CONTAINER_NAME` and `VECTOR_ALGORITHM` empty to run both containers. Set `VECTOR_ALGORITHM` to `diskann` or `quantizedflat` if you want to target one algorithm.

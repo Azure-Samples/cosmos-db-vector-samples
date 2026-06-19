@@ -31,6 +31,20 @@ git clone https://github.com/Azure-Samples/cosmos-db-vector-samples.git
 cd cosmos-db-vector-samples/nosql-create-index-typescript
 ```
 
+## Set up the data directory
+
+The sample requires `HotelsData_toCosmosDB_Vector.json` to be in a local `data/` subdirectory:
+
+```bash
+# Create the data directory if it doesn't exist
+mkdir -p ./data
+
+# Copy the data file from the shared location
+cp ../HotelsData_toCosmosDB_Vector.json ./data/
+```
+
+The sample expects the data file at: `./data/HotelsData_toCosmosDB_Vector.json`
+
 ## Overview: What you'll build
 
 This sample is split into three layers.
