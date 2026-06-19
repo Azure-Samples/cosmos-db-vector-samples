@@ -1,0 +1,1139 @@
+# Create-Index Samples: Architecture & Design
+
+**Document Purpose:** Comprehensive architectural design for the create-index samples suite, with emphasis on Article 2's distance function comparison feature.
+
+**Applies to:** All 5 language implementations (Python, TypeScript, Go, Java, .NET)  
+**Branch:** `diberry/article-2`  
+**Implementation Target:** 5 organized commits  
+
+---
+
+## 1. Executive Summary
+
+The create-index samples demonstrate how **vector index creation decisions directly impact query results**. Unlike vector-search samples (which focus on "how to query"), create-index samples answer **"how do index type and distance function choice affect results?"**
+
+**Article 2** specifically compares:
+- **2 index types:** DiskANN (approximate) vs QuantizedFlat (exact)
+- **3 distance functions:** Cosine, DotProduct, Euclidean
+- **Same query & data:** 6 scenarios to show how the same embedding produces different scores and rankings
+
+**Key Learning:** Distance function choice is NOT purely academic—it changes score magnitudes, ranking, and relevance interpretation.
+
+---
+
+## 2. Problem Domain
+
+### 2.1 Why This Matters
+
+Developers choosing vector indexes face critical decisions:
+1. **Index Type:** Approximate (DiskANN) vs Exact (QuantizedFlat)?
+2. **Distance Function:** Which metric fits my data (similarity vs distance)?
+3. **Score Interpretation:** Does higher mean better, or lower?
+
+**Current Gap:** Existing samples show *how to query* but not *how choices affect results*.
+
+### 2.2 Article 2 Solution
+
+Demonstrate all combinations end-to-end, showing:
+- Identical embedding produces different scores under different metrics
+- Ranking can differ between index types
+- Score magnitudes vary (Cosine: 0–1, Euclidean: 0.97–0.98 for this data)
+
+---
+
+## 3. Architecture Overview
+
+### 3.1 Data Flow
+
+```
+Query Text
+    ↓
+[Azure OpenAI Embedding API]
+    ↓
+Embedding Vector (1536 dimensions)
+    ↓
+[Parallel Queries]
+├─ Query Container A (DiskANN) ─┬─ Distance: Cosine
+│                                ├─ Distance: DotProduct
+│                                └─ Distance: Euclidean
+└─ Query Container B (QuantizedFlat) ─┬─ Distance: Cosine
+                                      ├─ Distance: DotProduct
+                                      └─ Distance: Euclidean
+    ↓
+Results Comparison Table
+(6 rows × 3 columns: index × distance function)
+```
+
+### 3.2 Core Components
+
+| Component | Purpose | Details |
+|-----------|---------|---------|
+| **Database** | Top-level container (pre-existing or created) | `HotelsCreateIndex` database (may exist empty; code tolerates this) |
+| **Container Layer** | Physical index storage (**created by code in Phase 1**) | 2 containers: `hotels_diskann`, `hotels_quantizedflat` (DO NOT pre-create) |
+| **Index Definition Layer** | Vector index configuration (**created by code in Phase 1**) | Immutable spec: dimensions=1536, distance=cosine (at creation); queryable with all 3 functions |
+| **Ingestion Layer** | Load hotel documents (**Phase 2**) | 50 documents, parallel ingestion to both containers |
+| **Query Layer** | Run 6 distance function scenarios (**Phase 3**) | Individual queries; results collected in table |
+| **Output Layer** | Results comparison (**Phase 3-4**) | Unified ASCII format across all languages |
+
+---
+
+## 4. Technical Design
+
+### 4.1 Index Type Specification
+
+#### DiskANN (Approximate Nearest Neighbor)
+- **Trade-off:** Speed vs accuracy (sacrifices some precision for query performance)
+- **Use case:** Large datasets, real-time latency constraints
+- **Index Parameters:**
+  - Type: `VectorSearchCompositePath` with algorithm `DISK_ANN`
+  - Dimensions: 1536 (text-embedding-3-small)
+  - Distance function at creation: Cosine (immutable)
+
+#### QuantizedFlat (Exact)
+- **Trade-off:** Precision vs memory (brute-force exact search)
+- **Use case:** Smaller datasets, correctness critical
+- **Index Parameters:**
+  - Type: `VectorSearchCompositePath` with algorithm `EXHAUSTIVE_KNN`
+  - Quantization: Enabled (vector compression to 1 byte per dimension)
+  - Dimensions: 1536 (text-embedding-3-small)
+  - Distance function at creation: Cosine (immutable)
+
+**Key Constraint:** Distance function is **immutable after index creation**. All 3 distance functions must be queryable on the SAME index (Cosmos DB supports this via query-time parameter).
+
+### 4.2 Distance Function Specification
+
+All three metrics operate on the same indexed vectors but produce different score interpretations:
+
+| Function | Type | Score Range | Interpretation | Formula | Use Case |
+|----------|------|-------------|-----------------|---------|----------|
+| **Cosine** | Similarity | [0, 1] | Higher = more similar | `dot(a,b) / (‖a‖·‖b‖)` | Text/semantic similarity |
+| **DotProduct** | Similarity | [0, 1] | Higher = more similar | `∑(aᵢ·bᵢ)` | Normalized embeddings |
+| **Euclidean** | Distance | [0, ∞) | Lower = more similar | `√(∑(aᵢ-bᵢ)²)` | Magnitude-aware distance |
+
+**Score Magnitudes in Practice** (verified on hotel data):
+- Cosine & DotProduct: 0.5–0.6 range (similarity metrics)
+- Euclidean: 0.97–0.98 range (distance metric, inverted interpretation)
+
+### 4.3 Ingestion Pattern
+
+**Design Decision: Individual Upserts (NOT Batch Operations)**
+
+**Rationale:**
+Cosmos DB transactional batch operations require all items in the batch to share the SAME partition key value. Our hotel documents have **different HotelId values** (one per document, and HotelId IS the partition key).
+
+```
+Document 1: HotelId="hotel-1" ← partition key value A
+Document 2: HotelId="hotel-2" ← partition key value B
+...
+Document 50: HotelId="hotel-50" ← partition key value AZ
+
+Batch operation requirement: ALL items must have partition key = same value
+Result: Batch operation fails with "400 Bad Request - Request being sent is invalid"
+```
+
+**Solution:**
+```
+Loop over 50 documents:
+  for doc in documents:
+    upsert_item(container, doc)  // Individual operation, any partition key
+```
+
+**Performance Impact:**
+- DiskANN container: ~6,805 RUs for 50 documents (~136 RUs per document)
+- QuantizedFlat container: ~3,402 RUs for 50 documents (~68 RUs per document)
+- Query cost: ~5.3 RUs per query (negligible vs ingestion)
+
+### 4.4 Query Pattern
+
+**Design Decision: Cross-Partition Query with Query-Time Distance Function Parameter**
+
+```sql
+SELECT TOP 5
+  c.HotelId,
+  c.HotelName,
+  VectorDistance(c.embedding, @userEmbedding, false, {'distanceFunction': 'Cosine'}) AS SimilarityScore
+FROM c
+WHERE VectorDistance(c.embedding, @userEmbedding, false, {'distanceFunction': 'Cosine'}) > 0.0
+ORDER BY SimilarityScore DESC
+```
+
+**Key Parameters:**
+- `enable_cross_partition_query=True`: Search all partition keys (no `WHERE c.HotelId = @id` filter)
+- `distanceFunction` parameter: Changed per query (Cosine → DotProduct → Euclidean)
+- `VectorDistance(..., false, {...})`: The second parameter (`false`) means "don't use 2nd best"; distance function config is in the third parameter
+
+**Why All 3 Functions on Same Index?**
+Cosmos DB allows querying with different distance functions on the same immutable index. The distance function is applied at query time, not index time (even though the index is created with a default distance function).
+
+---
+
+## 5. Implementation Pattern (Language-Agnostic)
+
+### 5.1 Configuration Management
+
+**Hard Constraint:** Environment variables come from Azure Developer CLI (`azd`), which follows a specific naming convention. Code must adapt to `azd` naming; never modify the `.env` file that `azd` produces.
+
+**Environment Variable Mapping:**
+
+| azd Env Variable | Code Uses | Extracted From | Notes |
+|------------------|-----------|-----------------|-------|
+| `AZURE_SUBSCRIPTION_ID` | subscription_id | Direct | Required for ARM SDK |
+| `AZURE_RESOURCE_GROUP` | resource_group | Direct | Required for ARM SDK |
+| `AZURE_COSMOS_ENDPOINT` | cosmos_endpoint | Direct | Full endpoint URL |
+| `AZURE_COSMOS_KEY` | cosmos_key | Inferred from connection string OR ARM SDK | Read-only key |
+| `AZURE_OPENAI_ENDPOINT` | openai_endpoint | Direct | Azure OpenAI resource |
+| `AZURE_OPENAI_KEY` | openai_key | Direct | Azure OpenAI API key |
+| `AZURE_OPENAI_EMBEDDING_DEPLOYMENT` | embedding_deployment | Direct | Deployment name (e.g., "text-embedding-3-small") |
+
+**Account Name Extraction:**
+The Cosmos DB account name is NOT provided as an env var. Extract from the endpoint URL:
+```
+Endpoint URL: https://db-dib-cos-4bpmnkpp4662v4.documents.azure.com:443/
+Account name: db-dib-cos-4bpmnkpp4662v4
+
+Pattern: https://{account-name}.documents.azure.com:443/
+```
+
+### 5.2 Code Module Structure
+
+Each language implementation MUST have these modules:
+
+| Module | Responsibility | File Name (example) |
+|--------|-----------------|-------------------|
+| **Config** | Environment variable mapping, validation, account name extraction | `config.py` / `config.ts` / `config.go` / `Config.java` / `Config.cs` |
+| **Control Plane** | ARM SDK operations (create containers, setup indexes) | `control_plane.py` / `control-plane.ts` / `control_plane.go` / `ControlPlane.java` / `ControlPlane.cs` |
+| **Data Plane** | Ingestion + queries | `data_plane.py` / `data-plane.ts` / `data_plane.go` / `DataPlane.java` / `DataPlane.cs` |
+| **Main Orchestration** | Lifecycle: diagnostic → create → ingest → query → cleanup | `index.py` / `index.ts` / `index.go` / `Index.java` / `Program.cs` |
+
+### 5.3 Execution Phases
+
+**Phase 0: Diagnostics**
+```
+- Verify Cosmos DB database exists
+- Check container count (should be 0 for fresh start)
+- Validate Azure OpenAI connectivity
+- Display configuration (redact secrets)
+```
+
+**Phase 1: Container Creation**
+```
+For each index type (DiskANN, QuantizedFlat):
+  - Delete existing container (idempotent)
+  - Create new container with vector index (immutable spec)
+  - Verify index creation successful
+  - Note: Vector index cannot be modified after creation
+```
+
+**Phase 2: Ingestion**
+```
+Load JSON file (50 hotel documents)
+For each container:
+  For each document:
+    - Generate embedding (Azure OpenAI API)
+    - Upsert to container (individual operation)
+    - Track RU cost
+  Report total RU usage
+```
+
+**Phase 3: Query**
+```
+User query text: "hotel near the ocean"
+For each index type:
+  For each distance function (Cosine, DotProduct, Euclidean):
+    - Convert query text to embedding
+    - Execute cross-partition vector query
+    - Collect top 5 results
+    - Format results row
+Compile 6-row results table
+```
+
+**Phase 4: Cleanup**
+```
+- Delete all documents from each container
+- Delete containers
+- Delete database
+- Verify cleanup successful
+```
+
+---
+
+## 6. Output Format & Verification
+
+### 6.1 Output Structure
+
+All 5 languages MUST produce identical structure:
+
+```
+=== Diagnostic Check ===
+Cosmos DB Endpoint: {endpoint}
+Database name: {database}
+[OK] Database 'HotelsCreateIndex' exists
+  Containers found: {count}
+Using Azure OpenAI Embedding Deployment/Model: {deployment/model}
+Reading JSON file from {filepath}
+Loaded {document_count} documents
+
+=== Phase 1: Create Containers ===
+[Container creation details for DiskANN and QuantizedFlat]
+
+=== Phase 2: Ingest Data ===
+Processing {batch_count} batches of {batch_size}...
+  [OK] {container_name}: {doc_count} inserted ({ru_cost} RUs)
+
+=== Phase 3: Query & Compare Distance Functions ===
+Query: "{user_query}"
+Embedding generated ({dimension_count} dimensions)
+
+Running searches (top 5 results for each distance function)...
+  [OK] {container_name} + {distance_function} queried ({query_ru_cost} RUs)
+
+=== Results: Distance Function Comparison ===
+
+| Index Type     | Distance Function | Top 1 Result      | Score | Top 2 Result | Score | Δ Score |
+|----------------|-------------------|-------------------|-------|--------------|-------|---------|
+| DiskANN        | Cosine            | {hotel_1}         | 0.58  | {hotel_2}    | 0.52  | 0.06    |
+| DiskANN        | DotProduct        | {hotel_1}         | 0.58  | {hotel_2}    | 0.52  | 0.06    |
+| DiskANN        | Euclidean         | {hotel_1}         | 0.98  | {hotel_2}    | 0.97  | 0.01    |
+| QuantizedFlat  | Cosine            | {hotel_1}         | 0.58  | {hotel_2}    | 0.52  | 0.06    |
+| QuantizedFlat  | DotProduct        | {hotel_1}         | 0.58  | {hotel_2}    | 0.52  | 0.06    |
+| QuantizedFlat  | Euclidean         | {hotel_1}         | 0.98  | {hotel_2}    | 0.97  | 0.01    |
+
+=== Phase 4: Cleanup ===
+[Deletion details]
+
+Exit: 0
+```
+
+### 6.2 Character Set Constraint
+
+- **ASCII only** (no Unicode checkmarks, no emoji)
+- Use `[OK]`, `[ERROR]`, `[SKIPPED]` for status indicators
+- Reason: Portability across terminals and CI/CD environments
+
+### 6.3 Cross-Language Verification
+
+All 5 languages must produce **identical results** for:
+- Container creation (same index specs)
+- Top-ranked results (same HotelId, same ranking)
+- Score magnitudes (slight floating-point variation acceptable, <0.01 difference)
+
+Verification command (after all implementations complete):
+```bash
+diff <(python output.txt) <(typescript output.txt)
+diff <(python output.txt) <(go output.txt)
+# etc. for Java and .NET
+```
+
+---
+
+## 7. Implementation Roadmap
+
+### 7.1 Five Organized Commits
+
+| Commit # | Scope | Files (All Languages) | Changes |
+|----------|-------|----------------------|---------|
+| **1** | Config & Environment Mapping | `src/config.*` (all 5 langs) | Implement azd env var mapping, account name extraction, validation |
+| **2** | Control Plane Setup | `src/control_plane.*` (all 5 langs) | Container creation, vector index specs (DiskANN, QuantizedFlat), immutability handling |
+| **3** | Ingestion & Query | `src/data_plane.*` (all 5 langs) | Individual upsert pattern, cross-partition queries, all 3 distance functions |
+| **4** | Output Formatting | `src/index.*` + output files (all 5 langs) | Results table, ASCII-only, cross-language consistency, capture to file |
+| **5** | Documentation & Samples | `.github/plans/`, `README.md`, output samples | Update this plan, add verified outputs for each language to repo |
+
+### 7.2 Implementation Status
+
+| Language | Config | Control | Ingestion/Query | Output | Status |
+|----------|--------|---------|-----------------|--------|--------|
+| **Python** | ✅ Complete | ✅ Complete | ✅ Complete | ✅ Complete | **VERIFIED** |
+| **TypeScript** | ⏳ Pending | ⏳ Pending | ⏳ Pending | ⏳ Pending | TODO |
+| **Go** | ⏳ Pending | ⏳ Pending | ⏳ Pending | ⏳ Pending | TODO |
+| **Java** | ⏳ Pending | ⏳ Pending | ⏳ Pending | ⏳ Pending | TODO |
+| **.NET** | ⏳ Pending | ⏳ Pending | ⏳ Pending | ⏳ Pending | TODO |
+
+---
+
+## 8. Verified Python Baseline (Reference Implementation)
+
+The Python implementation has been validated end-to-end with all 6 distance function scenarios working correctly. This baseline serves as the source of truth for propagating fixes to the other 4 languages.
+
+### 8.1 Verified Results Table
+
+Query: "hotel near the ocean"  
+Embedding Model: text-embedding-3-small (1536 dimensions)  
+Data: 50 hotel documents
+
+| Index Type | Distance Function | Top 1 Result | Score | Top 2 Result | Score | Score Difference | Notes |
+|------------|-------------------|--------------|-------|--------------|-------|------------------|-------|
+| DiskANN | Cosine | Windy Ocean Motel | 0.5268 | Ocean Water Resort & Spa | 0.5177 | 0.0091 | Similarity metric: higher = better |
+| DiskANN | DotProduct | Windy Ocean Motel | 0.5271 | Ocean Water Resort & Spa | 0.5179 | 0.0091 | Dot product: higher = better |
+| DiskANN | Euclidean | Windy Ocean Motel | 0.9730 | Ocean Water Resort & Spa | 0.9823 | -0.0093 | Distance metric: lower = better (inverted) |
+| QuantizedFlat | Cosine | Windy Ocean Motel | 0.5268 | Ocean Water Resort & Spa | 0.5177 | 0.0091 | Index type: same results as DiskANN |
+| QuantizedFlat | DotProduct | Windy Ocean Motel | 0.5271 | Ocean Water Resort & Spa | 0.5179 | 0.0091 | Consistent across index types |
+| QuantizedFlat | Euclidean | Windy Ocean Motel | 0.9730 | Ocean Water Resort & Spa | 0.9823 | -0.0093 | Euclidean: magnitude-aware distance |
+
+### 8.2 Baseline Observations
+
+**Finding 1: Ranking Consistency Across Distance Functions**
+- All 6 scenarios return "Windy Ocean Motel" as top result
+- Top 2 consistent: "Ocean Water Resort & Spa"
+- Conclusion: For this specific query, distance function choice doesn't change ranking, only score magnitudes
+
+**Finding 2: Score Magnitude Interpretation**
+- Similarity metrics (Cosine, DotProduct): 0.5–0.6 range (higher is more similar)
+- Distance metric (Euclidean): 0.97–0.98 range (lower is more similar; inverted interpretation)
+- Reason: Euclidean measures distance between points; similarity metrics measure orientation/correlation
+
+**Finding 3: Index Type Impact**
+- DiskANN (approximate) and QuantizedFlat (exact) produce **identical** top results
+- RU cost differs significantly (DiskANN: ~136 RUs/doc, QuantizedFlat: ~68 RUs/doc)
+- Implication: For smaller datasets, exact search is viable and cheaper
+
+**Finding 4: Operational Metrics**
+- Container creation: ~1 second each
+- Ingestion (individual upserts): ~6,805 RUs (DiskANN), ~3,402 RUs (QuantizedFlat)
+- Query execution: ~5.3 RUs per query (negligible vs. ingestion)
+- Embedding generation: Handled by Azure OpenAI, cost varies by tokens
+
+### 8.3 Why Python Baseline Is the Reference
+
+1. **All constraints validated:** Environment variables, partition keys, ingestion patterns, queries all working
+2. **All 6 scenarios tested:** Each distance function works independently and produces expected results
+3. **Output format finalized:** Results table structure, ASCII-only format, cross-language consistency template established
+4. **RU costs tracked:** Baseline for understanding performance implications of each operation
+5. **Reproducible:** Same query produces same results; same data; same Azure services
+
+---
+
+## 9. Known Constraints & Decisions
+
+### 9.1 Individual Upserts (Confirmed: Batch Upsert NOT Viable)
+
+**Question:** Why not use batch upsert instead of individual upserts?
+
+**Answer:** Cosmos DB transactional batch operations require ALL items in the batch to share the SAME partition key value. Our hotel documents have unique HotelId values (1 unique HotelId per document, 50 documents total). Therefore, batch upsert is NOT an option for this data model.
+
+**Test Results (test-batch-api.py):**
+- Total documents: 50
+- Unique partition keys (HotelId values): 50
+- Conclusion: Cannot use transactional batch (requires same partition key)
+
+**Pattern Used:** Individual `upsert_item()` calls in a loop.
+
+**Alignment:** This pattern is proven in the vector-search samples (`nosql-vector-search-python/src/utils.py` lines 148-161).
+
+**Trade-off:** Slower ingestion (50 roundtrips instead of 1), but required by the partition key architecture.
+
+**Performance Impact:** Negligible for 50 documents. Each upsert costs ~68-136 RUs (depending on index type).
+
+**Why Vector-Search Samples Also Use Individual Upserts:** Same reasoning—documents have different partition keys.
+
+**Alternative Approaches (Not Applicable Here):**
+1. Batch by partition key — group documents by HotelId, then batch each group separately (overcomplicated for 50 unique values)
+2. Bulk operations API (if available) — not supported in current Python SDK
+3. Direct ingestion mode — not applicable to this scenario
+
+
+### 9.2 Why Cross-Partition Queries
+
+**Constraint:** Our query doesn't filter by partition key (`WHERE HotelId = X`).
+**Reason:** We want to search ALL hotels for semantic similarity, not just one hotel's partition.
+**Solution:** `enable_cross_partition_query=True` in Cosmos DB client.
+**Cost:** Slightly higher RU consumption (each partition must be scanned).
+
+### 9.3 Why All Distance Functions on Same Index
+
+**Constraint:** Vector index is immutable after creation; distance function specified at creation time.
+**Question:** How can we query 3 different distance functions on the same index?
+**Answer:** Distance function is **also** a query-time parameter in Cosmos DB. The index is created with a default (Cosine), but queries can override it.
+**Implementation:** `VectorDistance(..., false, {'distanceFunction': 'Cosine|DotProduct|Euclidean'})` in SQL.
+
+### 9.4 Why No Separate Environment Variables
+
+**Constraint:** Azure Developer CLI (`azd`) doesn't provide `AZURE_COSMOSDB_ACCOUNT_NAME`.
+**Alternative:** Extract from endpoint URL pattern (`https://{account-name}.documents.azure.com:443/`).
+**Benefit:** No need to add new env vars to `.env`; code adapts to azd naming convention.
+**Implementation:** Regex or string splitting in config module.
+
+---
+
+## 10. Risk Mitigation & Testing Strategy
+
+### 10.1 Pre-Implementation Validation
+
+Before implementing any language:
+1. **Run Python baseline** to confirm environment is set up correctly
+2. **Verify all 6 scenarios** produce output
+3. **Check RU costs** are within expected range
+4. **Confirm embedding API** is accessible
+
+### 10.2 Per-Language Quality Checks
+
+After implementing each language:
+1. **Exit code:** Must be 0 (success)
+2. **Output format:** Exact ASCII match with Python output (minus runtime variations)
+3. **Top results:** Same HotelIds, same ranking as Python
+4. **Scores:** Floating-point tolerance ±0.01 acceptable
+5. **RU costs:** Within 10% of Python baseline
+
+### 10.3 Cross-Language Verification
+
+After all 5 languages complete:
+```bash
+# Example: diff all outputs
+for lang in python typescript go java dotnet; do
+  echo "Checking $lang..."
+  diff <(tail -15 output-python.txt) <(tail -15 output-$lang.txt)
+done
+```
+
+---
+
+## 11. Architecture Decision Records (ADRs)
+
+### ADR-001: Individual Upserts (Tested & Confirmed Pattern)
+**Date:** 2026-06-19  
+**Status:** ACCEPTED (CONFIRMED BY TEST)  
+**Decision:** Use individual `upsert_item()` calls in a loop instead of transactional batch operations.  
+**Rationale:** Cosmos DB transactional batch operations require ALL items to share the SAME partition key value. Our hotel documents have 50 unique HotelId values (each document has a different partition key). Batch upsert is therefore NOT viable. Individual upserts are the proven pattern used in the vector-search samples.  
+**Test Evidence:** test-batch-api.py confirms 50 documents have 50 unique partition keys.  
+**Consequences:** 50 roundtrips instead of 1 batch operation; negligible latency impact for 50 documents (~68-136 RUs per document).  
+**Verified Pattern:** Both create-index and vector-search samples use individual upserts for the same reason.
+
+### ADR-002: Cross-Partition Query Over Single-Partition Filter
+**Date:** 2026-06-19  
+**Status:** ACCEPTED  
+**Decision:** Use `enable_cross_partition_query=True` to search entire container.  
+**Rationale:** Query intent is semantic similarity across all hotels, not filtered by specific partition.  
+**Consequences:** Slightly higher RU cost (all partitions scanned); enables global search.  
+**Alternatives Rejected:** Filter by partition key (reduces query scope, not desired), federate multiple queries (complexity).
+
+### ADR-003: Query-Time Distance Function Parameter
+**Date:** 2026-06-19  
+**Status:** ACCEPTED  
+**Decision:** Create index with one distance function; query with override parameter.  
+**Rationale:** Cosmos DB supports distance function override at query time; index immutable.  
+**Consequences:** All 3 distance functions on same index without recreation; query-time flexibility.  
+**Alternatives Rejected:** Create 3 separate indexes (9 containers total, cost prohibitive), hard-code one distance function (loses feature).
+
+### ADR-004: Environment Variable Mapping (No New Vars)
+**Date:** 2026-06-19  
+**Status:** ACCEPTED  
+**Decision:** Extract account name from endpoint URL; don't add new env vars to `.env`.  
+**Rationale:** Respect azd naming convention; code adapts to azd output, not vice versa.  
+**Consequences:** Config parsing complexity (regex/string split); no need to modify azd integration.  
+**Alternatives Rejected:** Add `AZURE_COSMOSDB_ACCOUNT_NAME` to `.env` (violates azd contract), hard-code (not portable).
+
+---
+
+## 12. Glossary & Terminology
+
+| Term | Definition | Example |
+|------|-----------|---------|
+| **Vector Index** | Immutable spec defining how embeddings are organized (index type, distance function, dimensions) | DiskANN with Cosine, 1536 dims |
+| **Index Type** | Algorithm for nearest-neighbor search (approximate or exact) | DiskANN (approximate), QuantizedFlat (exact) |
+| **Distance Function** | Metric for measuring similarity/distance between embedding vectors | Cosine, DotProduct, Euclidean |
+| **Partition Key** | Logical grouping for documents; all items in batch must share same value | HotelId |
+| **Cross-Partition Query** | Search that spans all partition key values (entire container) | `enable_cross_partition_query=True` |
+| **RU (Request Unit)** | Cosmos DB billing unit; 1 RU ≈ 1 read of 1KB document | 6,805 RUs for ingesting 50 documents |
+| **Embedding** | Dense vector representation of text semantics | 1536-dimensional vector from text-embedding-3-small |
+
+---
+
+## 13. Success Criteria
+
+**Article 2 implementation is complete when:**
+
+- ✅ All 5 languages (Python, TypeScript, Go, Java, .NET) run end-to-end without errors
+- ✅ All 6 distance function scenarios produce output for each language
+- ✅ Results tables match Python baseline (same top results, score magnitudes within ±0.01)
+- ✅ All 5 languages produce identical output structure (ASCII-only, results table format)
+- ✅ RU costs tracked and reported (ingestion, queries)
+- ✅ 5 organized commits on `diberry/article-2` branch
+- ✅ Documentation updated (this plan, language-specific READMEs)
+- ✅ Output samples captured for each language (output-python.txt, output-typescript.txt, etc.)
+
+---
+
+## 14. Next Steps (Pending Your Approval)
+
+1. ✅ **Plan Architecture Approved** (THIS DOCUMENT — awaiting your sign-off)
+2. ⏳ **Propagate to TypeScript** — Apply same patterns as Python
+3. ⏳ **Propagate to Go** — Apply same patterns as Python
+4. ⏳ **Propagate to Java** — Apply same patterns as Python
+5. ⏳ **Propagate to .NET** — Apply same patterns as Python
+6. ⏳ **Verify All Languages** — Cross-check outputs
+7. ⏳ **Organize 5 Commits** — Bundle all changes per roadmap (Section 7.1)
+8. ⏳ **Final Documentation** — README updates, output samples in repo
+- Extracts account name from endpoint URL: `https://db-dib-cos-{account-name}.documents.azure.com:443/`
+
+### Ingestion Pattern (Individual Upserts, NOT Batch)
+
+**Why individual upserts?**
+- Cosmos DB transactional batch operations require **same partition key value** for all items
+- Our 50 hotel documents have **different HotelId values** (unique per document)
+- Solution: Individual `upsert_item()` calls in a loop
+
+**RU Cost:**
+- DiskANN: 6805.28 RUs for 50 docs (~136 RUs/doc)
+- QuantizedFlat: 3402.64 RUs for 50 docs (~68 RUs/doc)
+- Pattern: Same as vector-search-python samples (validated)
+
+### Implementation Commits (5 organized)
+
+| # | Scope | Commit Message | Files Affected |
+|---|-------|-----------------|-----------------|
+| 1 | **Config & Environment** (all 5 languages) | `fix: map Azure Developer CLI env var names correctly across all samples` | `config.py`, `Config.java`, `config.go`, `Config.cs`, `config.ts` |
+| 2 | **Ingestion Pattern** (all 5 languages) | `fix: use individual upserts instead of batch operations for partition key flexibility` | `data_plane.py`, `DataPlane.java`, `data-plane.go`, `DataPlane.cs`, `data-plane.ts` |
+| 3 | **Query Implementation** (all 5 languages) | `feat: add cross-partition vector search with all 3 distance functions` | `data_plane.py`, `DataPlane.java`, `data-plane.go`, `DataPlane.cs`, `data-plane.ts` |
+| 4 | **Output Formatting** (all 5 languages) | `fix: standardize output with ASCII characters and add distance function comparison table` | `index.py`, `Main.java`, `main.go`, `Program.cs`, `index.ts` |
+| 5 | **Documentation** (repo level) | `docs: add output samples showing distance function comparison across all 5 languages` | `output-python.txt`, `output-typescript.txt`, `output-go.txt`, `output-java.txt`, `output-dotnet.txt` |
+
+---
+
+## Implementation Progress
+
+### Phase 1: Python (✅ COMPLETE)
+
+**Status:** Python sample fully working end-to-end
+
+**Files Modified:**
+- ✅ `nosql-create-index-python/src/config.py`
+  - Fixed env var mapping: `AZURE_COSMOSDB_RESOURCE_GROUP` → `AZURE_RESOURCE_GROUP`
+  - Added `_extract_account_name_from_endpoint()` function
+  - Added `subscription_id`, `resource_group`, `account_name` fields
+  - Updated `REQUIRED_ENV_VARS` to match azd naming
+
+- ✅ `nosql-create-index-python/src/data_plane.py`
+  - Changed ingestion to individual `upsert_item()` calls
+  - Fixed queries to use cross-partition search without partition key filter
+  - Added all 3 distance functions (Cosine, DotProduct, Euclidean)
+  - Updated `_document_count()` to use `enable_cross_partition_query=True`
+
+- ✅ `nosql-create-index-python/src/control_plane.py`
+  - Already working; minimal changes needed
+
+- ✅ `nosql-create-index-python/src/index.py`
+  - Replaced Unicode output with ASCII equivalents
+
+**Verification:**
+- ✅ Creates 2 containers with correct vector indexes
+- ✅ Ingests 50 documents to both containers
+- ✅ Queries all 6 scenarios (2 indexes × 3 distance functions)
+- ✅ Returns correct results table
+- ✅ Cleans up all data and containers
+- ✅ Exit code 0
+
+### Phase 2: TypeScript (⏳ PENDING)
+
+**To Do:**
+- [ ] Fix config.ts env var mapping (same pattern as Python)
+- [ ] Fix ingestion: individual upserts
+- [ ] Fix queries: all 3 distance functions + cross-partition
+- [ ] Fix output formatting
+- [ ] Test end-to-end
+- [ ] Capture output to `output-typescript.txt`
+
+### Phase 3: Go (⏳ PENDING)
+
+**To Do:**
+- [ ] Fix config.go env var mapping
+- [ ] Fix ingestion: individual upserts
+- [ ] Fix queries: all 3 distance functions + cross-partition
+- [ ] Fix output formatting
+- [ ] Test end-to-end
+- [ ] Capture output to `output-go.txt`
+
+### Phase 4: Java (⏳ PENDING)
+
+**To Do:**
+- [ ] Fix Config.java env var mapping
+- [ ] Fix ingestion: individual upserts
+- [ ] Fix queries: all 3 distance functions + cross-partition
+- [ ] Fix output formatting
+- [ ] Test end-to-end
+- [ ] Capture output to `output-java.txt`
+
+### Phase 5: .NET (⏳ PENDING)
+
+**To Do:**
+- [ ] Fix Config.cs env var mapping
+- [ ] Fix ingestion: individual upserts
+- [ ] Fix queries: all 3 distance functions + cross-partition
+- [ ] Fix output formatting
+- [ ] Test end-to-end
+- [ ] Capture output to `output-dotnet.txt`
+
+---
+
+
+
+---
+
+## Lifecycle Phases
+
+Every create-index sample executes these phases in order:
+
+### Phase 1: Setup — Create Container + Vector Index (Control-Plane)
+
+**SDK:** ARM SDK (`@azure/arm-cosmosdb`, `azure-mgmt-cosmosdb`, `com.azure.resourcemanager.cosmos`, etc.)  
+**Operation:** Infrastructure management  
+**Containers:** 
+- `hotels_diskann` (DiskANN vector index)
+- `hotels_quantizedflat` (Quantized Flat vector index)
+
+**Steps:**
+1. Delete containers if they exist (ensures clean state on re-run)
+2. Create each container with its respective vector index definition
+3. Verify containers are ready
+
+**Code Location:** Control-plane module (e.g., `control-plane.ts`, `ControlPlane.java`)
+
+---
+
+### Phase 2: Ingest — Add Sample Data (Data-Plane)
+
+**SDK:** Cosmos Client SDK (`@azure/cosmos`, `azure.cosmos`, `azure-cosmos`, etc.)  
+**Operation:** Data insertion  
+**Data Source:** `sample-hotels.json` with pre-computed embeddings  
+
+**Steps:**
+1. Read JSON documents from `sample-hotels.json`
+2. Generate or verify embeddings using Azure OpenAI
+3. Upsert documents into both containers
+
+**Code Location:** Data-plane module (e.g., `data-plane.ts`, `DataPlane.java`)
+
+---
+
+### Phase 3: Query — Vector Search (Data-Plane)
+
+**SDK:** Cosmos Client SDK  
+**Operation:** Querying with vector search  
+**Distance Functions:** Cosine, DotProduct, Euclidean
+
+**Steps:**
+1. Generate query embedding from user query text
+2. For each container and distance function:
+   - Execute vector search query
+   - Capture top N results, request charges
+3. Display comparison table
+
+**Code Location:** Data-plane module (e.g., `data-plane.ts`, `DataPlane.java`)
+
+---
+
+### Phase 4: Cleanup — Clear Data + Delete Containers (Data-Plane + Control-Plane)
+
+**Step 4a — Clear Data (Data-Plane)**
+- Delete all sample documents from containers
+- Keep containers and indexes intact for potential reuse
+- Uses Cosmos Client SDK
+- Code: Data-plane cleanup function
+
+**Step 4b — Delete Containers + Indexes (Control-Plane)**
+- Delete both containers and their vector index definitions
+- Ensures each run starts from a clean infrastructure state
+- Uses ARM SDK
+- Code: Control-plane cleanup function
+
+**Rationale:** 
+- Data cleanup (4a) is data-plane responsibility
+- Container deletion (4b) is control-plane responsibility
+- Full deletion ensures no leftover infrastructure costs
+- Containers are recreated on next run (samples are self-contained)
+
+---
+
+## SDK Usage Summary
+
+**CRITICAL REQUIREMENT:** All samples MUST use official Azure SDKs — never use REST APIs directly.
+
+| Phase | Operation | SDK | Language Specifics |
+|-------|-----------|-----|-------------------|
+| 1 | Create container + index | ARM SDK | `@azure/arm-cosmosdb` (TS), `azure-mgmt-cosmosdb` (Python), `com.azure.resourcemanager.cosmos.armcosmos` (Java), `github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/cosmos/armcosmos` (Go), `Azure.ResourceManager.CosmosDB` (.NET) |
+| 2 | Ingest data | Cosmos Client | `container.items.create()` or `container.upsertItem()` |
+| 3 | Vector search | Cosmos Client | `container.items.query()` with vector query syntax |
+| 4a | Delete documents | Cosmos Client | `container.deleteItem()` or bulk delete |
+| 4b | Delete containers | ARM SDK | `sqlResources.beginDeleteSqlContainerAndWait()` or SDK equivalent per language |
+
+---
+
+## Infrastructure Responsibility
+
+### What the Infra (Bicep/azd) Creates
+
+✅ **MUST Create:**
+- Azure Cosmos DB account
+- Database (e.g., `HotelsCreateIndex`)
+- Authentication (Managed Identity, RBAC roles)
+- Key Vault secrets (endpoint, connection strings)
+
+❌ **MUST NOT Create:**
+- **Containers** (`hotels_diskann`, `hotels_quantizedflat`) — Each sample creates its own (Phase 1)
+- **Indexes** — Each sample creates its own (Phase 1)
+- **Sample data** — Each sample ingests its own (Phase 2)
+
+**Rationale:** Samples are self-contained and demonstrate the *full* create-index workflow, including infrastructure provisioning. This matches real-world usage where developers provision infrastructure, then samples handle their own complete lifecycle.
+
+### Implementation Status
+
+**Bicep/Infra Updates (Completed):**
+- ✅ `infra/database.bicep`: Removed `createIndexContainers` module (was lines 147-191)
+- ✅ `infra/database.bicep`: Kept `createIndexDatabase` module (database only, no containers)
+- ✅ `infra/main.bicep`: Removed container name outputs (`DISKANN_CONTAINER_NAME`, `QUANTIZEDFLAT_CONTAINER_NAME`)
+- ✅ `infra/main.bicep`: Kept configuration outputs (`EMBEDDED_FIELD`, `PARTITION_KEY_PATH`, `EMBEDDING_DIMENSIONS`)
+
+---
+
+## Quickstart Setup Responsibilities
+
+### What the Quickstart Guide MUST Document
+
+✅ **MUST instruct:**
+1. Copy `HotelsData_toCosmosDB_Vector.json` from the shared data directory into each sample's `data/` subdirectory
+2. Install dependencies (npm/pip/Maven/dotnet)
+3. Set required environment variables (endpoint, credentials, OpenAI config)
+4. Run the sample from its own directory (e.g., `nosql-create-index-python/`)
+
+**Sample quickstart step:**
+```bash
+# Copy data file to sample directory
+mkdir -p nosql-create-index-{language}/data
+cp path/to/HotelsData_toCosmosDB_Vector.json nosql-create-index-{language}/data/
+
+# Run sample
+cd nosql-create-index-{language}
+# ... language-specific run commands ...
+```
+
+### Implementation Status
+
+Each language's quickstart MUST include this setup step:
+- ✅ **TypeScript:** `quickstart-create-index-typescript.md` — Add data file copy step
+- ⏳ **Go:** `quickstart-create-index-go.md` — Add data file copy step
+- ⏳ **Python:** `quickstart-create-index-python.md` — Add data file copy step
+- ⏳ **Java:** `quickstart-create-index-java.md` — Add data file copy step
+- ⏳ **.NET:** `quickstart-create-index-dotnet.md` — Add data file copy step
+
+---
+
+## Cross-Sample Consistency Checklist
+
+Every create-index sample MUST follow this checklist:
+
+- [ ] **Control-plane module** exists and imports ARM SDK
+- [ ] **Phase 1:** Delete containers if exist → Create containers with vector indexes
+- [ ] **Data-plane module** exists and imports Cosmos Client SDK
+- [ ] **Phase 2:** Ingest documents (upsert)
+- [ ] **Phase 3:** Query with all 3 distance functions (Cosine, DotProduct, Euclidean)
+- [ ] **Phase 4a:** Data cleanup — Delete all documents (data-plane)
+- [ ] **Phase 4b:** Infrastructure cleanup — Delete containers (control-plane)
+- [ ] **Main entry point** orchestrates all phases in order
+- [ ] **Error handling** distinguishes between 404 (expected) and other errors
+- [ ] **Output** displays results table with same columns as other samples
+- [ ] **Cleanup guarantee:** Even if an error occurs, cleanup code runs (use try/finally or equivalent)
+
+---
+
+## Output Format (Consistent Across All Samples)
+
+### Standard Phases Display
+
+All samples MUST output these phases in order with ASCII-only characters:
+
+```
+=== Diagnostic Check ===
+Cosmos DB Endpoint: [endpoint]
+Database name: [database]
+[OK] Database '[database]' exists
+  Containers found: 0
+  WARNING: Database exists but has NO containers.
+Using Azure OpenAI Embedding Deployment/Model: text-embedding-3-small
+Reading JSON file from HotelsData_toCosmosDB_Vector.json
+Loaded 50 documents
+
+=== Phase 1: Create Containers ===
+
+=== Phase 1: Create Container with Vector Index ===
+  Container:      hotels_diskann
+  Index type:     diskANN
+  Dimensions:     1536
+  Distance func:  cosine (queried with all 3 metrics)
+  Deleted existing container
+  Created in ~1s
+  Vector index is IMMUTABLE - cannot be changed after creation
+
+=== Phase 1: Create Container with Vector Index ===
+  Container:      hotels_quantizedflat
+  Index type:     quantizedflat
+  Dimensions:     1536
+  Distance func:  cosine (queried with all 3 metrics)
+  Deleted existing container
+  Created in ~1s
+  Vector index is IMMUTABLE - cannot be changed after creation
+
+Processing in batches of 50...
+  [OK] hotels_diskann: 50 inserted (X.XX RUs)
+  [OK] hotels_quantizedflat: 50 inserted (X.XX RUs)
+
+Query: "hotel near the ocean"
+Embedding generated (1536 dimensions)
+
+Running searches (top 5 results for each distance function)...
+  [OK] hotels_diskann queried (X.XX RUs)
+  [OK] hotels_diskann queried (X.XX RUs)
+  [OK] hotels_diskann queried (X.XX RUs)
+  [OK] hotels_quantizedflat queried (X.XX RUs)
+  [OK] hotels_quantizedflat queried (X.XX RUs)
+  [OK] hotels_quantizedflat queried (X.XX RUs)
+```
+
+### Distance Functions Results Table (ARTICLE 2 SPECIAL)
+
+**EXACT STRUCTURE — All 6 scenarios (2 indexes × 3 distance functions):**
+
+```
+| Index Type     | Distance Function | Top 1 Result               | Score  | Top 2 Result               | Score  | Diff   |
+|----------------|-------------------|----------------------------|--------|----------------------------|--------|--------|
+| DiskANN        | Cosine            | Windy Ocean Motel          | 0.5268 | Ocean Water Resort & Spa   | 0.5177 | 0.0091 |
+| DiskANN        | DotProduct        | Windy Ocean Motel          | 0.5271 | Ocean Water Resort & Spa   | 0.5179 | 0.0091 |
+| DiskANN        | Euclidean         | Windy Ocean Motel          | 0.9730 | Ocean Water Resort & Spa   | 0.9823 | -0.0094 |
+| QuantizedFlat  | Cosine            | Windy Ocean Motel          | 0.5268 | Ocean Water Resort & Spa   | 0.5177 | 0.0091 |
+| QuantizedFlat  | DotProduct        | Windy Ocean Motel          | 0.5271 | Ocean Water Resort & Spa   | 0.5179 | 0.0091 |
+| QuantizedFlat  | Euclidean         | Windy Ocean Motel          | 0.9730 | Ocean Water Resort & Spa   | 0.9823 | -0.0094 |
+```
+
+### Cleanup Display
+
+```
+=== Cleanup: Clear Sample Data ===
+  [OK] Cleared data from hotels_diskann
+  [OK] Cleared data from hotels_quantizedflat
+
+=== Cleanup: Delete Containers ===
+  [OK] Deleted hotels_diskann
+  [OK] Deleted hotels_quantizedflat
+
+Complete
+```
+
+### Requirements for Results Table
+
+- **Rows:** Exactly 6 (2 containers × 3 distance functions, in order)
+- **Order:** DiskANN rows first, then QuantizedFlat; within each, Cosine → DotProduct → Euclidean
+- **Top results:** 2 results per row (Top 1 and Top 2)
+- **Score:** Must show actual similarity/distance scores returned by Cosmos DB
+- **Diff:** Top1Score - Top2Score (can be negative if using Euclidean/distance metrics)
+- **Hotel names:** Must match actual hotel names from the data (e.g., "Windy Ocean Motel")
+- **Column alignment:** Table must be valid Markdown (all rows same number of columns)
+
+---
+
+## Implementation Order (By Language)
+
+1. **TypeScript** — Reference implementation (already updated)
+2. **Go** — Add container deletion (control-plane)
+3. **Python** — Add container deletion (control-plane)
+4. **Java** — Add container deletion (control-plane)
+5. **.NET** — Add container deletion (control-plane)
+
+---
+
+---
+
+## Drift Prevention — Mandatory Configuration Consistency
+
+**RULE: All 5 create-index samples (TypeScript, Go, Python, Java, .NET) MUST use identical scenario values. Language-specific code idioms are allowed ONLY for syntax; behavior and configuration MUST match exactly.**
+
+### Mandatory Consistent Details
+
+These details are NOT negotiable and MUST be identical across ALL languages. Any deviation is a bug.
+
+#### 1. Database Name — MUST be `"HotelsCreateIndex"`
+- **Why:** Single database for the scenario; all samples operate on same infrastructure
+- **TypeScript:** `src/config.ts` line ~36 → `databaseName: "HotelsCreateIndex"`
+- **Go:** `config.go` line ~75 → default case when env var is empty
+- **Python:** `src/config.py` → add `DEFAULT_DATABASE_NAME = "HotelsCreateIndex"` and use when `AZURE_COSMOSDB_CREATE_INDEX_DATABASENAME` is not set
+- **Java:** `src/main/java/com/azure/cosmos/createindex/Config.java` → `DEFAULT_DATABASE_NAME = "HotelsCreateIndex"`
+- **.NET:** `src/Config.cs` → default when `AZURE_COSMOSDB_CREATE_INDEX_DATABASENAME` not in config
+
+#### 2. Partition Key Field Name — MUST be `"HotelId"`
+- **Why:** Vector-search samples already use `"HotelId"` as partition key in data. Mismatch = queries fail.
+- **Current status:** Go/Python currently use `"PartitionKey"` (WRONG). Java/TypeScript unclear.
+- **FIX REQUIRED:** Change ALL to `"HotelId"` 
+- **TypeScript:** Update `src/data-plane.ts` to use `"HotelId"` in all document construction and queries
+- **Go:** CHANGE `config.go` line 17 from `partitionKeyFieldName = "PartitionKey"` → `"HotelId"`
+- **Python:** CHANGE `src/data_plane.py` to use `"HotelId"` instead of `"PartitionKey"` in document fields
+- **Java:** Ensure `DataPlane.java` uses `"HotelId"` (not `"HotelId"`... verify actual code)
+- **.NET:** Ensure `src/DataPlane.cs` uses `"HotelId"` consistently
+
+#### 3. Partition Key Value — MUST be `"hotels"`
+- **Why:** Single partition for sample simplicity (all data in one logical partition)
+- **All languages:** Must set `partitionKeyValue = "hotels"` in document construction and queries
+- **Verify:** Every document upserted must have `"HotelId": "hotels"`
+- **Verify:** Every query must use partition key `"hotels"`
+
+#### 4. Container Names — MUST be exactly `["hotels_diskann", "hotels_quantizedflat"]` (in that order)
+- **Why:** Both vector index types demonstrated in single run
+- **All languages:** 
+  - Define constant list/array with both names
+  - Process containers in this exact order (diskANN first, then quantizedflat)
+  - Results table rows must follow this order
+
+#### 5. Embedding Field Name — MUST be `"DescriptionVector"`
+- **Why:** Vector search queries target this field in documents
+- **All languages:** 
+  - Documents must include `"DescriptionVector": [embedding_array]`
+  - Vector queries must reference `"DescriptionVector"`
+  - Cannot vary per sample
+
+#### 6. Embedding Dimensions — MUST be `1536`
+- **Why:** Output size of `text-embedding-3-small` model
+- **All languages:** 
+  - Config must validate incoming embeddings are exactly 1536 dimensions
+  - Reject documents with different dimensions
+  - Error messages must state "expected 1536 dimensions"
+
+#### 7. Default Query Text — MUST be exactly `"hotel near the ocean"`
+- **Why:** Ensures all samples generate and search with same embedding for comparison
+- **All languages:** 
+  - If no `QUERY_TEXT` env var set, use this exact string
+  - Generate embedding from this string
+  - Display query results with this query text in output
+
+#### 8. Top Result Count — MUST be `5`
+- **Why:** Consistent output size across all samples; comparison table has same rows
+- **Go:** CHANGE from current value (likely 3) to 5
+- **All languages:** 
+  - Return exactly 5 results per distance function per container
+  - All results tables must have 5 rows per container × distance function
+
+#### 9. Distance Functions — MUST be exactly `["Cosine", "DotProduct", "Euclidean"]` (in that order)
+- **Why:** Demonstrates all three metrics; comparison table must have same columns
+- **All languages:**
+  - Run queries in this exact order: Cosine → DotProduct → Euclidean
+  - Results table columns must reflect this order
+  - All three must succeed or sample fails
+
+#### 10. Data File Path — MUST use `"./data/HotelsData_toCosmosDB_Vector.json"` (relative to sample directory, copied during quickstart setup)
+
+**CRITICAL:** The data file is NOT in the repo. It is **copied by the quickstart setup process** into a `data/` subdirectory within each sample directory. All samples MUST look for it there.
+
+**Expected directory structure after quickstart setup:**
+```
+nosql-create-index-{language}/
+├── src/
+│   ├── index.ts / index.py / Program.cs / Main.java / main.go
+│   └── ...
+├── data/                                 ← Created by quickstart setup
+│   └── HotelsData_toCosmosDB_Vector.json ← Copied by quickstart setup
+├── package.json / requirements.txt / ...
+└── README.md
+```
+
+**Implementation rules:**
+- **Go:** Use `filepath.Join("data", "HotelsData_toCosmosDB_Vector.json")` 
+- **Python:** Use `Path(__file__).parent.parent / "data" / "HotelsData_toCosmosDB_Vector.json"` or equivalent with `pathlib.Path`
+- **TypeScript:** Use `path.join(__dirname, "..", "data", "HotelsData_toCosmosDB_Vector.json")`
+- **Java:** Use `Paths.get("data", "HotelsData_toCosmosDB_Vector.json")` with proper working directory handling
+- **.NET:** Use `Path.Combine("data", "HotelsData_toCosmosDB_Vector.json")`
+- **No hardcoded backslashes or forward slashes** — use platform-agnostic path construction in ALL languages
+- **Default path:** If `DATA_FILE` env var not set, default to `./data/HotelsData_toCosmosDB_Vector.json`
+- **Error message:** If file not found, display: `"Data file not found: {path}. Copy HotelsData_toCosmosDB_Vector.json to the data/ directory as described in the quickstart."`
+
+
+#### 11. Embedding Model — MUST be `"text-embedding-3-small"`
+- **Why:** Fixed model for reproducible embeddings
+- **All languages:** Default value when `AZURE_OPENAI_EMBEDDING_DEPLOYMENT` not set
+- **All languages:** Display in output: `"Using Azure OpenAI Embedding Deployment/Model: text-embedding-3-small"`
+
+#### 12. OpenAI API Version — MUST be `"2024-08-01-preview"`
+- **Why:** Fixed API version for reproducible behavior
+- **All languages:** Default value when `AZURE_OPENAI_EMBEDDING_API_VERSION` not set
+
+#### 13. Output Format — MUST match exactly
+```
+=== Create Containers with Vector Indexes ===
+  ✓ Created hotels_diskann
+  ✓ Created hotels_quantizedflat
+
+=== Ingest Documents ===
+  ✓ hotels_diskann: {count} upserted ({ru} RUs)
+  ✓ hotels_quantizedflat: {count} upserted ({ru} RUs)
+
+=== Vector Search Queries ===
+  ✓ hotels_diskann queried ({ru} RUs)
+  ✓ hotels_quantizedflat queried ({ru} RUs)
+
+Query: "hotel near the ocean"
+Embedding generated (1536 dimensions)
+Running searches (top 5 results for each distance function)...
+
+| Index Type | Distance Function | Top 1 Result | Score | Top 2 Result | Score | Diff |
+|------------|-------------------|--------------|-------|--------------|-------|------|
+| DiskANN    | Cosine            | [hotel name] | 0.xxxx | [hotel name] | 0.xxxx | 0.xxxx |
+| DiskANN    | DotProduct        | [hotel name] | 0.xxxx | [hotel name] | 0.xxxx | 0.xxxx |
+| DiskANN    | Euclidean         | [hotel name] | 0.xxxx | [hotel name] | 0.xxxx | 0.xxxx |
+| QuantizedFlat | Cosine         | [hotel name] | 0.xxxx | [hotel name] | 0.xxxx | 0.xxxx |
+| QuantizedFlat | DotProduct     | [hotel name] | 0.xxxx | [hotel name] | 0.xxxx | 0.xxxx |
+| QuantizedFlat | Euclidean      | [hotel name] | 0.xxxx | [hotel name] | 0.xxxx | 0.xxxx |
+
+=== Cleanup: Clear Sample Data ===
+  ✓ Cleared data from hotels_diskann
+  ✓ Cleared data from hotels_quantizedflat
+
+=== Cleanup: Delete Containers ===
+  ✓ Deleted hotels_diskann
+  ✓ Deleted hotels_quantizedflat
+
+Complete
+```
+
+### Drift Prevention Enforcement
+
+**CI Validation Script:** `.github/test/create-index-schema-validation.sh`
+
+```bash
+#!/bin/bash
+# Validates all 5 samples conform to mandatory configuration consistency
+# Fails the build if any sample deviates from the schema
+
+SCHEMA=(
+  "DATABASE_NAME=HotelsCreateIndex"
+  "PARTITION_KEY_FIELD=HotelId"
+  "PARTITION_KEY_VALUE=hotels"
+  "EMBEDDING_FIELD=DescriptionVector"
+  "EMBEDDING_DIMENSIONS=1536"
+  "DEFAULT_QUERY_TEXT=hotel near the ocean"
+  "DEFAULT_TOP_COUNT=5"
+  "EMBEDDING_MODEL=text-embedding-3-small"
+  "EMBEDDING_API_VERSION=2024-08-01-preview"
+  "CONTAINERS=hotels_diskann,hotels_quantizedflat"
+)
+
+# Validation rules per language:
+# ✓ TypeScript: grep src/config.ts for const names and values
+# ✓ Go: grep config.go for const names and values
+# ✓ Python: python -m pytest tests/test_config.py (validates all CONSTANTS exist and match)
+# ✓ Java: grep Config.java for static final names and values
+# ✓ .NET: grep src/Config.cs for private const names and values
+
+# Exit code 0 = all match, 1 = drift detected, 2 = validation error
+```
+
+**When This Runs:**
+- Every PR to any `nosql-create-index-*` directory
+- Must pass before merge
+- Blocks merge if any sample drifts from schema
+
+**Future Changes:**
+- Any change to mandatory details MUST update ALL 5 samples in ONE PR
+- PR cannot merge until validation script passes for all 5 languages
+- No exceptions, no per-language overrides allowed
+
+---
+
+## References
+
+- Cosmos DB Vector Search: [Docs](https://learn.microsoft.com/azure/cosmos-db/vector-search)
+- ARM SDK for Cosmos: `@azure/arm-cosmosdb`
+- Cosmos Client SDK: Language-specific packages
+- Drift Analysis: [`.github/plans/create-index-drift-analysis.md`](./create-index-drift-analysis.md)
