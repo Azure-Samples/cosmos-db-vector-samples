@@ -73,7 +73,7 @@ def read_documents(data_file: Path) -> List[Dict[str, Any]]:
 def prepare_document(item: Dict[str, Any]) -> Dict[str, Any]:
     document = dict(item)
     document["id"] = str(item["HotelId"])
-    document["PartitionKey"] = "hotels"
+    document["HotelId"] = item.get("HotelId", "hotels")  # Ensure HotelId is partition key
     return document
 
 
@@ -163,7 +163,7 @@ def query_top_matches(
     query_text = (
         "SELECT TOP @topK c.HotelId, c.HotelName, c.Description, "
         "VectorDistance(c.{0}, @embedding, false, {{'distanceFunction': '{1}'}}) AS similarityScore "
-        "FROM c WHERE c.PartitionKey = @partitionKey "
+        "FROM c WHERE c.HotelId = @partitionKey "
         "ORDER BY VectorDistance(c.{0}, @embedding, false, {{'distanceFunction': '{1}'}})"
     ).format(embedding_field, distance_function)
 
@@ -265,11 +265,11 @@ def wrap_runtime_error(error: Exception) -> RuntimeError:
 
 
 def _document_count(container: Any) -> int:
-    query = "SELECT VALUE COUNT(1) FROM c WHERE c.PartitionKey = @partitionKey"
+    query = "SELECT VALUE COUNT(1) FROM c WHERE c.HotelId = @hotelId"
     results = list(
         container.query_items(
             query=query,
-            parameters=[{"name": "@partitionKey", "value": "hotels"}],
+            parameters=[{"name": "@hotelId", "value": "hotels"}],
             partition_key="hotels",
         )
     )
@@ -294,3 +294,15 @@ def _shorten(value: str, limit: int = 110) -> str:
     if len(value) <= limit:
         return value
     return value[: limit - 3].rstrip() + "..."
+
+
+def clear_container_data(container: Any) -> None:
+    """Delete all sample-inserted documents from a container."""
+    try:
+        query = "SELECT c.id FROM c"
+        items_to_delete = list(container.query_items(query=query, partition_key="hotels"))
+        
+        for item in items_to_delete:
+            container.delete_item(item["id"], partition_key="hotels")
+    except Exception as e:
+        raise RuntimeError("Failed to clear container data: {0}".format(str(e)))

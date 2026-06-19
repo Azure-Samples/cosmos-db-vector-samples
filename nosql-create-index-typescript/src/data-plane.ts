@@ -125,8 +125,9 @@ export async function insertDocuments(
     resourceBody: {
       id: item.HotelId,
       ...item,
+      HotelId: "hotels",  // Partition key value (uniform for all docs in sample)
     },
-    partitionKey: [item.HotelId],
+    partitionKey: ["hotels"],
   }));
 
   const response = await container.items.executeBulkOperations(operations);
@@ -183,7 +184,7 @@ export async function vectorQuery(
 
   console.log(`\nQuery: "${queryText}"`);
   console.log(`Embedding generated (${queryEmbedding.length} dimensions)`);
-  console.log(`\nRunning search (top 3 results for each distance function)...`);
+  console.log(`\nRunning search (top 5 results for each distance function)...`);
 
   // Query with 3 distance functions using VectorDistance() options parameter
   const distanceFunctions = ["Cosine", "DotProduct", "Euclidean"];
@@ -191,7 +192,7 @@ export async function vectorQuery(
 
   for (const distanceFunction of distanceFunctions) {
     const querySpec = {
-      query: `SELECT TOP 3
+      query: `SELECT TOP 5
                 c.id,
                 c.HotelName,
                 c.Description,
@@ -228,4 +229,28 @@ export async function vectorQuery(
   console.log(`  ✓ ${containerName} queried with 3 distance functions (${results.reduce((acc, r) => acc + r.ru, 0).toFixed(2)} RUs)`);
 
   return results;
+}
+
+/**
+ * Delete all sample-inserted documents from a container.
+ * Uses a query to find all documents and delete them in bulk.
+ */
+export async function clearContainerData(container: Container): Promise<void> {
+  const querySpec = {
+    query: "SELECT c.id FROM c",
+  };
+
+  const { resources: itemsToDelete } = await container.items.query(querySpec).fetchAll();
+
+  if (itemsToDelete.length === 0) {
+    return;
+  }
+
+  const operations = itemsToDelete.map((item: any) => ({
+    operationType: BulkOperationType.Delete,
+    id: item.id,
+    partitionKey: [item.id],
+  }));
+
+  await container.items.bulk(operations);
 }

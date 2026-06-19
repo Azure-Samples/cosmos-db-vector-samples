@@ -54,6 +54,7 @@ public static partial class DataPlane
             }
 
             document.Id = document.HotelId;
+            document.HotelId = "hotels";  // Partition key value (uniform for all docs)
         }
 
         return documents;
@@ -219,6 +220,27 @@ public static partial class DataPlane
 
         var response = await iterator.ReadNextAsync(cancellationToken);
         return response.Resource.FirstOrDefault();
+    }
+
+    public static async Task ClearContainerDataAsync(Container container, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            using var iterator = container.GetItemQueryIterator<VectorSearchRow>(new QueryDefinition("SELECT c.id FROM c"));
+            
+            while (iterator.HasMoreResults)
+            {
+                var response = await iterator.ReadNextAsync(cancellationToken);
+                foreach (var item in response)
+                {
+                    await container.DeleteItemAsync<VectorSearchRow>(item.HotelId, new PartitionKey("hotels"), null, cancellationToken);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException("Failed to clear container data", ex);
+        }
     }
 
     public sealed record IngestionSummary(

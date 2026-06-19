@@ -80,6 +80,7 @@ public final class DataPlane {
                 throw new IllegalStateException("Each document must contain HotelId.");
             }
             document.put("id", String.valueOf(hotelId));
+            document.put("HotelId", "hotels");  // Partition key value (uniform for all docs)
             documents.add(document);
         }
         return documents;
@@ -194,6 +195,23 @@ public final class DataPlane {
             return value;
         }
         return value.substring(0, 107).trim() + "...";
+    }
+
+    public static void clearContainerData(CosmosContainer container) {
+        try {
+            SqlQuerySpec querySpec = new SqlQuerySpec("SELECT c.id FROM c");
+            container.queryItems(querySpec, new CosmosQueryRequestOptions(), Map.class)
+                    .stream()
+                    .forEach(item -> {
+                        String id = String.valueOf(item.get("id"));
+                        container.deleteItem(id, new PartitionKeyBuilder()
+                                .add("hotels")
+                                .build(),
+                                null);
+                    });
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to clear container data: " + e.getMessage(), e);
+        }
     }
 }
 

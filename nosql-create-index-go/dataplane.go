@@ -17,6 +17,7 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
+	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/cosmos/armcosmos"
 	"github.com/Azure/azure-sdk-for-go/sdk/data/azcosmos"
 )
 
@@ -319,6 +320,43 @@ func algorithmLabel(containerName string) string {
 	}
 }
 
+func DeleteContainers(ctx context.Context, credential azcore.TokenCredential, cfg *Config) error {
+	// Initialize Cosmos management client
+	// Note: v1.0.0 uses a different API - direct client creation instead of factory pattern
+	sqlResourcesClient, err := armcosmos.NewSQLResourcesClient(cfg.SubscriptionID, credential, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create SQL resources client: %w", err)
+	}
+
+	for _, containerName := range []string{"hotels_diskann", "hotels_quantizedflat"} {
+		// Delete container via ARM SDK
+		poller, err := sqlResourcesClient.BeginDeleteSQLContainer(ctx, cfg.ResourceGroup, cfg.AccountName, cfg.DatabaseName, containerName, nil)
+		if err != nil {
+			// 404 is expected if container doesn't exist on first run — skip silently
+			if strings.Contains(err.Error(), "404") {
+				fmt.Printf("  ✓ Deleted %s (was already removed)\n", containerName)
+				continue
+			}
+			return fmt.Errorf("failed to delete container %q: %w", containerName, err)
+		}
+
+		// Wait for operation to complete
+		_, err = poller.PollUntilDone(ctx, nil)
+		if err != nil {
+			// 404 is still expected on retry/completion
+			if strings.Contains(err.Error(), "404") {
+				fmt.Printf("  ✓ Deleted %s (was already removed)\n", containerName)
+				continue
+			}
+			return fmt.Errorf("failed to wait for container deletion %q: %w", containerName, err)
+		}
+
+		fmt.Printf("  ✓ Deleted %s\n", containerName)
+	}
+
+	return nil
+}
+
 func dashes(n int) string {
 	return strings.Repeat("-", n)
 }
@@ -332,4 +370,42 @@ func truncate(s string, maxLen int) string {
 
 func newHTTPClient() *http.Client {
 	return &http.Client{Timeout: 60 * time.Second}
+}
+
+// ClearContainerData deletes all sample-inserted documents from a container
+func ClearContainerData(ctx context.Context, container *azcosmos.ContainerClient) error {
+	queryText := "SELECT c.id FROM c"
+	partitionKey := azcosmos.NewPartitionKey().AppendString(partitionKeyFieldValue)
+	pager := container.NewQueryItemsPager(queryText, partitionKey, nil)
+
+	var itemsToDelete []string
+	for pager.More() {
+		page, err := pager.NextPage(ctx)
+		if err != nil {
+			return fmt.Errorf("query items for deletion: %w", err)
+		}
+		for _, item := range page.Items {
+			var doc map[string]any
+			if err := json.Unmarshal(item, &doc); err != nil {
+				return fmt.Errorf("parse item for deletion: %w", err)
+			}
+			if id, ok := doc["id"].(string); ok {
+				itemsToDelete = append(itemsToDelete, id)
+			}
+		}
+	}
+
+	if len(itemsToDelete) == 0 {
+		return nil
+	}
+
+	// Delete in batches
+	for _, id := range itemsToDelete {
+		_, err := container.DeleteItem(ctx, partitionKey.AppendString(id), id, nil)
+		if err != nil {
+			return fmt.Errorf("delete item %q: %w", id, err)
+		}
+	}
+
+	return nil
 }
