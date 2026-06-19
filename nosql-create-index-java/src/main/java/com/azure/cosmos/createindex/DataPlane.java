@@ -72,17 +72,41 @@ public final class DataPlane {
                 new TypeReference<List<Map<String, Object>>>() {
                 });
 
+        java.util.Set<String> regionsFound = new java.util.LinkedHashSet<>();
+        java.util.Set<String> validRegions = java.util.Set.of("Northeast", "Midwest", "South", "West");
+
         List<Map<String, Object>> documents = new ArrayList<>(items.size());
-        for (Map<String, Object> item : items) {
+        for (int idx = 0; idx < items.size(); idx++) {
+            Map<String, Object> item = items.get(idx);
             LinkedHashMap<String, Object> document = new LinkedHashMap<>(item);
+
+            // Validate HotelId
             Object hotelId = document.get("HotelId");
             if (hotelId == null) {
                 throw new IllegalStateException("Each document must contain HotelId.");
             }
+
+            // Validate Region property
+            Object region = document.get("Region");
+            if (region == null) {
+                throw new IllegalStateException(
+                        "Document at index " + idx + " (HotelId=" + hotelId + ") missing Region property");
+            }
+            String regionStr = String.valueOf(region);
+            if (!validRegions.contains(regionStr)) {
+                throw new IllegalStateException(
+                        "Document at index " + idx + " (HotelId=" + hotelId + ") has unexpected Region '" + regionStr + "'");
+            }
+            regionsFound.add(regionStr);
+
             document.put("id", String.valueOf(hotelId));
-            document.put("HotelId", "hotels");  // Partition key value (uniform for all docs)
+            // Do NOT overwrite Region — keep it as-is for partition key
             documents.add(document);
         }
+
+        // Log region distribution
+        System.out.println("✓ Region validation passed. Found regions: " + String.join(", ", regionsFound));
+
         return documents;
     }
 
@@ -93,10 +117,14 @@ public final class DataPlane {
 
         List<CosmosItemOperation> operations = new ArrayList<>(documents.size());
         for (Map<String, Object> document : documents) {
-            String hotelId = String.valueOf(document.get("HotelId"));
+            // Extract Region from document for partition key
+            Object region = document.get("Region");
+            if (region == null) {
+                throw new IllegalStateException("Document missing Region property");
+            }
             operations.add(CosmosBulkOperations.getUpsertItemOperation(
                     document,
-                    new PartitionKeyBuilder().add(hotelId).build()));
+                    new PartitionKeyBuilder().add(String.valueOf(region)).build()));
         }
 
         int upsertedDocuments = 0;
