@@ -14,7 +14,7 @@ const (
 	quantizedFlatContainer          = "hotels_quantizedflat"
 	embeddingFieldName              = "DescriptionVector"
 	embeddingDimensions             = 1536
-	partitionKeyFieldName           = "PartitionKey"
+	partitionKeyFieldName           = "HotelId"
 	partitionKeyFieldValue          = "hotels"
 	defaultQueryText                = "hotel near the ocean"
 	azureOpenAIEmbeddingsAPIVersion = "2024-02-01"
@@ -40,6 +40,9 @@ type Config struct {
 	PartitionKeyFieldValue    string
 	QueryText                 string
 	OpenAIAPIVersion          string
+	SubscriptionID            string
+	ResourceGroup             string
+	AccountName               string
 }
 
 func LoadConfig() (*Config, error) {
@@ -67,13 +70,16 @@ func LoadConfigFromEnv(getenv func(string) string) (*Config, error) {
 		PartitionKeyFieldValue:    partitionKeyFieldValue,
 		QueryText:                 defaultQueryText,
 		OpenAIAPIVersion:          azureOpenAIEmbeddingsAPIVersion,
+		SubscriptionID:            strings.TrimSpace(getenv("AZURE_SUBSCRIPTION_ID")),
+		ResourceGroup:             strings.TrimSpace(getenv("AZURE_RESOURCE_GROUP")),
+		AccountName:               strings.TrimSpace(getenv("AZURE_COSMOSDB_ACCOUNT_NAME")),
 	}
 
 	if cfg.DatabaseName == "" {
-		cfg.DatabaseName = "Hotels"
+		cfg.DatabaseName = "HotelsCreateIndex"
 	}
 	if cfg.DataFileWithVectors == "" {
-		cfg.DataFileWithVectors = filepath.Join("data", "HotelsData_toCosmosDB_Vector.json")
+		cfg.DataFileWithVectors = filepath.Join(".", "data", "HotelsData_toCosmosDB_Vector.json")
 	}
 
 	if err := validateConfig(cfg); err != nil {

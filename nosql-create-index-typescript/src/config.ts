@@ -47,7 +47,7 @@ export function loadConfigFromEnv(
     embeddingField: env.EMBEDDED_FIELD || "DescriptionVector",
     expectedDimensions: parseInt(env.EMBEDDING_DIMENSIONS || "1536", 10),
     dataFile:
-      env.DATA_FILE_WITH_VECTORS || "../data/HotelsData_toCosmosDB_Vector.json",
+      env.DATA_FILE_WITH_VECTORS || "./data/HotelsData_toCosmosDB_Vector.json",
   };
 }
 

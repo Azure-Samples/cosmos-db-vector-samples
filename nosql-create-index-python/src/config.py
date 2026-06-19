@@ -82,7 +82,7 @@ def load_config(env: Optional[Mapping[str, str]] = None) -> SampleConfig:
 
     data_file_value = _clean(environment.get("DATA_FILE_WITH_VECTORS"))
     if not data_file_value:
-        data_file_value = "..\\data\\HotelsData_toCosmosDB_Vector.json"
+        data_file_value = "./data/HotelsData_toCosmosDB_Vector.json"
 
     return SampleConfig(
         cosmos_endpoint=_clean(environment.get("AZURE_COSMOSDB_ENDPOINT")) or "",

@@ -11,10 +11,10 @@ public final class Config {
     );
     private static final List<String> TARGET_CONTAINERS = List.of("hotels_diskann", "hotels_quantizedflat");
 
-    private static final String DEFAULT_DATABASE_NAME = "Hotels";
+    private static final String DEFAULT_DATABASE_NAME = "HotelsCreateIndex";
     private static final String DEFAULT_API_VERSION = "2024-08-01-preview";
     private static final String DEFAULT_QUERY_TEXT = "hotel near the ocean";
-    private static final String DEFAULT_DATA_FILE = "..\\data\\HotelsData_toCosmosDB_Vector.json";
+    private static final String DEFAULT_DATA_FILE = "./data/HotelsData_toCosmosDB_Vector.json";
     private static final String DEFAULT_EMBEDDING_FIELD = "DescriptionVector";
     private static final int DEFAULT_TOP_COUNT = 5;
     private static final int EXPECTED_DIMENSIONS = 1536;
@@ -34,6 +34,9 @@ public final class Config {
         Path dataFile = sampleRoot.resolve(read("DATA_FILE_WITH_VECTORS", DEFAULT_DATA_FILE)).normalize();
 
         return new SampleConfig(
+                read("AZURE_SUBSCRIPTION_ID", null),
+                read("AZURE_RESOURCE_GROUP", null),
+                read("AZURE_COSMOSDB_ACCOUNT_NAME", null),
                 read("AZURE_COSMOSDB_ENDPOINT", null),
                 databaseName,
                 containerName,
@@ -118,6 +121,9 @@ public final class Config {
 }
 
 record SampleConfig(
+        String subscriptionId,
+        String resourceGroup,
+        String accountName,
         String cosmosEndpoint,
         String databaseName,
         String containerName,

@@ -4,6 +4,9 @@ namespace NosqlCreateIndexDotnet;
 
 public sealed record SampleConfig(
     string SampleRoot,
+    string SubscriptionId,
+    string ResourceGroup,
+    string AccountName,
     string CosmosEndpoint,
     string DatabaseName,
     string? ContainerName,
@@ -28,7 +31,7 @@ public sealed record SampleConfig(
 public static class Config
 {
     private const string ProjectFileName = "nosql-create-index-dotnet.csproj";
-    private const string DefaultDataFile = "../data/HotelsData_toCosmosDB_Vector.json";
+    private const string DefaultDataFile = "./data/HotelsData_toCosmosDB_Vector.json";
     private const string DefaultQueryText = "hotel near the ocean";
     private const string DefaultEmbeddingFieldName = "DescriptionVector";
     private const string DefaultOpenAIEmbeddingApiVersion = "2024-08-01-preview";
@@ -47,8 +50,11 @@ public static class Config
 
         return new SampleConfig(
             SampleRoot: sampleRoot,
+            SubscriptionId: Normalize(configuration["AZURE_SUBSCRIPTION_ID"]) ?? string.Empty,
+            ResourceGroup: Normalize(configuration["AZURE_RESOURCE_GROUP"]) ?? string.Empty,
+            AccountName: Normalize(configuration["AZURE_COSMOSDB_ACCOUNT_NAME"]) ?? string.Empty,
             CosmosEndpoint: Normalize(configuration["AZURE_COSMOSDB_ENDPOINT"]) ?? string.Empty,
-            DatabaseName: Normalize(configuration["AZURE_COSMOSDB_CREATE_INDEX_DATABASENAME"]) ?? string.Empty,
+            DatabaseName: Normalize(configuration["AZURE_COSMOSDB_CREATE_INDEX_DATABASENAME"]) ?? "HotelsCreateIndex",
             ContainerName: Normalize(configuration["AZURE_COSMOSDB_CONTAINER_NAME"]),
             OpenAIEmbeddingEndpoint: Normalize(configuration["AZURE_OPENAI_EMBEDDING_ENDPOINT"]) ?? string.Empty,
             OpenAIEmbeddingDeployment: Normalize(configuration["AZURE_OPENAI_EMBEDDING_DEPLOYMENT"]) ?? string.Empty,
