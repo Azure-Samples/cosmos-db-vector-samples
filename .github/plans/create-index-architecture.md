@@ -1181,6 +1181,65 @@ Save as `verify-section-3.sh`, make executable (`chmod +x verify-section-3.sh`),
 
 ---
 
+## Phase 3 Validation & Testing (Replicable Commands)
+
+**Status:** 🟡 IN PROGRESS (2/4 requirements complete)
+
+See `PHASE_3_VERIFICATION.md` for detailed evidence-based verification.
+
+### Requirement 1: Region Distribution Logging (Partial ⚠️)
+- ✅ **Python, TypeScript:** Display per-region document counts during ingest
+- ⚠️ **Go, Java, .NET:** Only show region validation message (missing per-region breakdown)
+
+**Verification:**
+```bash
+# Python: Check for region count output
+grep -A2 "for region, region_docs in docs_by_region.items():" \
+  nosql-create-index-python/src/data_plane.py | tail -1
+
+# Go: Shows gap (only validation, no counts)
+grep -c "fmt.Printf.*region" nosql-create-index-go/dataplane.go
+```
+
+### Requirement 2: RU Cost Tracking (Complete ✅)
+All 5 languages track and output request unit consumption.
+
+**Verification:**
+```bash
+# All languages contain requestCharge references
+for lang in python typescript go java dotnet; do
+  case $lang in
+    python) file="nosql-create-index-python/src/data_plane.py" ;;
+    typescript) file="nosql-create-index-typescript/src/data-plane.ts" ;;
+    go) file="nosql-create-index-go/dataplane.go" ;;
+    java) file="nosql-create-index-java/src/main/java/com/azure/cosmos/createindex/DataPlane.java" ;;
+    dotnet) file="nosql-create-index-dotnet/src/DataPlane.cs" ;;
+  esac
+  echo "$lang: $(grep -c 'request.*charge\|requestCharge\|RequestCharge\|request_charge' "$file" 2>/dev/null || echo 0) matches"
+done
+```
+
+### Requirement 3: End-to-End Testing (Ready ⚠️)
+Code configured for correct data file; execution not yet verified.
+
+**Verification:**
+```bash
+# All 5 languages configured to use HotelsData_toCosmosDB_Vector_byRegion.json
+for dir in nosql-create-index-python nosql-create-index-typescript \
+            nosql-create-index-go nosql-create-index-java nosql-create-index-dotnet; do
+  echo "$dir: $(grep -c 'HotelsData_toCosmosDB_Vector_byRegion' $dir/src/* 2>/dev/null || echo 0) files"
+done
+
+# Verify data file region distribution (should be 10 per region)
+jq -r '.[] | .Region' data/HotelsData_toCosmosDB_Vector_byRegion.json | \
+  sort | uniq -c | sort -rn
+```
+
+### Requirement 4: Cross-Language Validation (Not Yet Done ❌)
+No test output found comparing similarity scores across 5 languages.
+
+---
+
 ## SDK Usage Summary
 
 **CRITICAL REQUIREMENT:** All samples MUST use official Azure SDKs — never use REST APIs directly.
