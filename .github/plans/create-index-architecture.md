@@ -9,6 +9,14 @@
 
 ---
 
+## ⚡ Quick Links
+
+- **📋 Verification Guide:** See `VERIFICATION_BY_PHASE.md` for replicable commands to verify each phase (Setup → Ingest → Query → Cleanup)
+- **✅ Phase 2 Status:** `PHASE_2_VERIFICATION.md` — All 6 requirements verified (data file, embedding field, partition key, region batching, region validation, RU tracking)
+- **🟡 Phase 3 Status:** `PHASE_3_VERIFICATION.md` — Requirements defined, region distribution logging partial (Python+TS complete, Go/Java/.NET need per-region counts)
+
+---
+
 ## 1. Executive Summary
 
 The create-index samples demonstrate how **vector index creation decisions directly impact query results**. Unlike vector-search samples (which focus on "how to query"), create-index samples answer **"how do index type and distance function choice affect results?"**
