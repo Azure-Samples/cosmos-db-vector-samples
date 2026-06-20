@@ -856,7 +856,110 @@ done
 
 ## Phase 2 Summary: Region-Based Partitioning (✅ COMPLETE)
 
+### How to Verify Phase 2 (Replicable Commands)
 
+All Phase 2 work is **programmatically verifiable** using git and grep. Run these commands from the repo root to confirm all 5 languages have been properly refactored:
+
+#### 1. Verify Data File Path (All 5 Languages)
+```bash
+# All 5 languages should use HotelsData_toCosmosDB_Vector_byRegion.json
+grep -r "HotelsData_toCosmosDB_Vector_byRegion" nosql-create-index-*/src/config.* | wc -l
+# Expected output: 5
+```
+
+#### 2. Verify Embedding Field Name (All 5 Languages)
+```bash
+# All 5 languages should use "embedding" (not "DescriptionVector")
+grep -r 'DEFAULT_EMBEDDING_FIELD\|embeddingField\|embeddingFieldName' nosql-create-index-*/src/ | grep '"embedding"' | wc -l
+# Expected output: 5
+```
+
+#### 3. Verify Partition Key Path (All 5 Languages)
+```bash
+# All control planes should configure /Region as partition key
+grep -r '"/Region"\|paths.*Region' nosql-create-index-*/src/*ontrol* --include="*.py" --include="*.ts" --include="*.go" --include="*.java" --include="*.cs" | wc -l
+# Expected output: 5+
+```
+
+#### 4. Verify Region-Based Batching Logic (All 5 Languages)
+```bash
+# Python: _group_by_region function
+grep -n "_group_by_region" nosql-create-index-python/src/data_plane.py | wc -l
+# Expected output: 4+ (function def + calls)
+
+# TypeScript: groupByRegion function
+grep -n "groupByRegion" nosql-create-index-typescript/src/data-plane.ts | wc -l
+# Expected output: 3+ (function def + calls)
+
+# Go: region extraction in partition key
+grep -n "partitionKey.*region\|region.*PartitionKey" nosql-create-index-go/dataplane.go | wc -l
+# Expected output: 2+
+
+# Java: Region extraction in PartitionKeyBuilder
+grep -n "document.get.*Region" nosql-create-index-java/src/main/java/com/azure/cosmos/createindex/DataPlane.java | wc -l
+# Expected output: 1+
+
+# .NET: Region in PartitionKey
+grep -n "new PartitionKey(document.Region)" nosql-create-index-dotnet/src/DataPlane.cs | wc -l
+# Expected output: 1+
+```
+
+#### 5. Verify Region Validation (All 5 Languages)
+```bash
+# All implementations should validate Region property
+grep -r "validate.*region\|Region.*property\|region==null" nosql-create-index-*/src/ --include="*.py" --include="*.ts" --include="*.go" --include="*.java" --include="*.cs" | wc -l
+# Expected output: 5+ (one validation per language)
+```
+
+#### 6. Verify All Commits Are Present
+```bash
+# Show all Phase 2 implementation commits
+git log --oneline diberry/article-2 | grep -E "refactor.*region|Phase 2|partition key" | wc -l
+# Expected output: 9+ (Python, TypeScript, Go, Java, .NET + dependency updates + plan updates)
+
+# Show the complete commit history for Phase 2
+git log --oneline diberry/article-2 | head -20
+# Should show commits from 9df5fb4 (Python refactor) through ce78648 (verification)
+```
+
+#### 7. Verify No Uncommitted Changes
+```bash
+# Working tree should be clean
+git status
+# Expected output: "nothing to commit, working tree clean"
+```
+
+#### 8. Full Verification Script (Run All Checks at Once)
+```bash
+#!/bin/bash
+echo "=== Phase 2 Verification ==="
+echo ""
+echo "1. Data file paths (expect: 5):"
+grep -r "HotelsData_toCosmosDB_Vector_byRegion" nosql-create-index-*/src/config.* | wc -l
+echo ""
+echo "2. Embedding field names (expect: 5):"
+grep -r '"embedding"' nosql-create-index-*/src/config.* nosql-create-index-*/src/Config.* | wc -l
+echo ""
+echo "3. Partition key paths (expect: 5+):"
+grep -r '"/Region"' nosql-create-index-*/src/*ontrol* | wc -l
+echo ""
+echo "4. Region-based batching logic (expect: 10+):"
+grep -r "_group_by_region\|groupByRegion\|partitionKey.*region\|document.get.*Region\|new PartitionKey(document.Region)" nosql-create-index-*/src/ --include="*.py" --include="*.ts" --include="*.go" --include="*.java" --include="*.cs" | wc -l
+echo ""
+echo "5. Region validation (expect: 5+):"
+grep -r "validate.*region\|Region.*property" nosql-create-index-*/src/ --include="*.py" --include="*.ts" --include="*.go" --include="*.java" --include="*.cs" | wc -l
+echo ""
+echo "6. Phase 2 commits (expect: 9+):"
+git log --oneline diberry/article-2 | grep -E "refactor.*region|Phase 2|partition key" | wc -l
+echo ""
+echo "7. Working tree status:"
+git status --short | wc -l
+echo "   (Should be 0 for clean working tree)"
+echo ""
+echo "=== End Verification ==="
+```
+
+Save this as `verify-phase-2.sh`, make it executable (`chmod +x verify-phase-2.sh`), and run it to get a complete verification report.
 
 ---
 
