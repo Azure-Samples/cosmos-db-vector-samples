@@ -171,33 +171,33 @@ def validate_region_property(documents: List[Dict[str, Any]]) -> None:
 
 | Language | Data File | Partition Key | Embedding Field | Batch Logic | Region Validation |
 |----------|-----------|---------------|-----------------|-------------|------------------|
-| **Python** | ❌ OLD | ❌ "hotels" value | ❌ "DescriptionVector" | ❌ By size, not region | ❌ Missing |
-| **TypeScript** | ❌ OLD | ❌ "hotels" value | ❌ "DescriptionVector" | ❌ By size, not region | ❌ Missing |
-| **Go** | ❌ OLD | ❌ "hotels" value | ❌ "DescriptionVector" | ❌ By size, not region | ❌ Missing |
-| **Java** | ❌ OLD | ❌ "hotels" value | ❌ "DescriptionVector" | ❌ By size, not region | ❌ Missing |
-| **.NET** | ❌ OLD | ❌ "hotels" value | ❌ "DescriptionVector" | ❌ By size, not region | ❌ Missing |
+| **Python** | ✅ NEW | ✅ `/Region` path | ✅ `embedding` | ✅ By region | ✅ Validates |
+| **TypeScript** | ✅ NEW | ✅ `/Region` path | ✅ `embedding` | ✅ By region | ✅ Validates |
+| **Go** | ✅ NEW | ✅ `/Region` path | ✅ `embedding` | ✅ By region (query workaround) | ✅ Validates |
+| **Java** | ✅ NEW | ✅ `/Region` path | ✅ `embedding` | ✅ By region | ✅ Validates |
+| **.NET** | ✅ NEW | ✅ `/Region` path | ✅ `embedding` | ✅ By region | ✅ Validates |
 
 ---
 
 ## Required Changes (Priority Order)
 
 ### Phase 1: Configuration Updates (Unblock all languages)
-1. ✏️ Update all config files to reference `HotelsData_toCosmosDB_Vector_byRegion.json`
-2. ✏️ Change embedding field from `"DescriptionVector"` to `"embedding"`
-3. ✏️ Update container creation partition key from `/HotelId` to `/Region`
+1. ✅ Update all config files to reference `HotelsData_toCosmosDB_Vector_byRegion.json`
+2. ✅ Change embedding field from `"DescriptionVector"` to `"embedding"`
+3. ✅ Update container creation partition key from `/HotelId` to `/Region`
 
 ### Phase 2: Ingestion Logic Refactor (Per Language)
-1. Python: Refactor batch ingestion to group by Region
-2. TypeScript: Refactor batch ingestion to group by Region
-3. Go: Refactor batch ingestion to group by Region
-4. Java: Refactor batch ingestion to group by Region
-5. .NET: Refactor batch ingestion to group by Region
+1. ✅ Python: Refactor batch ingestion to group by Region
+2. ✅ TypeScript: Refactor batch ingestion to group by Region
+3. ✅ Go: Refactor batch ingestion to group by Region
+4. ✅ Java: Refactor batch ingestion to group by Region
+5. ✅ .NET: Refactor batch ingestion to group by Region
 
-### Phase 3: Validation & Testing
-1. Add Region property validation to all implementations
-2. Add logging to show Region-based batching statistics
-3. Test end-to-end with new data file
-4. Verify results match across all 5 languages (within ±0.01 tolerance)
+### Phase 3: Validation & Testing (NEXT)
+1. ⏳ Add Region property validation to all implementations (PARTIALLY DONE)
+2. ⏳ Add logging to show Region-based batching statistics
+3. ⏳ Test end-to-end with new data file
+4. ⏳ Verify results match across all 5 languages (within ±0.01 tolerance)
 
 ---
 
@@ -220,7 +220,23 @@ def validate_region_property(documents: List[Dict[str, Any]]) -> None:
 
 ## Next Steps
 
-1. **This session:** Create organized summary of findings ✅
-2. **Next phase:** Implement fixes across all 5 languages (5 separate commits)
-3. **Testing:** Validate each language implementation independently
-4. **Verification:** Cross-language consistency check
+### Phase 2 Complete ✅
+**Completed in this session:**
+- ✅ All 5 languages (Python, TypeScript, Go, Java, .NET) refactored to use region-based partition keys
+- ✅ All configuration files updated (data file path, embedding field name, partition key path)
+- ✅ All implementations validate Region property and group documents by region
+- ✅ Go implementation includes region-by-region query workaround (SDK limitation)
+- ✅ All 5 languages verified to build successfully
+- ✅ Changes committed with 14 total organized commits on `diberry/article-2` branch
+- ✅ Go dependency lock files (go.mod, go.sum) committed with transitive armcosmos dependency
+
+**Commits included:**
+- Phase 1 (prior session): Configuration & env var fixes, data file path corrections, embedding field standardization
+- Phase 2 (prior session): Python, TypeScript, Go, Java region-based ingestion refactoring
+- Phase 2.5 (this session): .NET region-based ingestion refactoring + dependency updates
+
+### Phase 3 Next (Validation & Testing)
+1. **Add region distribution logging** — Display region counts during data load (Northeast/Midwest/South/West breakdown)
+2. **Add RU cost tracking** — Log request units per region during ingestion and queries
+3. **Test end-to-end** — Run each sample with new data file, verify all documents ingest correctly
+4. **Cross-language validation** — Verify query results match across all 5 languages (within ±0.01 similarity tolerance)

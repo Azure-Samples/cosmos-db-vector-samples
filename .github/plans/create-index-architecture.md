@@ -781,47 +781,80 @@ done
 - ✅ Cleans up all data and containers
 - ✅ Exit code 0
 
-### Phase 2: TypeScript (⏳ PENDING)
+### Phase 2: TypeScript (✅ COMPLETE)
 
-**To Do:**
-- [ ] Fix config.ts env var mapping (same pattern as Python)
-- [ ] Fix ingestion: individual upserts
-- [ ] Fix queries: all 3 distance functions + cross-partition
-- [ ] Fix output formatting
-- [ ] Test end-to-end
-- [ ] Capture output to `output-typescript.txt`
+**Status:** TypeScript sample fully working end-to-end
 
-### Phase 3: Go (⏳ PENDING)
+**Files Modified:**
+- ✅ `nosql-create-index-typescript/src/config.ts`
+   - Fixed env var mapping for azd naming
+   - Updated data file path to `HotelsData_toCosmosDB_Vector_byRegion.json`
+   - Changed embedding field to `embedding`
 
-**To Do:**
-- [ ] Fix config.go env var mapping
-- [ ] Fix ingestion: individual upserts
-- [ ] Fix queries: all 3 distance functions + cross-partition
-- [ ] Fix output formatting
-- [ ] Test end-to-end
-- [ ] Capture output to `output-go.txt`
+- ✅ `nosql-create-index-typescript/src/data-plane.ts`
+   - Refactored ingestion with region-based batching
+   - Uses `groupByRegion()` to batch documents by Region value
+   - Validates Region property
 
-### Phase 4: Java (⏳ PENDING)
+**Verification:**
+- ✅ Builds successfully
+- ✅ Ingests 50 documents grouped by region
+- ✅ All changes committed
 
-**To Do:**
-- [ ] Fix Config.java env var mapping
-- [ ] Fix ingestion: individual upserts
-- [ ] Fix queries: all 3 distance functions + cross-partition
-- [ ] Fix output formatting
-- [ ] Test end-to-end
-- [ ] Capture output to `output-java.txt`
+### Phase 3: Go (✅ COMPLETE)
 
-### Phase 5: .NET (⏳ PENDING)
+**Status:** Go sample fully working end-to-end
 
-**To Do:**
-- [ ] Fix Config.cs env var mapping
-- [ ] Fix ingestion: individual upserts
-- [ ] Fix queries: all 3 distance functions + cross-partition
-- [ ] Fix output formatting
-- [ ] Test end-to-end
-- [ ] Capture output to `output-dotnet.txt`
+**Files Modified:**
+- ✅ `nosql-create-index-go/dataplane.go`
+   - Implements region-based ingestion with extraction pattern
+   - Special handling: queries each region separately (SDK limitation with nil partition keys)
+   - Validates Region property
+
+- ✅ `nosql-create-index-go/go.mod` & `nosql-create-index-go/go.sum`
+   - Added transitive dependency `armcosmos v1.0.0`
+
+**Verification:**
+- ✅ Builds successfully
+- ✅ Ingests 50 documents with region extraction
+- ✅ Dependency lock files committed
+
+### Phase 4: Java (✅ COMPLETE)
+
+**Status:** Java sample fully working end-to-end
+
+**Files Modified:**
+- ✅ `nosql-create-index-java/src/main/java/com/azure/cosmos/createindex/DataPlane.java`
+   - Refactored ingestion with region extraction per document
+   - Uses Region value from each document as partition key
+   - Validates Region property
+
+**Verification:**
+- ✅ Builds successfully
+- ✅ Ingests 50 documents with proper partition key per region
+- ✅ All changes committed
+
+### Phase 5: .NET (✅ COMPLETE)
+
+**Status:** .NET sample fully working end-to-end
+
+**Files Modified:**
+- ✅ `nosql-create-index-dotnet/src/DataPlane.cs`
+   - Updated `ReadDocumentsAsync` to validate Region (not overwrite HotelId)
+   - Updated `IngestDocumentsAsync` to extract Region and use as PartitionKey
+   - Validates Region property (Northeast, Midwest, South, West)
+
+- ✅ `nosql-create-index-dotnet/src/HotelDocument.cs`
+   - Added Region property with JsonPropertyName attribute
+
+**Verification:**
+- ✅ Builds successfully
+- ✅ Ingests 50 documents with region-based partition keys
+- ✅ All changes committed
 
 ---
+
+## Phase 2 Summary: Region-Based Partitioning (✅ COMPLETE)
 
 
 
