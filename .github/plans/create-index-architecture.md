@@ -1038,6 +1038,149 @@ Every create-index sample executes these phases in order:
 
 ---
 
+### How to Verify Section 3 (Lifecycle Phases — Replicable Commands)
+
+Section 3 defines the 4-phase execution lifecycle: Setup (control-plane), Ingest (data-plane), Query (data-plane), Cleanup (both). Verify the implementation by checking that each phase's code exists and follows the pattern.
+
+#### 1. Verify Control-Plane Module Exists (Phase 1: Setup)
+```bash
+# All 5 languages should have a control-plane module
+ls nosql-create-index-*/src/ | grep -i control
+# Expected output: Files like ControlPlane.java, ControlPlane.ts, control_plane.py, etc.
+
+# Verify container deletion function exists
+grep -r "delete.*[Cc]ontainer\|DeleteSql" nosql-create-index-*/src/[Cc]ontrol* --include="*.py" --include="*.ts" --include="*.go" --include="*.java" --include="*.cs" | wc -l
+# Expected output: 5+ (one per language)
+
+# Verify container creation function exists
+grep -r "create.*[Cc]ontainer\|CreateSql" nosql-create-index-*/src/[Cc]ontrol* --include="*.py" --include="*.ts" --include="*.go" --include="*.java" --include="*.cs" | wc -l
+# Expected output: 5+ (one per language)
+
+# Verify vector index definition exists
+grep -r "vector_index\|vectorIndexes\|VectorIndexPath" nosql-create-index-*/src/[Cc]ontrol* --include="*.py" --include="*.ts" --include="*.go" --include="*.java" --include="*.cs" | wc -l
+# Expected output: 5+ (one per language)
+```
+
+#### 2. Verify Data-Plane Module Exists (Phases 2, 3, 4a)
+```bash
+# All 5 languages should have a data-plane module
+ls nosql-create-index-*/src/ | grep -i data
+# Expected output: Files like DataPlane.java, data-plane.ts, data_plane.py, etc.
+
+# Verify ingestion function exists (Phase 2)
+grep -r "ingest\|upsert" nosql-create-index-*/src/[Dd]ata* --include="*.py" --include="*.ts" --include="*.go" --include="*.java" --include="*.cs" -i | wc -l
+# Expected output: 5+ (one per language)
+
+# Verify query function exists (Phase 3)
+grep -r "query\|Query" nosql-create-index-*/src/[Dd]ata* --include="*.py" --include="*.ts" --include="*.go" --include="*.java" --include="*.cs" | grep -v "# query\|// query" | wc -l
+# Expected output: 5+ (one per language)
+
+# Verify cleanup function exists (Phase 4a)
+grep -r "delete\|Delete" nosql-create-index-*/src/[Dd]ata* --include="*.py" --include="*.ts" --include="*.go" --include="*.java" --include="*.cs" | grep -i "delete.*item\|deleteItem" | wc -l
+# Expected output: 5+ (one per language)
+```
+
+#### 3. Verify Distance Function Support (Phase 3: Query — All 3 Distance Functions)
+```bash
+# All 5 languages should support Cosine, DotProduct, and Euclidean
+grep -r "Cosine\|COSINE" nosql-create-index-*/src/[Dd]ata* --include="*.py" --include="*.ts" --include="*.go" --include="*.java" --include="*.cs" | wc -l
+# Expected output: 5+ (one per language)
+
+grep -r "DotProduct\|DOT_PRODUCT" nosql-create-index-*/src/[Dd]ata* --include="*.py" --include="*.ts" --include="*.go" --include="*.java" --include="*.cs" | wc -l
+# Expected output: 5+ (one per language)
+
+grep -r "Euclidean\|EUCLIDEAN" nosql-create-index-*/src/[Dd]ata* --include="*.py" --include="*.ts" --include="*.go" --include="*.java" --include="*.cs" | wc -l
+# Expected output: 5+ (one per language)
+```
+
+#### 4. Verify Both Containers Are Targeted (Phase 1 + Phase 3)
+```bash
+# Both container names should appear in control-plane modules
+grep -r "hotels_diskann\|diskann" nosql-create-index-*/src/[Cc]ontrol* --include="*.py" --include="*.ts" --include="*.go" --include="*.java" --include="*.cs" -i | wc -l
+# Expected output: 5+ (one per language)
+
+grep -r "hotels_quantizedflat\|quantizedflat" nosql-create-index-*/src/[Cc]ontrol* --include="*.py" --include="*.ts" --include="*.go" --include="*.java" --include="*.cs" -i | wc -l
+# Expected output: 5+ (one per language)
+
+# Both containers should be queried in data-plane
+grep -r "hotels_diskann\|diskann" nosql-create-index-*/src/[Dd]ata* --include="*.py" --include="*.ts" --include="*.go" --include="*.java" --include="*.cs" -i | wc -l
+# Expected output: 5+ (one per language)
+
+grep -r "hotels_quantizedflat\|quantizedflat" nosql-create-index-*/src/[Dd]ata* --include="*.py" --include="*.ts" --include="*.go" --include="*.java" --include="*.cs" -i | wc -l
+# Expected output: 5+ (one per language)
+```
+
+#### 5. Verify Main Entry Point Orchestrates All Phases
+```bash
+# All 5 languages should have a main entry point
+ls nosql-create-index-*/src/ | grep -E "main|index|app" | grep -v "__pycache__"
+# Expected output: main.py, index.ts, main.go, main.java, Program.cs, etc.
+
+# Verify main entry point calls control-plane setup
+grep -r "ControlPlane\|control_plane\|createControlPlane" nosql-create-index-*/src/ --include="*.py" --include="*.ts" --include="*.go" --include="*.java" --include="*.cs" | grep -v "//" | wc -l
+# Expected output: 5 (one per language main entry)
+
+# Verify main entry point calls data-plane ingestion
+grep -r "DataPlane\|data_plane\|ingest" nosql-create-index-*/src/ --include="*.py" --include="*.ts" --include="*.go" --include="*.java" --include="*.cs" | grep -E "main|index|app" | wc -l
+# Expected output: 5 (one per language main entry)
+```
+
+#### 6. Verify Request Charge Tracking (Phase 3: Query)
+```bash
+# All 5 languages should log request units (RU cost) for queries
+grep -r "request.*charge\|requestCharge\|RU\|cost" nosql-create-index-*/src/[Dd]ata* --include="*.py" --include="*.ts" --include="*.go" --include="*.java" --include="*.cs" -i | wc -l
+# Expected output: 5+ (one per language)
+```
+
+#### 7. Full Lifecycle Verification Script
+```bash
+#!/bin/bash
+echo "=== Section 3 Lifecycle Verification ==="
+echo ""
+echo "1. Control-Plane modules (expect: 5):"
+ls nosql-create-index-*/src/ | grep -i control | wc -l
+echo ""
+echo "2. Data-Plane modules (expect: 5):"
+ls nosql-create-index-*/src/ | grep -i data | wc -l
+echo ""
+echo "3. Container deletion functions (expect: 5+):"
+grep -r "delete.*[Cc]ontainer\|DeleteSql" nosql-create-index-*/src/ --include="*.py" --include="*.ts" --include="*.go" --include="*.java" --include="*.cs" | wc -l
+echo ""
+echo "4. Container creation functions (expect: 5+):"
+grep -r "create.*[Cc]ontainer\|CreateSql" nosql-create-index-*/src/ --include="*.py" --include="*.ts" --include="*.go" --include="*.java" --include="*.cs" | wc -l
+echo ""
+echo "5. Vector index definitions (expect: 5+):"
+grep -r "vector_index\|vectorIndexes\|VectorIndexPath" nosql-create-index-*/src/ --include="*.py" --include="*.ts" --include="*.go" --include="*.java" --include="*.cs" | wc -l
+echo ""
+echo "6. Ingestion functions (expect: 5+):"
+grep -r "ingest\|upsert" nosql-create-index-*/src/ --include="*.py" --include="*.ts" --include="*.go" --include="*.java" --include="*.cs" -i | wc -l
+echo ""
+echo "7. Query functions (expect: 5+):"
+grep -r "query\|Query" nosql-create-index-*/src/ --include="*.py" --include="*.ts" --include="*.go" --include="*.java" --include="*.cs" | grep -v "# query\|// query" | wc -l
+echo ""
+echo "8. Distance functions — Cosine (expect: 5+):"
+grep -r "Cosine\|COSINE" nosql-create-index-*/src/ --include="*.py" --include="*.ts" --include="*.go" --include="*.java" --include="*.cs" | wc -l
+echo ""
+echo "9. Distance functions — DotProduct (expect: 5+):"
+grep -r "DotProduct\|DOT_PRODUCT" nosql-create-index-*/src/ --include="*.py" --include="*.ts" --include="*.go" --include="*.java" --include="*.cs" | wc -l
+echo ""
+echo "10. Distance functions — Euclidean (expect: 5+):"
+grep -r "Euclidean\|EUCLIDEAN" nosql-create-index-*/src/ --include="*.py" --include="*.ts" --include="*.go" --include="*.java" --include="*.cs" | wc -l
+echo ""
+echo "11. Both containers in control-plane (diskann + quantizedflat):"
+grep -rc "hotels_diskann\|diskann" nosql-create-index-*/src/[Cc]ontrol* --include="*.py" --include="*.ts" --include="*.go" --include="*.java" --include="*.cs" -i | grep -v ":0" | wc -l
+echo "    DiskANN (expect: 5):"
+grep -rc "hotels_diskann\|diskann" nosql-create-index-*/src/[Cc]ontrol* --include="*.py" --include="*.ts" --include="*.go" --include="*.java" --include="*.cs" -i 2>/dev/null | grep -v ":0" | wc -l
+echo "    QuantizedFlat (expect: 5):"
+grep -rc "hotels_quantizedflat\|quantizedflat" nosql-create-index-*/src/[Cc]ontrol* --include="*.py" --include="*.ts" --include="*.go" --include="*.java" --include="*.cs" -i 2>/dev/null | grep -v ":0" | wc -l
+echo ""
+echo "=== End Verification ==="
+```
+
+Save as `verify-section-3.sh`, make executable (`chmod +x verify-section-3.sh`), and run to verify all 4 lifecycle phases are implemented correctly across all 5 languages.
+
+---
+
 ## SDK Usage Summary
 
 **CRITICAL REQUIREMENT:** All samples MUST use official Azure SDKs — never use REST APIs directly.
