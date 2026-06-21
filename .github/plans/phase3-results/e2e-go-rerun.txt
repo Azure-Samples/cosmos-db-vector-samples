@@ -1,0 +1,33 @@
+✓ Region validation passed. Found regions: Midwest, Northeast, South, West
+  Region 'Northeast': 10 documents
+  Region 'Midwest': 10 documents
+  Region 'South': 14 documents
+  Region 'West': 16 documents
+Using Azure OpenAI Embedding Deployment/Model: text-embedding-3-small
+Reading JSON file from C:\project-dina-data-ai\repos\public-azuresamples-cosmos-db-vector-samples\nosql-create-index-go\data\HotelsData_toCosmosDB_Vector_byRegion.json
+Loaded 50 documents
+Processing in batches of 50...
+  ✓ hotels_diskann: 50 documents already exist (skipped)
+  ✓ hotels_quantizedflat: 50 documents already exist (skipped)
+
+Query: "hotel near the ocean"
+Embedding generated (1536 dimensions)
+
+Running search (top 3 results for each distance function)...
+  ✓ hotels_diskann queried (15.86 RUs)
+  ✓ hotels_diskann queried (15.86 RUs)
+  ✓ hotels_diskann queried (15.86 RUs)
+  ✓ hotels_quantizedflat queried (15.86 RUs)
+  ✓ hotels_quantizedflat queried (15.86 RUs)
+  ✓ hotels_quantizedflat queried (15.86 RUs)
+
+| Container            | Metric     | Top 1 Result               | Score  | Top 2 Result               | Score  | Diff   |
+|----------------------|------------|----------------------------|--------|----------------------------|--------|--------|
+| hotels_diskann       | Cosine     | Windy Ocean Motel          | 0.5268 | Ocean Water Resort & Spa   | 0.5177 | 0.0091 |
+| hotels_diskann       | DotProduct | Windy Ocean Motel          | 0.5271 | Ocean Water Resort & Spa   | 0.5179 | 0.0091 |
+| hotels_diskann       | Euclidean  | Grand Gaming Resort        | 1.1523 | Economy Universe Motel     | 1.1492 | 0.0031 |
+| hotels_quantizedflat | Cosine     | Windy Ocean Motel          | 0.5268 | Ocean Water Resort & Spa   | 0.5177 | 0.0091 |
+| hotels_quantizedflat | DotProduct | Windy Ocean Motel          | 0.5271 | Ocean Water Resort & Spa   | 0.5179 | 0.0091 |
+| hotels_quantizedflat | Euclidean  | Grand Gaming Resort        | 1.1523 | Economy Universe Motel     | 1.1492 | 0.0031 |
+
+Complete

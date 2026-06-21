@@ -1,0 +1,19 @@
+
+Error: Status code: 400 Sub-status: 1001
+There was an error in the transactional batch on index 0. Error message: BAD_REQUEST - Request being sent is invalid.
+
+=== Diagnostic Check ===
+Cosmos DB Endpoint: https://db-dib-cos-4bpmnkpp4662v4.documents.azure.com:443/
+Database name: HotelsCreateIndex
+✓ Database 'HotelsCreateIndex' exists
+  Containers found: 1
+    - hotels_diskann
+Using Azure OpenAI Embedding Deployment/Model: text-embedding-3-small
+Reading JSON file from C:\project-dina-data-ai\repos\public-azuresamples-cosmos-db-vector-samples\nosql-create-index-python\data\HotelsData_toCosmosDB_Vector_byRegion.json
+Loaded 50 documents
+Processing in batches of 50...
+✓ Region validation passed. Found regions: ['Midwest', 'Northeast', 'South', 'West']
+  Region 'Midwest': 10 documents
+  Region 'Northeast': 10 documents
+  Region 'South': 14 documents
+  Region 'West': 16 documents

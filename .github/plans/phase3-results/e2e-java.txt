@@ -1,0 +1,39 @@
+[INFO] Scanning for projects...
+[INFO] 
+[INFO] ---------< com.azure.samples.cosmosdb:nosql-create-index-java >---------
+[INFO] Building Azure Cosmos DB NoSQL Create Index - Java 1.0.0
+[INFO]   from pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- clean:3.2.0:clean (default-clean) @ nosql-create-index-java ---
+[INFO] Deleting C:\project-dina-data-ai\repos\public-azuresamples-cosmos-db-vector-samples\nosql-create-index-java\target
+[INFO] 
+[INFO] --- resources:3.4.0:resources (default-resources) @ nosql-create-index-java ---
+[INFO] skip non existing resourceDirectory C:\project-dina-data-ai\repos\public-azuresamples-cosmos-db-vector-samples\nosql-create-index-java\src\main\resources
+[INFO] 
+[INFO] --- compiler:3.14.0:compile (default-compile) @ nosql-create-index-java ---
+[INFO] Recompiling the module because of changed source code.
+[INFO] Compiling 3 source files with javac [debug release 17] to target\classes
+[INFO] 
+[INFO] --- exec:3.5.0:java (default-cli) @ nosql-create-index-java ---
+SLF4J: Failed to load class "org.slf4j.impl.StaticLoggerBinder".
+SLF4J: Defaulting to no-operation (NOP) logger implementation
+SLF4J: See http://www.slf4j.org/codes.html#StaticLoggerBinder for further details.
+Using Azure OpenAI Embedding Deployment/Model: text-embedding-3-small
+Reading JSON file from C:\project-dina-data-ai\repos\public-azuresamples-cosmos-db-vector-samples\nosql-create-index-java\data\HotelsData_toCosmosDB_Vector_byRegion.json
+? Region validation passed. Found regions: Northeast, Midwest, South, West
+  Region 'Northeast': 10 documents
+  Region 'Midwest': 10 documents
+  Region 'South': 14 documents
+  Region 'West': 16 documents
+Loaded 50 documents
+Processing in batches of 50...
+  ? hotels_diskann: 50 upserted (14796.33 RUs)
+  ? hotels_quantizedflat: 50 upserted (14796.33 RUs)
+
+Query: "hotel near the ocean"
+Embedding generated (1536 dimensions)
+
+Running searches (top 5 results for each distance function)...
+
+Error: Cosmos DB data-plane request failed. Verify that azd up created the database and containers and that your identity has the required Microsoft Entra ID roles. Original error: {"innerErrorMessage":"Query contains 1 or more unsupported features. Upgrade your SDK to a version that does support the requested features:\r\nQuery contained NonStreamingOrderBy, which the calling client does not support.\r\nActivityId: 7605c633-7dfb-484f-84bf-b7fc7f34b592, Microsoft.Azure.Documents.Common/2.14.0, StatusCode: BadRequest","cosmosDiagnostics":{"userAgent":"azsdk-java-cosmos/4.58.0 Windows11/10.0 JRE/17.0.19","activityId":"7605c633-7dfb-484f-84bf-b7fc7f34b592","requestLatencyInMs":156,"requestStartTimeUTC":"2026-06-21T12:35:52.142841700Z","requestEndTimeUTC":"2026-06-21T12:35:52.298959100Z","responseStatisticsList":[],"supplementalResponseStatisticsList":[],"addressResolutionStatistics":{},"regionsContacted":["east us 2"],"retryContext":{"statusAndSubStatusCodes":null,"retryLatency":0,"retryCount":0},"metadataDiagnosticsContext":{"metadataDiagnosticList":null},"serializationDiagnosticsContext":{"serializationDiagnosticsList":null},"gatewayStatisticsList":[{"sessionToken":null,"operationType":"QueryPlan","resourceType":"Document","statusCode":400,"subStatusCode":0,"requestCharge":0.0,"requestTimeline":[{"eventName":"connectionAcquired","startTimeUTC":"2026-06-21T12:35:52.148381900Z","durationInMilliSecs":0.9967},{"eventName":"connectionConfigured","startTimeUTC":"2026-06-21T12:35:52.149378600Z","durationInMilliSecs":0.0},{"eventName":"requestSent","startTimeUTC":"2026-06-21T12:35:52.149378600Z","durationInMilliSecs":1.9989},{"eventName":"transitTime","startTimeUTC":"2026-06-21T12:35:52.151377500Z","durationInMilliSecs":145.5818},{"eventName":"received","startTimeUTC":"2026-06-21T12:35:52.296959300Z","durationInMilliSecs":0.9999}],"partitionKeyRangeId":null,"responsePayloadSizeInBytes":0,"exceptionMessage":"Query contains 1 or more unsupported features. Upgrade your SDK to a version that does support the requested features:\r\nQuery contained NonStreamingOrderBy, which the calling client does not support.\r\nActivityId: 7605c633-7dfb-484f-84bf-b7fc7f34b592, Microsoft.Azure.Documents.Common/2.14.0, StatusCode: BadRequest","exceptionResponseHeaders":"{Strict-Transport-Security=max-age=31536000, Server=Microsoft-HTTPAPI/2.0, x-ms-aad-applied-role-assignment=02959356-56b0-52d3-962c-6aa0bf275b78, x-ms-gatewayversion=version=2.14.0, Content-Length=328, Date=Sun, 21 Jun 2026 12:35:51 GMT, x-ms-activity-id=7605c633-7dfb-484f-84bf-b7fc7f34b592, Content-Type=application/json}"}],"samplingRateSnapshot":1.0,"systemInformation":{"usedMemory":"92849 KB","availableMemory":"16676175 KB","systemCpuLoad":"empty","availableProcessors":16},"clientCfgs":{"id":1,"machineId":"vmId_c9d81d5e-2596-4e9b-9dfe-565a529fd18a","connectionMode":"DIRECT","numberOfClients":0,"excrgns":"[]","clientEndpoints":{"https://db-dib-cos-4bpmnkpp4662v4.documents.azure.com:443/":1},"connCfg":{"rntbd":"(cto:PT5S, nrto:PT5S, icto:PT0S, ieto:PT1H, mcpe:130, mrpc:30, cer:true)","gw":"(cps:1000, nrto:PT1M, icto:PT1M, p:false)","other":"(ed: true, cs: false, rv: true)"},"consistencyCfg":"(consistency: null, mm: true, prgns: [])","proactiveInitCfg":"","e2ePolicyCfg":"","sessionRetryCfg":""}}}

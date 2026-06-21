@@ -1,0 +1,41 @@
+
+> nosql-create-index-typescript@1.0.0 start
+> tsc && node --env-file .env dist/index.js
+
+Using Azure OpenAI Embedding Deployment/Model: text-embedding-3-small
+
+=== Step 1: Create Container with Vector Index ===
+  Container:      hotels_diskann
+  Index type:     diskANN
+  Dimensions:     1536
+  Distance func:  cosine (queried with all 3 metrics)
+  Deleting existing container if present...
+  Deleted existing container
+  Created in 8.6s
+  Vector index is IMMUTABLE — cannot be changed after creation
+
+=== Step 1: Create Container with Vector Index ===
+  Container:      hotels_quantizedflat
+  Index type:     quantizedFlat
+  Dimensions:     1536
+  Distance func:  cosine (queried with all 3 metrics)
+  Deleting existing container if present...
+  Deleted existing container
+  Created in 11.4s
+  Vector index is IMMUTABLE — cannot be changed after creation
+
+==================================================
+Index type: diskANN
+Container: hotels_diskann
+==================================================
+
+Reading JSON file from C:\project-dina-data-ai\repos\public-azuresamples-cosmos-db-vector-samples\nosql-create-index-typescript\data\HotelsData_toCosmosDB_Vector_byRegion.json
+Loaded 50 documents
+✓ Region validation passed. Found regions: Midwest, Northeast, South, West
+  Region 'Midwest': 10 documents
+  Region 'Northeast': 10 documents
+  Region 'South': 14 documents
+  Region 'West': 16 documents
+Processing by region...
+
+Error: Batch ingestion incomplete: 50 documents failed in container 'hotels_diskann'.
