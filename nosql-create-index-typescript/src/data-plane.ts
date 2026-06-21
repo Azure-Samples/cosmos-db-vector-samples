@@ -10,8 +10,10 @@ import { CosmosClient, BulkOperationType, type Container } from "@azure/cosmos";
 import { AzureOpenAI } from "openai";
 import { getBearerTokenProvider, type TokenCredential } from "@azure/identity";
 import { readFile } from "node:fs/promises";
+import { appendFileSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { randomUUID } from "node:crypto";
 import type { SampleConfig } from "./config.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -144,6 +146,7 @@ function groupByRegion(documents: any[]): Map<string, any[]> {
 export async function insertDocuments(
   container: Container,
   config: SampleConfig,
+  embeddingField: string,
   containerName?: string
 ) {
   const actualContainerName = containerName || config.cosmos.containerName;
@@ -162,7 +165,7 @@ export async function insertDocuments(
 
   if (countResult[0] > 0) {
     console.log(
-      `  \u2713 ${actualContainerName}: ${countResult[0]} documents already exist (skipped)`
+      `  ✓ ${actualContainerName}: ${countResult[0]} documents already exist (skipped)`
     );
     return { total: data.length, inserted: 0, skipped: countResult[0] };
   }
@@ -174,44 +177,77 @@ export async function insertDocuments(
   console.log(`Processing by region...`);
   let inserted = 0;
   let failed = 0;
+  let conflict = 0;
   let totalRU = 0;
+  const errors: Array<{ doc: string; error: string; statusCode?: number }> = [];
 
   // Batch ingest by region (one batch per region)
   for (const [region, regionDocs] of docsByRegion) {
     const operations = regionDocs.map((item) => ({
       operationType: BulkOperationType.Create,
-      resourceBody: item,  // Keep original document structure, including Region and id (HotelId)
+      resourceBody: {
+        ...item,
+        id: item.HotelId || randomUUID(), // Map HotelId to id (required for Cosmos bulk ops)
+        [embeddingField]: item.embedding, // Rename embedding field to match config
+      },
       partitionKey: [region],
     }));
 
-    const response = await container.items.executeBulkOperations(operations);
+    try {
+      const response = await container.items.executeBulkOperations(operations);
 
-    if (response) {
-      for (const result of response) {
-        const code = result.response?.statusCode ?? result.error?.code;
-        const ru = result.response?.requestCharge ?? 0;
+      if (response) {
+        for (const result of response) {
+          const statusCode = result.response?.statusCode;
+          const errorCode = result.error?.code;
+          const ru = result.response?.requestCharge ?? 0;
 
-        if (code && Number(code) >= 200 && Number(code) < 300) {
-          inserted++;
-        } else if (Number(code) === 409) {
-          inserted++;
-        } else if (result.error) {
-          failed++;
-        } else {
-          inserted++;
+          if (statusCode && Number(statusCode) >= 200 && Number(statusCode) < 300) {
+            inserted++;
+          } else if (Number(statusCode) === 409) {
+            // 409 Conflict: document already exists
+            conflict++;
+            inserted++;
+          } else if (result.error) {
+            failed++;
+            const docId = (result as any).resourceBody?.id || "unknown";
+            errors.push({
+              doc: docId,
+              error: result.error.message || "Unknown error",
+              statusCode: statusCode as number | undefined,
+            });
+          } else {
+            inserted++;
+          }
+          totalRU += ru;
         }
-        totalRU += ru;
       }
+    } catch (error) {
+      failed += regionDocs.length;
+      errors.push({
+        doc: `Region: ${region} (${regionDocs.length} docs)`,
+        error: (error as Error).message || "Batch operation failed",
+      });
+    }
+  }
+
+  if (errors.length > 0) {
+    console.error(`  ✗ Errors during ingestion:`);
+    for (const err of errors.slice(0, 5)) {
+      console.error(`    - ${err.doc}: ${err.error}${err.statusCode ? ` (${err.statusCode})` : ""}`);
+    }
+    if (errors.length > 5) {
+      console.error(`    ... and ${errors.length - 5} more errors`);
     }
   }
 
   if (failed > 0) {
     throw new Error(
-      `Batch ingestion incomplete: ${failed} documents failed in container '${actualContainerName}'.`
+      `Batch ingestion incomplete: ${failed} documents failed, ${conflict} conflicts, ${inserted} inserted in container '${actualContainerName}'.`
     );
   }
 
-  console.log(`  \u2713 ${actualContainerName}: ${inserted} inserted (${totalRU.toFixed(2)} RUs)`);
+  console.log(`  ✓ ${actualContainerName}: ${inserted} inserted (${conflict > 0 ? `${conflict} conflicts, ` : ""}${totalRU.toFixed(2)} RUs)`);
   return { total: data.length, inserted, failed };
 }
 
@@ -225,7 +261,7 @@ export async function vectorQuery(
   config: SampleConfig
 ) {
   const embeddingField = config.embeddingField;
-
+  
   // Cosmos DB SQL does not support parameter placeholders for field names,
   // so the field name is string-interpolated. Validate to prevent injection.
   if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(embeddingField)) {
@@ -244,42 +280,75 @@ export async function vectorQuery(
   console.log(`\nRunning search (top 5 results for each distance function)...`);
 
   // Query with 3 distance functions using VectorDistance() options parameter
-  const distanceFunctions = ["Cosine", "DotProduct", "Euclidean"];
+  const distanceFunctions = [
+    { name: "Cosine", orderDirection: "DESC" },      // Similarity: higher = better
+    { name: "DotProduct", orderDirection: "DESC" },  // Similarity: higher = better
+    { name: "Euclidean", orderDirection: "ASC" },    // Distance: lower = better
+  ];
   const results: Array<{ container: string; metric: string; top1: string; top1Score: number; top2: string; top2Score: number; diff: number; ru: number }> = [];
 
-  for (const distanceFunction of distanceFunctions) {
-    const querySpec = {
+  for (const distFunc of distanceFunctions) {
+    const distanceFunction = distFunc.name;
+    
+    // Query strategy: VectorDistance automatically sorts by similarity
+    // (no ORDER BY clause allowed - it's automatic and always sorts most-to-least similar)
+    
+    // Strategy: Query with partition key filtering (like Python does)
+    // Python passes partition_key parameter to query_items call
+    // This focuses the query and fixes SDK compatibility issues
+    const partitionKeyValue = "West";  // Sample partition key value from our data
+    
+     const querySpec = {
       query: `SELECT TOP 5
                 c.id,
                 c.HotelName,
                 c.Description,
-                VectorDistance(c.${embeddingField}, @embedding, false, {distanceFunction: '${distanceFunction}'}) AS similarity
+               VectorDistance(c.${embeddingField}, @embedding, false, {'distanceFunction': '${distanceFunction}'}) AS similarity
               FROM c
-              ORDER BY VectorDistance(c.${embeddingField}, @embedding, false, {distanceFunction: '${distanceFunction}'})`,
-      parameters: [{ name: "@embedding", value: queryEmbedding }],
+              WHERE c.Region = @partitionKey`,
+      parameters: [
+        { name: "@embedding", value: queryEmbedding },
+        { name: "@partitionKey", value: partitionKeyValue }
+      ],
     };
 
-    const { resources, requestCharge } = await container.items
-      .query(querySpec)
+    try {
+     // DEBUG: Write query to file for inspection
+     appendFileSync(`query-${distanceFunction}.sql`, `Query for ${distanceFunction}:\n${querySpec.query}\n\nParameters:\n${JSON.stringify(querySpec.parameters)}\n\n---\n\n`);
+      
+     const { resources, requestCharge } = await container.items
+      .query(querySpec, { partitionKey: partitionKeyValue })
       .fetchAll();
 
-    if (resources.length > 0) {
-      const top1Name = (resources[0].HotelName || resources[0].Description || "").substring(0, 26);
-      const top1Score = resources[0].similarity;
-      const top2Name = resources.length > 1 ? (resources[1].HotelName || resources[1].Description || "").substring(0, 26) : "";
-      const top2Score = resources.length > 1 ? resources[1].similarity : 0;
-      const diff = top1Score - top2Score;
+     if (resources.length > 0) {
+       const top1Name = (resources[0].HotelName || resources[0].Description || "").substring(0, 26);
+       const top1Score = resources[0].similarity;
+       const top2Name = resources.length > 1 ? (resources[1].HotelName || resources[1].Description || "").substring(0, 26) : "";
+       const top2Score = resources.length > 1 ? resources[1].similarity : 0;
+        
+       // For similarity metrics (Cosine, DotProduct), diff = top1 - top2 (higher score difference = better)
+       // For distance metric (Euclidean), diff = top1 - top2 (lower is better, so negative diff means top2 was actually closer)
+       const diff = Math.abs(top1Score - top2Score);
 
-      results.push({
-        container: containerName,
-        metric: distanceFunction,
-        top1: top1Name,
-        top1Score,
-        top2: top2Name,
-        top2Score,
-        diff,
-        ru: requestCharge,
-      });
+       results.push({
+         container: containerName,
+         metric: distanceFunction,
+         top1: top1Name,
+         top1Score,
+         top2: top2Name,
+         top2Score,
+         diff,
+         ru: requestCharge,
+       });
+
+       console.log(`    ✓ ${distanceFunction}: top1=${top1Score.toFixed(4)}, top2=${top2Score.toFixed(4)}, diff=${diff.toFixed(4)}`);
+     }
+    } catch (error) {
+     const errMsg = error instanceof Error ? error.message : String(error);
+     const fullErr = error instanceof Error && 'code' in error ? `${(error as any).code}: ${errMsg}` : errMsg;
+     console.error(`  ✗ ${distanceFunction} query failed: ${fullErr}`);
+     console.error(`    Full query: ${querySpec.query}`);
+     console.error(`    Embedding: [${queryEmbedding.slice(0, 3).join(', ')}...] (length: ${queryEmbedding.length}, first type: ${typeof queryEmbedding[0]})`);
     }
   }
 

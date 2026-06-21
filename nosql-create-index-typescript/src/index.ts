@@ -68,7 +68,7 @@ export async function main() {
     console.log(`Container: ${containerName}`);
     console.log(`${"=".repeat(50)}`);
 
-    await insertDocuments(container, config, containerName);
+    await insertDocuments(container, config, config.embeddingField, containerName);
     const results = await vectorQuery(container, containerName, openaiClient, config);
     allResults.push(...results);
   }
