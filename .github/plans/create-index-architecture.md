@@ -1,6 +1,8 @@
 # Create-Index Samples: Architecture & Design
 
-**Document Purpose:** Comprehensive architectural design for the create-index samples suite, with emphasis on Article 2's distance function comparison feature.
+**Document Purpose:**  
+**Purpose 1:** Each language sample MUST use that language's ARM SDK to create containers and vector indexes (control plane).  
+**Purpose 2:** Demonstrate distance functions across algorithms (Cosine, DotProduct, Euclidean)—showing how the same embedding produces different scores and rankings based on distance function choice.
 
 **Applies to:** All 5 language implementations (Python, TypeScript, Go, Java, .NET)  
 **Branch:** `diberry/article-2`  
@@ -453,15 +455,39 @@ diff <(python output.txt) <(go output.txt)
 | **4** | Output Formatting | `src/index.*` + output files (all 5 langs) | Results table, ASCII-only, cross-language consistency, capture to file |
 | **5** | Documentation & Samples | `.github/plans/`, `README.md`, output samples | Update this plan, add verified outputs for each language to repo |
 
-### 7.2 Implementation Status
+### 7.2 SDK Requirements & Implementation Status
 
-| Language | Config | Control | Ingestion/Query | Output | Status |
-|----------|--------|---------|-----------------|--------|--------|
-| **Python** | ✅ Complete | ✅ Complete | ✅ Complete | ✅ Complete | **VERIFIED** |
-| **TypeScript** | ⏳ Pending | ⏳ Pending | ⏳ Pending | ⏳ Pending | TODO |
-| **Go** | ⏳ Pending | ⏳ Pending | ⏳ Pending | ⏳ Pending | TODO |
-| **Java** | ⏳ Pending | ⏳ Pending | ⏳ Pending | ⏳ Pending | TODO |
-| **.NET** | ⏳ Pending | ⏳ Pending | ⏳ Pending | ⏳ Pending | TODO |
+#### 7.2.1 Required SDKs (ARM + Non-ARM Data Plane)
+
+| Language | ARM SDK (Control Plane) | Data Plane SDK | Purpose |
+|----------|----------------------|-----------------|---------|
+| **Python** | `azure-mgmt-cosmosdb` | `azure-cosmos` | Create containers/indexes; Query documents with distance functions |
+| **TypeScript** | `@azure/arm-cosmosdb` | `@azure/cosmos` | Create containers/indexes; Query documents with distance functions |
+| **Go** | `github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/cosmos/armcosmos` | `github.com/Azure/azure-sdk-for-go/sdk/data/azcosmos` | Create containers/indexes; Query documents with distance functions |
+| **Java** | `com.azure.resourcemanager:azure-resourcemanager-cosmos` | `com.azure:azure-cosmos` | Create containers/indexes; Query documents with distance functions |
+| **.NET** | `Azure.ResourceManager.CosmosDB` | `Microsoft.Azure.Cosmos` | Create containers/indexes; Query documents with distance functions |
+
+#### 7.2.2 Implementation Progress (Both Goals)
+
+**Goal 1: ARM SDK Control Plane (Container + Vector Index Creation)**
+
+| Language | ARM SDK | Container Creation | Vector Index Creation | Status |
+|----------|---------|-------------------|----------------------|--------|
+| **Python** | `azure-mgmt-cosmosdb` | ⏳ Pending | ⏳ Pending | TODO |
+| **TypeScript** | `@azure/arm-cosmosdb` | ✅ Complete | ✅ Complete | **VERIFIED** |
+| **Go** | `armcosmos` | ⏳ Pending | ⏳ Pending | TODO |
+| **Java** | `azure-resourcemanager-cosmos` | ⏳ Pending | ⏳ Pending | TODO |
+| **.NET** | `Azure.ResourceManager.CosmosDB` | ⏳ Pending | ⏳ Pending | TODO |
+
+**Goal 2: Data Plane Implementation (Distance Functions Across All 5 SDKs)**
+
+| Language | Data SDK | Ingestion | Cosine | DotProduct | Euclidean | Output | Status |
+|----------|----------|-----------|--------|-----------|-----------|--------|--------|
+| **Python** | `azure-cosmos` | ✅ Complete | ✅ Complete | ✅ Complete | ✅ Complete | ✅ Complete | **VERIFIED** |
+| **TypeScript** | `@azure/cosmos` | ⏳ Pending | ⏳ Pending | ⏳ Pending | ⏳ Pending | ⏳ Pending | TODO |
+| **Go** | `azcosmos` | ⏳ Pending | ⏳ Pending | ⏳ Pending | ⏳ Pending | ⏳ Pending | TODO |
+| **Java** | `azure-cosmos` | ⏳ Pending | ⏳ Pending | ⏳ Pending | ⏳ Pending | ⏳ Pending | TODO |
+| **.NET** | `Microsoft.Azure.Cosmos` | ⏳ Pending | ⏳ Pending | ⏳ Pending | ⏳ Pending | ⏳ Pending | TODO |
 
 ---
 
