@@ -4,50 +4,59 @@
 
 **Status:** All phases verified UP TO Phase 2 (Region-Based Ingestion Refactoring)
 
+**Context:** Verification must distinguish between:
+- **Phase 1 ARM SDK (Control Plane):** TypeScript only — uses ARM SDK to create containers + indexes
+- **Phase 1 Bicep (Pre-provision):** Python/Go/Java/.NET — use Bicep scripts, then samples reference existing containers
+- **Phases 2-4 (Data Plane):** All 5 languages — identical verification steps apply
+
 ---
 
 ## Overview of Phases
 
 | Phase | Name | Stage | Scope | Verification |
 |-------|------|-------|-------|--------------|
-| **1** | Setup | Control-Plane | Create container + vector index | ✅ VERIFIED |
-| **2** | Ingest | Data-Plane | Read data file, batch by region, insert documents | ✅ VERIFIED |
-| **3** | Query | Data-Plane | Execute vector similarity search | 🟡 READY (needs execution) |
-| **4** | Cleanup | Data-Plane + Control-Plane | Clear documents + delete containers | ⚠️ PARTIAL |
+| **1** | Setup | Control-Plane | Create container + vector index (ARM SDK: TypeScript only; Bicep: others) | ⚠️ PARTIAL (TypeScript ✅; others Bicep) |
+| **2** | Ingest | Data-Plane | Read data file, batch by region, insert documents | ✅ VERIFIED (all 5) |
+| **3** | Query | Data-Plane | Execute vector similarity search (distance functions) | 🟡 READY (needs execution) |
+| **4** | Cleanup | Data-Plane + Control-Plane | Clear documents & delete containers | ⚠️ PARTIAL |
 
 ---
 
-## Phase 1: Setup — Create Container + Vector Index ✅
+## Phase 1: Setup — Create Container + Vector Index ⚠️ PARTIAL
 
 ### What Gets Verified
-- Container creation by name (`hotels_diskann`, `hotels_quantizedflat`)
+
+**ARM SDK Implementation (Control Plane) — TypeScript Only:**
+- Container creation via `@azure/arm-cosmosdb` SDK
 - Vector index configuration with correct embedding field and dimensions
 - Partition key path set to `/Region`
 
+**Bicep Pre-provisioning (Python/Go/Java/.NET):**
+- Bicep templates pre-create containers (outside SDK)
+- Data-plane samples reference existing containers
+
 ### Verification Commands
 
-#### 1.1: Verify Control-Plane Container Creation Code Exists
+#### 1.1: Verify ARM SDK Control-Plane Implementation (TypeScript Only)
 ```bash
-# Python
-grep -n "def create_container\|CREATE.*INDEX\|container_name.*hotels" \
-  nosql-create-index-python/src/control_plane.py | head -5
+# TypeScript: VERIFY control-plane.ts uses ARM SDK
+grep -n "import.*arm\|CosmosDBManagementClient\|createContainers" \
+  nosql-create-index-typescript/src/control-plane.ts
 
-# TypeScript
-grep -n "async function createContainer\|hotels_diskann\|hotels_quantizedflat" \
-  nosql-create-index-typescript/src/control-plane.ts | head -5
-
-# Go
-grep -n "func CreateContainers\|hotels_diskann" \
-  nosql-create-index-go/controlplane.go | head -5
-
-# Java
-grep -n "createContainer\|hotels_diskann" \
-  nosql-create-index-java/src/main/java/com/azure/cosmos/createindex/ControlPlane.java | head -5
-
-# .NET
-grep -n "CreateContainers\|hotels_diskann" \
-  nosql-create-index-dotnet/src/ControlPlane.cs | head -5
+# Expected: ARM SDK imports + createContainers function in control-plane.ts
 ```
+
+#### 1.2: Verify Bicep Pre-provisioning (Python/Go/Java/.NET)
+```bash
+# Python, Go, Java, .NET: NO control-plane.* file expected (uses Bicep)
+# Check that Bicep scripts exist at repo root:
+find . -name "*.bicep" | grep -E "(main|deploy|cosmos)" | head -5
+
+# Or check for bicep directory:
+ls -la bicep/ 2>/dev/null || echo "Bicep pre-provisioning expected at repo root"
+```
+
+#### 1.3: Verify Control-Plane Container Creation Code (Helper Functions)
 
 #### 1.2: Verify Embedding Dimensions Configuration
 ```bash

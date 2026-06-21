@@ -7,3 +7,4 @@ Using Azure OpenAI Embedding Deployment/Model: text-embedding-3-small
 Reading JSON file from C:\project-dina-data-ai\repos\public-azuresamples-cosmos-db-vector-samples\nosql-create-index-go\data\HotelsData_toCosmosDB_Vector_byRegion.json
 Loaded 50 documents
 Processing in batches of 50...
+2026/06/21 06:04:54 container "hotels_diskann" failed: failed to insert 50 documents. Verify that the database and containers were provisioned already and that your identity has Azure Cosmos DB data-plane access.

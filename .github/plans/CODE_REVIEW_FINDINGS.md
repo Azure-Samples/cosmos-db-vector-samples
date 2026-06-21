@@ -1,8 +1,18 @@
 # Create-Index Samples: Code Review Findings
 
+## ⚠️ HISTORICAL CONTEXT
+
+**Date Created:** Pre-2026-06-21 (before Phase 1 gap discovery)  
+**Status:** This document captures Phase 2-4 DATA PLANE issues from earlier review cycles.  
+**Priority:** See `PHASE_1_IMPLEMENTATION_GAP.md` for current blocking issue (Phase 1 ARM SDK — TypeScript only).
+
+**Note:** Code review findings listed below are DATA PLANE issues (Phases 2-4). Phase 1 (control-plane ARM SDK) is a separate architectural decision documented in `PHASE_1_IMPLEMENTATION_GAP.md`.
+
+---
+
 ## Summary
 
-**Critical Issue:** All 5 language implementations reference **OLD data file paths and partition key values** that don't match the new region-based architecture plan. The implementations are missing proper batch ingestion by region, proper partition key configuration, and the embedding field name is inconsistent.
+**Data Plane Issues:** All 5 language implementations reference **OLD data file paths and partition key values** that don't match the new region-based architecture plan. The implementations are missing proper batch ingestion by region, proper partition key configuration, and the embedding field name is inconsistent.
 
 ---
 

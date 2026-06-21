@@ -1,11 +1,16 @@
 # Phase 2 Verification Checklist — Programmatic Evidence
 
 ## Summary
-**Phase 2 (Region-Based Ingestion Refactoring) is COMPLETE** — all 5 languages verified to implement region-based partition keys, proper validation, and all changes committed.
+**Phase 2 (Region-Based Ingestion) is COMPLETE** — all 5 languages verified to implement region-based partition keys, proper validation, and all changes committed.
 
-**Verification Date:** 2026-06-20  
+**Important Context:** 
+- **Phase 1 (Control Plane):** TypeScript only (ARM SDK). Python/Go/Java/.NET use Bicep pre-provisioning.
+- **Phase 2 (Data Plane):** ALL 5 languages complete and verified below. Assumes Phase 1 is pre-provisioned (via ARM SDK or Bicep).
+- **This verification focuses on DATA PLANE operations only**, not control-plane completeness.
+
+**Verification Date:** 2026-06-21 (updated to reflect Phase 1 context)  
 **Verified By:** Automated code inspection + git history analysis  
-**Status:** ✅ ALL CHECKS PASS
+**Status:** ✅ ALL CHECKS PASS (for data-plane ingestion)
 
 ---
 
