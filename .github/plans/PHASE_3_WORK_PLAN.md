@@ -228,6 +228,8 @@ Results saved to: .github/plans/phase3-results
 **Status:** ⏳ READY TO START (after Task 1+2)  
 **Blocking:** No (can run last)
 
+**Expectation:** All 5 SDKs querying the same Cosmos DB container return **identical** results.
+
 Create validation script `test-phase3-validation.sh`:
 
 ```bash
@@ -240,86 +242,130 @@ echo ""
 RESULTS_DIR=".github/plans/phase3-results"
 mkdir -p "$RESULTS_DIR"
 
-# Run all 5 samples and capture query results
-# Extract similarity scores and compare
-# Tolerance: ±0.01
+# All 5 samples query the SAME container with the SAME query
+# Results MUST be identical (same documents, same similarity scores, same order)
 
-echo "Running query validation across all languages..."
+echo "Comparing query results across all 5 languages..."
+echo "Expected: IDENTICAL results (same documents, same similarity scores)"
 echo ""
 
 # Execute each sample and extract query results
 for lang in python typescript go java dotnet; do
   SAMPLE_DIR="nosql-create-index-$lang"
-  QUERY_OUTPUT="$RESULTS_DIR/query-$lang.json"
+  QUERY_OUTPUT="$RESULTS_DIR/query-results-$lang.txt"
+  
+  echo "Capturing $lang query results..."
   
   case $lang in
     python)
       cd "$SAMPLE_DIR"
-      python -m src.main 2>/dev/null | grep -A 20 "Query results" > "$QUERY_OUTPUT" || echo "{}" > "$QUERY_OUTPUT"
+      python -m src.main 2>&1 | grep -A 50 "Query results\|Top hotels" > "$QUERY_OUTPUT" || echo "No results" > "$QUERY_OUTPUT"
       cd ..
       ;;
     typescript)
       cd "$SAMPLE_DIR"
-      npm start 2>/dev/null | grep -A 20 "Query results" > "$QUERY_OUTPUT" || echo "{}" > "$QUERY_OUTPUT"
+      npm start 2>&1 | grep -A 50 "Query results\|Top hotels" > "$QUERY_OUTPUT" || echo "No results" > "$QUERY_OUTPUT"
       cd ..
       ;;
     go)
       cd "$SAMPLE_DIR"
-      go run . 2>/dev/null | grep -A 20 "Query results" > "$QUERY_OUTPUT" || echo "{}" > "$QUERY_OUTPUT"
+      go run . 2>&1 | grep -A 50 "Query results\|Top hotels" > "$QUERY_OUTPUT" || echo "No results" > "$QUERY_OUTPUT"
       cd ..
       ;;
     java)
       cd "$SAMPLE_DIR"
-      mvn exec:java 2>/dev/null | grep -A 20 "Query results" > "$QUERY_OUTPUT" || echo "{}" > "$QUERY_OUTPUT"
+      mvn exec:java 2>&1 | grep -A 50 "Query results\|Top hotels" > "$QUERY_OUTPUT" || echo "No results" > "$QUERY_OUTPUT"
       cd ..
       ;;
     dotnet)
       cd "$SAMPLE_DIR"
-      dotnet run 2>/dev/null | grep -A 20 "Query results" > "$QUERY_OUTPUT" || echo "{}" > "$QUERY_OUTPUT"
+      dotnet run 2>&1 | grep -A 50 "Query results\|Top hotels" > "$QUERY_OUTPUT" || echo "No results" > "$QUERY_OUTPUT"
       cd ..
       ;;
   esac
 done
 
-echo "Comparing results across languages..."
+echo ""
+echo "Comparing results..."
 echo ""
 
-# Compare similarity scores
-TOLERANCE=0.01
 COMPARISON_FILE="$RESULTS_DIR/cross-language-validation.txt"
 
-echo "Cross-Language Query Result Comparison" > "$COMPARISON_FILE"
+echo "Cross-Language Query Result Validation" > "$COMPARISON_FILE"
 echo "=======================================" >> "$COMPARISON_FILE"
 echo "" >> "$COMPARISON_FILE"
-echo "Tolerance: ±$TOLERANCE" >> "$COMPARISON_FILE"
+echo "Expectation: All 5 SDKs return IDENTICAL results (same documents, same similarity scores)" >> "$COMPARISON_FILE"
 echo "" >> "$COMPARISON_FILE"
 
-# Extract scores from each output and compare
-# (Specific parsing depends on output format)
-echo "Results:" >> "$COMPARISON_FILE"
+# Compare outputs
+PYTHON_OUTPUT="$RESULTS_DIR/query-results-python.txt"
+TYPESCRIPT_OUTPUT="$RESULTS_DIR/query-results-typescript.txt"
+GO_OUTPUT="$RESULTS_DIR/query-results-go.txt"
+JAVA_OUTPUT="$RESULTS_DIR/query-results-java.txt"
+DOTNET_OUTPUT="$RESULTS_DIR/query-results-dotnet.txt"
+
+echo "Results by language:" >> "$COMPARISON_FILE"
 echo "" >> "$COMPARISON_FILE"
 
-# For now, just verify all files exist and contain query results
 for lang in python typescript go java dotnet; do
-  OUTPUT_FILE="$RESULTS_DIR/query-$lang.json"
-  if [ -f "$OUTPUT_FILE" ] && [ -s "$OUTPUT_FILE" ]; then
-    echo "✓ $lang: Query results captured" >> "$COMPARISON_FILE"
+  case $lang in
+    python) OUTPUT="$PYTHON_OUTPUT" ;;
+    typescript) OUTPUT="$TYPESCRIPT_OUTPUT" ;;
+    go) OUTPUT="$GO_OUTPUT" ;;
+    java) OUTPUT="$JAVA_OUTPUT" ;;
+    dotnet) OUTPUT="$DOTNET_OUTPUT" ;;
+  esac
+  
+  if [ -f "$OUTPUT" ] && [ -s "$OUTPUT" ] && ! grep -q "No results" "$OUTPUT"; then
+    LINE_COUNT=$(wc -l < "$OUTPUT")
+    echo "✓ $lang: Query results captured ($LINE_COUNT lines)" >> "$COMPARISON_FILE"
   else
-    echo "⚠️ $lang: Query results NOT captured" >> "$COMPARISON_FILE"
+    echo "⚠️ $lang: Query results NOT found" >> "$COMPARISON_FILE"
   fi
 done
+
+echo "" >> "$COMPARISON_FILE"
+echo "Comparison:" >> "$COMPARISON_FILE"
+echo "" >> "$COMPARISON_FILE"
+
+# Simple diff check - all outputs should be identical
+if diff -q "$PYTHON_OUTPUT" "$TYPESCRIPT_OUTPUT" > /dev/null 2>&1; then
+  echo "✓ Python == TypeScript" >> "$COMPARISON_FILE"
+else
+  echo "⚠️ Python != TypeScript (differences detected)" >> "$COMPARISON_FILE"
+fi
+
+if diff -q "$PYTHON_OUTPUT" "$GO_OUTPUT" > /dev/null 2>&1; then
+  echo "✓ Python == Go" >> "$COMPARISON_FILE"
+else
+  echo "⚠️ Python != Go (differences detected)" >> "$COMPARISON_FILE"
+fi
+
+if diff -q "$PYTHON_OUTPUT" "$JAVA_OUTPUT" > /dev/null 2>&1; then
+  echo "✓ Python == Java" >> "$COMPARISON_FILE"
+else
+  echo "⚠️ Python != Java (differences detected)" >> "$COMPARISON_FILE"
+fi
+
+if diff -q "$PYTHON_OUTPUT" "$DOTNET_OUTPUT" > /dev/null 2>&1; then
+  echo "✓ Python == .NET" >> "$COMPARISON_FILE"
+else
+  echo "⚠️ Python != .NET (differences detected)" >> "$COMPARISON_FILE"
+fi
 
 echo ""
 cat "$COMPARISON_FILE"
 echo ""
-echo "Detailed comparison saved to: $COMPARISON_FILE"
+echo "Detailed results saved to: $RESULTS_DIR"
+echo "Individual outputs:"
+ls -1 "$RESULTS_DIR"/query-results-*.txt 2>/dev/null | xargs -I {} sh -c 'echo ""; echo "=== {} ==="; head -20 {}'
 ```
 
 **Acceptance Criteria:**
-- Query results captured from all 5 languages
-- Similarity scores extracted and compared
-- Comparison report generated
-- Results within ±0.01 tolerance (or documented with explanation)
+- Query results captured from all 5 languages ✅
+- All 5 outputs are **identical** ✅
+- If outputs differ: capture the diff and investigate why
+- Generate comparison report documenting result validation
 
 ---
 
