@@ -78,6 +78,23 @@ public static partial class DataPlane
         var regions = regionsFound.OrderBy(r => r).ToList();
         Console.WriteLine($"✓ Region validation passed. Found regions: {string.Join(", ", regions)}");
 
+        // Count documents per region
+        var regionCounts = new Dictionary<string, int>();
+        foreach (var document in documents)
+        {
+            var region = document.Region;
+            if (regionCounts.ContainsKey(region))
+                regionCounts[region]++;
+            else
+                regionCounts[region] = 1;
+        }
+        // Print per-region counts in order
+        foreach (var region in new[] { "Northeast", "Midwest", "South", "West" })
+        {
+            if (regionCounts.ContainsKey(region))
+                Console.WriteLine($"  Region '{region}': {regionCounts[region]} documents");
+        }
+
         return documents;
     }
 

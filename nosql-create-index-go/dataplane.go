@@ -107,6 +107,19 @@ func LoadDocuments(path string) ([]map[string]any, error) {
 	sort.Strings(regions)
 	fmt.Printf("✓ Region validation passed. Found regions: %s\n", strings.Join(regions, ", "))
 
+	// Count documents per region
+	regionCounts := make(map[string]int)
+	for _, doc := range prepared {
+		region := doc["Region"].(string)
+		regionCounts[region]++
+	}
+	// Print per-region counts in order
+	for _, region := range []string{"Northeast", "Midwest", "South", "West"} {
+		if count, exists := regionCounts[region]; exists {
+			fmt.Printf("  Region '%s': %d documents\n", region, count)
+		}
+	}
+
 	return prepared, nil
 }
 

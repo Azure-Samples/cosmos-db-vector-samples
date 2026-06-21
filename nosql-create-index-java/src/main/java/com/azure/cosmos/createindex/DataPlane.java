@@ -19,6 +19,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -106,6 +108,19 @@ public final class DataPlane {
 
         // Log region distribution
         System.out.println("✓ Region validation passed. Found regions: " + String.join(", ", regionsFound));
+
+        // Count documents per region
+        Map<String, Integer> regionCounts = new HashMap<>();
+        for (Map<String, Object> document : documents) {
+            String region = (String) document.get("Region");
+            regionCounts.put(region, regionCounts.getOrDefault(region, 0) + 1);
+        }
+        // Print per-region counts in order
+        for (String region : Arrays.asList("Northeast", "Midwest", "South", "West")) {
+            if (regionCounts.containsKey(region)) {
+                System.out.println("  Region '" + region + "': " + regionCounts.get(region) + " documents");
+            }
+        }
 
         return documents;
     }
