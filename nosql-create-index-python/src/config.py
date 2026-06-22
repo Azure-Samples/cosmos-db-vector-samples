@@ -164,7 +164,7 @@ def algorithm_label(container_name: str) -> str:
 def _env_to_field(env_name: str) -> str:
     mapping = {
         "AZURE_COSMOSDB_ENDPOINT": "cosmos_endpoint",
-        "AZURE_COSMOSDB_DATABASENAME": "database_name",
+        "AZURE_COSMOSDB_CREATE_INDEX_DATABASENAME": "database_name",
         "AZURE_OPENAI_EMBEDDING_ENDPOINT": "openai_embedding_endpoint",
         "AZURE_OPENAI_EMBEDDING_DEPLOYMENT": "openai_embedding_deployment",
     }
