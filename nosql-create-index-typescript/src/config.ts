@@ -44,7 +44,7 @@ export function loadConfigFromEnv(
         env.AZURE_OPENAI_EMBEDDING_API_VERSION || "2024-08-01-preview",
     },
     vectorIndexType: env.VECTOR_INDEX_TYPE || "diskANN",
-    embeddingField: env.EMBEDDED_FIELD || "embedding",
+    embeddingField: env.AZURE_COSMOSDB_CREATE_INDEX_EMBEDDED_FIELD || "embedding",
     expectedDimensions: parseInt(env.EMBEDDING_DIMENSIONS || "1536", 10),
     dataFile:
       env.DATA_FILE_WITH_VECTORS || "./data/HotelsData_toCosmosDB_Vector_byRegion.json",

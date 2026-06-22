@@ -63,7 +63,7 @@ public static class Config
             OpenAIEmbeddingApiVersion: Normalize(configuration["AZURE_OPENAI_EMBEDDING_API_VERSION"]) ?? DefaultOpenAIEmbeddingApiVersion,
             VectorAlgorithm: Normalize(configuration["VECTOR_ALGORITHM"])?.ToLowerInvariant(),
             DataFileWithVectors: ResolvePath(sampleRoot, dataFileValue),
-            EmbeddingFieldName: DefaultEmbeddingFieldName,
+            EmbeddingFieldName: Normalize(configuration["AZURE_COSMOSDB_CREATE_INDEX_EMBEDDED_FIELD"]) ?? DefaultEmbeddingFieldName,
             PartitionKeyValue: Normalize(configuration["PARTITION_KEY_VALUE"]) ?? DefaultPartitionKeyValue,
             QueryText: DefaultQueryText,
             ExpectedDimensions: 1536,

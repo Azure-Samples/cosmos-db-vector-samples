@@ -18,6 +18,7 @@ const (
 	partitionKeyFieldValue          = "hotels"
 	defaultQueryText                = "hotel near the ocean"
 	azureOpenAIEmbeddingsAPIVersion = "2024-02-01"
+	defaultEmbeddingFieldName       = "embedding" // fallback; read from AZURE_COSMOSDB_CREATE_INDEX_EMBEDDED_FIELD if available
 )
 
 var algorithmToContainer = map[string]string{
@@ -55,6 +56,10 @@ func LoadConfigFromEnv(getenv func(string) string) (*Config, error) {
 	algorithm := strings.ToLower(strings.TrimSpace(getenv("VECTOR_ALGORITHM")))
 	containerName := strings.TrimSpace(getenv("AZURE_COSMOSDB_CONTAINER_NAME"))
 	dataFile := strings.TrimSpace(getenv("DATA_FILE_WITH_VECTORS"))
+	embeddingField := strings.TrimSpace(getenv("AZURE_COSMOSDB_CREATE_INDEX_EMBEDDED_FIELD"))
+	if embeddingField == "" {
+		embeddingField = defaultEmbeddingFieldName
+	}
 
 	cfg := &Config{
 		CosmosEndpoint:            strings.TrimSpace(getenv("AZURE_COSMOSDB_ENDPOINT")),
@@ -64,7 +69,7 @@ func LoadConfigFromEnv(getenv func(string) string) (*Config, error) {
 		OpenAIEmbeddingDeployment: strings.TrimSpace(getenv("AZURE_OPENAI_EMBEDDING_DEPLOYMENT")),
 		VectorAlgorithm:           algorithm,
 		DataFileWithVectors:       dataFile,
-		EmbeddingFieldName:        embeddingFieldName,
+		EmbeddingFieldName:        embeddingField,
 		EmbeddingDimensions:       embeddingDimensions,
 		PartitionKeyFieldName:     partitionKeyFieldName,
 		PartitionKeyFieldValue:    partitionKeyFieldValue,

@@ -46,7 +46,7 @@ public final class Config {
                 vectorAlgorithm,
                 dataFile,
                 DEFAULT_QUERY_TEXT,
-                DEFAULT_EMBEDDING_FIELD,
+                read("AZURE_COSMOSDB_CREATE_INDEX_EMBEDDED_FIELD", DEFAULT_EMBEDDING_FIELD),
                 DEFAULT_TOP_COUNT,
                 EXPECTED_DIMENSIONS
         );

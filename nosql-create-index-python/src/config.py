@@ -22,7 +22,7 @@ REQUIRED_ENV_VARS = (
 DEFAULT_QUERY_TEXT = "hotel near the ocean"
 DEFAULT_EMBEDDING_API_VERSION = "2024-08-01-preview"
 DEFAULT_EMBEDDING_MODEL = "text-embedding-3-small"
-DEFAULT_EMBEDDING_FIELD = "embedding"
+DEFAULT_EMBEDDING_FIELD = "embedding"  # fallback; read from AZURE_COSMOSDB_CREATE_INDEX_EMBEDDED_FIELD if available
 DEFAULT_PARTITION_KEY_VALUE = "Northeast"  # Region partition key (one of: Northeast, Midwest, South, West)
 DEFAULT_TOP_COUNT = 5
 EXPECTED_DIMENSIONS = 1536
@@ -101,6 +101,7 @@ def load_config(env: Optional[Mapping[str, str]] = None) -> SampleConfig:
         ),
         data_file_with_vectors=_resolve_data_file(data_file_value),
         partition_key_value=partition_key_value,
+        embedding_field_name=_clean(environment.get("AZURE_COSMOSDB_CREATE_INDEX_EMBEDDED_FIELD")) or DEFAULT_EMBEDDING_FIELD,
     )
 
 
