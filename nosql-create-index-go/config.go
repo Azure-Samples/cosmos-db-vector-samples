@@ -108,6 +108,9 @@ func validateConfig(cfg *Config) error {
 		"AZURE_OPENAI_EMBEDDING_ENDPOINT":   cfg.OpenAIEmbeddingEndpoint,
 		"AZURE_OPENAI_EMBEDDING_DEPLOYMENT": cfg.OpenAIEmbeddingDeployment,
 		"DATA_FILE_WITH_VECTORS":            cfg.DataFileWithVectors,
+		"AZURE_SUBSCRIPTION_ID":             cfg.SubscriptionID,
+		"AZURE_RESOURCE_GROUP":              cfg.ResourceGroup,
+		"AZURE_COSMOSDB_ACCOUNT_NAME":       cfg.AccountName,
 	}
 
 	missing := make([]string, 0)

@@ -666,11 +666,13 @@ diff <(python output.txt) <(go output.txt)
 
 | Language | ARM SDK | Container Creation | Vector Index Creation | Status |
 |----------|---------|-------------------|----------------------|--------|
-| **Python** | `azure-mgmt-cosmosdb` | ⏳ Pending | ⏳ Pending | TODO |
+| **Python** | `azure-mgmt-cosmosdb` | ✅ Complete | ✅ Complete | **VERIFIED** |
 | **TypeScript** | `@azure/arm-cosmosdb` | ✅ Complete | ✅ Complete | **VERIFIED** |
-| **Go** | `armcosmos` | ⏳ Pending | ⏳ Pending | TODO |
-| **Java** | `azure-resourcemanager-cosmos` | ⏳ Pending | ⏳ Pending | TODO |
-| **.NET** | `Azure.ResourceManager.CosmosDB` | ⏳ Pending | ⏳ Pending | TODO |
+| **Go** | `armcosmos` | ❌ Missing | ❌ Missing | **TODO** — Article 2 requires ARM SDK implementation |
+| **Java** | `azure-resourcemanager-cosmos` | ❌ Missing | ❌ Missing | **TODO** — Article 2 requires ARM SDK implementation |
+| **.NET** | `Azure.ResourceManager.CosmosDB` | ✅ Complete | ✅ Complete | **VERIFIED** |
+
+**Note (2026-06-21):** Go and Java currently lack ARM SDK control-plane code. They have data-plane implementations (ingestion + queries) but do NOT create containers or vector indexes themselves—they assume pre-existing infrastructure. **Article 2's purpose requires demonstrating the control-plane pattern**, so Go and Java must be updated to use ARM SDK (like Python/TypeScript/.NET) to meet the stated goals.
 
 **Goal 2: Data Plane Implementation (Distance Functions Across All 5 SDKs)**
 
@@ -1853,6 +1855,89 @@ SCHEMA=(
 - Any change to mandatory details MUST update ALL 5 samples in ONE PR
 - PR cannot merge until validation script passes for all 5 languages
 - No exceptions, no per-language overrides allowed
+
+---
+
+## 15. Go ARM SDK Implementation Details (Control-Plane REST API Pattern)
+
+### 15.1 Challenge: Vector Index Support in armcosmos SDK
+
+The Azure SDK for Go (`armcosmos v1.0.0`) was released before full vector indexing support. The strongly-typed Go structures do not include `VectorEmbeddingPolicy` or `VectorIndexes` fields, making it impossible to use the SDK's typed model for container creation with vector indexes.
+
+### 15.2 Solution: Raw JSON + REST API
+
+Following the **same pattern used by Python**, Go's control-plane implementation uses raw JSON payloads with the Azure Resource Manager REST API directly:
+
+1. **Build JSON payload** with vector index configuration
+2. **Authenticate** with `DefaultAzureCredential`
+3. **Call ARM REST API** (`https://management.azure.com/.../containers/{name}?api-version=2024-05-15`)
+4. **Send PUT request** with JSON body
+
+### 15.3 Implementation: `controlplane.go`
+
+**Key Functions:**
+
+- `buildContainerPayload()` — Constructs JSON with:
+  - PartitionKey configuration (`/Region`, kind=Hash, version=1)
+  - IndexingPolicy (vectorIndexes: path + type)
+  - VectorEmbeddingPolicy (path, dataType, dimensions, distanceFunction)
+
+- `deleteContainerIfExists()` — Idempotent deletion using GET to check existence, then DELETE if found
+
+- `CreateContainersWithVectorIndexes()` — Orchestrator that:
+  - Gets auth token via `DefaultAzureCredential`
+  - Loops through both index types (DiskANN, QuantizedFlat)
+  - Deletes existing container (if present)
+  - Creates new container via PUT to ARM API
+  - Returns early on success
+
+**Advantages of this approach:**
+- ✅ Bypasses SDK type limitation
+- ✅ Works with current SDK version (v1.0.0)
+- ✅ Identical JSON structure to Python (consistency)
+- ✅ Simple, readable code (minimal boilerplate)
+- ✅ Direct REST API calls (no abstraction overhead)
+
+**Integration in `main.go`:**
+```go
+// --- Control Plane: Create containers with vector indexes (ARM SDK) ---
+if err := CreateContainersWithVectorIndexes(ctx, credential, cfg); err != nil {
+    log.Fatalf("failed to create containers: %v", err)
+}
+```
+
+Called **before** data-plane operations to ensure containers exist with correct vector indexes.
+
+### 15.4 Configuration Requirements
+
+Go now requires additional environment variables (same as Python, TypeScript, .NET):
+
+- `AZURE_SUBSCRIPTION_ID` — ARM subscription ID
+- `AZURE_RESOURCE_GROUP` — Resource group name
+- `AZURE_COSMOSDB_ACCOUNT_NAME` — Cosmos DB account name
+
+**Updated `config.go`:** Added these three variables to the validation check, making them required (not optional).
+
+### 15.5 Testing Go Control-Plane Code
+
+To verify the Go implementation builds and links correctly:
+
+```bash
+cd nosql-create-index-go
+go build -v
+echo $?  # Exit code 0 = success
+```
+
+Once environment variables are provided and the code is run with `azd auth login`:
+
+```bash
+azd auth login
+export AZURE_SUBSCRIPTION_ID="..."
+export AZURE_RESOURCE_GROUP="..."
+export AZURE_COSMOSDB_ACCOUNT_NAME="..."
+# ... other required env vars ...
+./nosql-create-index-go
+```
 
 ---
 

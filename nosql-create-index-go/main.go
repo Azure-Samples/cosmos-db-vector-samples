@@ -44,6 +44,11 @@ func main() {
 	fmt.Printf("Reading JSON file from %s\n", cfg.DataFileWithVectors)
 	fmt.Printf("Loaded %d documents\n", len(documents))
 
+	// --- Control Plane: Create containers with vector indexes (ARM SDK) ---
+	if err := CreateContainersWithVectorIndexes(ctx, credential, cfg); err != nil {
+		log.Fatalf("failed to create containers: %v", err)
+	}
+
 	// --- Ingest ---
 	fmt.Printf("Processing in batches of %d...\n", len(documents))
 	for _, containerName := range cfg.ContainerNames {
