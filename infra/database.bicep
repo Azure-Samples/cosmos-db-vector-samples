@@ -258,3 +258,6 @@ output createIndexContainers array = !empty(createIndexDatabaseName)
     ]
   : []
 
+output embeddedFieldNameForVectorSearch string = 'DescriptionVector'
+output embeddedFieldNameForCreateIndex string = 'embedding'
+
