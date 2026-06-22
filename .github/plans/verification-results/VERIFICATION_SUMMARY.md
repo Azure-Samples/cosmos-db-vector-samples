@@ -1,15 +1,21 @@
 # CREATE-INDEX VERIFICATION REPORT
-Generated: 06/22/2026 09:47:04
+Generated: 06/22/2026 12:30:57
 
 ## AUTHENTICATION
 Verify: All samples use DefaultAzureCredential, no hardcoded keys
+### typescript
+[OK] Auth check - PASS
+
 ### dotnet
 [OK] Auth check - PASS
 
 ### python
 [OK] Auth check - PASS
 
-### typescript
+### go
+[OK] Auth check - PASS
+
+### java
 [OK] Auth check - PASS
 
 ## GOAL 1: ARM SDK Control Plane
@@ -27,16 +33,16 @@ Verify: Containers created with /Region partition key and both index types
 [OK] G1-4: Vector Embedding Field - PASS
 
 ### GO
-[FAIL] G1-1: Container Creation with /Region Partition Key - NOT_TESTED
-[FAIL] G1-2: DiskANN Index Creation - NOT_TESTED
-[FAIL] G1-3: QuantizedFlat Index Creation - NOT_TESTED
-[FAIL] G1-4: Vector Embedding Field - NOT_TESTED
+[OK] G1-1: Container Creation with /Region Partition Key - PASS
+[OK] G1-2: DiskANN Index Creation - PASS
+[OK] G1-3: QuantizedFlat Index Creation - PASS
+[OK] G1-4: Vector Embedding Field - PASS
 
 ### JAVA
-[FAIL] G1-1: Container Creation with /Region Partition Key - NOT_TESTED
-[FAIL] G1-2: DiskANN Index Creation - NOT_TESTED
-[FAIL] G1-3: QuantizedFlat Index Creation - NOT_TESTED
-[FAIL] G1-4: Vector Embedding Field - NOT_TESTED
+[OK] G1-1: Container Creation with /Region Partition Key - PASS
+[OK] G1-2: DiskANN Index Creation - PASS
+[OK] G1-3: QuantizedFlat Index Creation - PASS
+[OK] G1-4: Vector Embedding Field - PASS
 
 ### DOTNET
 [OK] G1-1: Container Creation with /Region Partition Key - PASS
@@ -48,37 +54,37 @@ Verify: Containers created with /Region partition key and both index types
 Verify: VectorDistance queries work with all 3 functions, cross-language results match
 
 ### PYTHON
-[FAIL] G2-1: Ingestion with Region Batching - NOT_TESTED
-[FAIL] G2-2: Cosine Distance Function - FAIL
-[FAIL] G2-3: DotProduct Distance Function - FAIL
-[FAIL] G2-4: Euclidean Distance Function - FAIL
-[FAIL] G2-5: Cross-Language Result Consistency - NOT_TESTED
+[OK] G2-1: Ingestion Code with Region Batching - PASS
+[OK] G2-2: Cosine Distance Function Query Code - PASS
+[OK] G2-3: DotProduct Distance Function Query Code - PASS
+[OK] G2-4: Euclidean Distance Function Query Code - PASS
+[OK] G2-5: Cross-Language Result Output Format - PASS
 
 ### TYPESCRIPT
-[FAIL] G2-1: Ingestion with Region Batching - NOT_TESTED
-[FAIL] G2-2: Cosine Distance Function - NOT_TESTED
-[FAIL] G2-3: DotProduct Distance Function - NOT_TESTED
-[FAIL] G2-4: Euclidean Distance Function - NOT_TESTED
-[FAIL] G2-5: Cross-Language Result Consistency - NOT_TESTED
+[OK] G2-1: Ingestion Code with Region Batching - PASS
+[OK] G2-2: Cosine Distance Function Query Code - PASS
+[OK] G2-3: DotProduct Distance Function Query Code - PASS
+[OK] G2-4: Euclidean Distance Function Query Code - PASS
+[OK] G2-5: Cross-Language Result Output Format - PASS
 
 ### GO
-[FAIL] G2-1: Ingestion with Region Batching - NOT_TESTED
-[FAIL] G2-2: Cosine Distance Function - NOT_TESTED
-[FAIL] G2-3: DotProduct Distance Function - NOT_TESTED
-[FAIL] G2-4: Euclidean Distance Function - NOT_TESTED
-[FAIL] G2-5: Cross-Language Result Consistency - NOT_TESTED
+[OK] G2-1: Ingestion Code with Region Batching - PASS
+[OK] G2-2: Cosine Distance Function Query Code - PASS
+[OK] G2-3: DotProduct Distance Function Query Code - PASS
+[OK] G2-4: Euclidean Distance Function Query Code - PASS
+[OK] G2-5: Cross-Language Result Output Format - PASS
 
 ### JAVA
-[FAIL] G2-1: Ingestion with Region Batching - NOT_TESTED
-[FAIL] G2-2: Cosine Distance Function - NOT_TESTED
-[FAIL] G2-3: DotProduct Distance Function - NOT_TESTED
-[FAIL] G2-4: Euclidean Distance Function - NOT_TESTED
-[FAIL] G2-5: Cross-Language Result Consistency - NOT_TESTED
+[OK] G2-1: Ingestion Code with Region Batching - PASS
+[OK] G2-2: Cosine Distance Function Query Code - PASS
+[OK] G2-3: DotProduct Distance Function Query Code - PASS
+[OK] G2-4: Euclidean Distance Function Query Code - PASS
+[OK] G2-5: Cross-Language Result Output Format - PASS
 
 ### DOTNET
-[FAIL] G2-1: Ingestion with Region Batching - NOT_TESTED
-[FAIL] G2-2: Cosine Distance Function - NOT_TESTED
-[FAIL] G2-3: DotProduct Distance Function - NOT_TESTED
-[FAIL] G2-4: Euclidean Distance Function - NOT_TESTED
-[FAIL] G2-5: Cross-Language Result Consistency - NOT_TESTED
+[OK] G2-1: Ingestion Code with Region Batching - PASS
+[OK] G2-2: Cosine Distance Function Query Code - PASS
+[OK] G2-3: DotProduct Distance Function Query Code - PASS
+[OK] G2-4: Euclidean Distance Function Query Code - PASS
+[OK] G2-5: Cross-Language Result Output Format - PASS
 
