@@ -1,8 +1,9 @@
 # Create-Index Samples: Architecture & Design
 
 **Document Purpose:**  
-**Purpose 1:** Each language sample MUST use that language's ARM SDK to create containers and vector indexes (control plane).  
-**Purpose 2:** Demonstrate distance functions across algorithms (Cosine, DotProduct, Euclidean)—showing how the same embedding produces different scores and rankings based on distance function choice.
+**Purpose 1 (Goal 1):** Each language sample MUST use that language's ARM SDK to create containers and vector indexes (control plane).  
+**Purpose 2 (Goal 2):** Code MUST demonstrate distance functions across algorithms (Cosine, DotProduct, Euclidean)—showing how the same embedding produces different scores and rankings based on distance function choice.  
+**Purpose 3 (Goal 3):** When run against provisioned Azure resources, samples MUST successfully execute all queries and produce consistent results across all 5 languages.
 
 **Applies to:** All 5 language implementations (Python, TypeScript, Go, Java, .NET)  
 **Branch:** `diberry/article-2`  
@@ -29,6 +30,16 @@ The create-index samples demonstrate how **vector index creation decisions direc
 - **Same query & data:** 6 scenarios to show how the same embedding produces different scores and rankings
 
 **Key Learning:** Distance function choice is NOT purely academic—it changes score magnitudes, ranking, and relevance interpretation.
+
+### Goal Hierarchy
+
+| Goal | Type | Verification | Blocker? |
+|------|------|--------------|----------|
+| **Goal 1** | ARM SDK Control Plane | Static code inspection | ✅ Required for merge |
+| **Goal 2** | Distance Function Queries | Static code inspection | ✅ Required for merge |
+| **Goal 3** | Azure Resource Execution | Runtime tests (requires `azd up`) | ⚠️ Optional for CI/CD, required for release |
+
+**Goal 3 Rationale:** Static verification ensures code correctness, but doesn't validate that the sample actually runs against real Azure resources. Goal 3 separates integration testing (which may not run in CI/CD due to cost/credentials) from correctness verification.
 
 ---
 
@@ -267,6 +278,38 @@ query_iterable = container.query_items(query=sql, parameters=params, enable_cros
 **Why All 3 Functions on Same Index?**
 Cosmos DB allows querying with different distance functions on the same immutable index. The distance function is applied at query time, not index time (even though the index is created with a default distance function).
 
+---
+
+## 4.4 Goal 3: Azure Resource Execution & Consistency Verification
+
+**Definition:** When samples are run against provisioned Azure resources (post-`azd up`), all queries execute successfully and produce consistent results across all 5 languages.
+
+**Prerequisite:** Requires active Azure Cosmos DB account with containers pre-created by Goal 1 code.
+
+**Verification Requirements:**
+
+| Requirement | Condition | Pass Criteria |
+|-------------|-----------|---------------|
+| **G3-1** | Environment Variables Available | All required env vars present: AZURE_COSMOSDB_ENDPOINT, AZURE_COSMOSDB_ACCOUNT_NAME, etc. |
+| **G3-2** | Containers Exist & Accessible | Both `hotels_diskann` and `hotels_quantizedflat` containers readable via Data Plane SDK |
+| **G3-3** | Data Ingestion Succeeds | All 50 hotel documents successfully upserted; region batching tracked |
+| **G3-4** | Cosine Query Executes | Query with `distanceFunction: 'Cosine'` returns top 5 hotels with scores in [0, 1] range |
+| **G3-5** | DotProduct Query Executes | Query with `distanceFunction: 'DotProduct'` returns top 5 hotels with scores in [0, 1] range |
+| **G3-6** | Euclidean Query Executes | Query with `distanceFunction: 'Euclidean'` returns top 5 hotels with scores in [0.97, 0.99] range (expected for this data) |
+| **G3-7** | Cross-Language Consistency | All 5 languages return same top hotel for same query (HotelId match on rank 1) |
+| **G3-8** | Performance Acceptable | Query latency < 1s; ingestion latency < 5s |
+
+**Execution Flow (Goal 3 Test):**
+```
+1. Check environment variables (G3-1)
+2. Attempt Data Plane connection (G3-2)
+3. Ingest sample data (G3-3)
+4. Execute distance function queries (G3-4, G3-5, G3-6)
+5. Compare results across languages (G3-7)
+6. Check latency metrics (G3-8)
+```
+
+**Note:** Goal 3 tests are **optional in CI/CD** (requires Azure credentials and incurs costs) but **required before release** or merging to main.
 
 ---
 
