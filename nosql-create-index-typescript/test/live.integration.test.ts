@@ -8,9 +8,6 @@ import { fileURLToPath } from "node:url";
 import {
   createArmClient,
   createContainer,
-  createRbacAccess,
-  ROLE_ASSIGNMENT_GUID,
-  ROLE_DEFINITION_GUID,
 } from "../src/control-plane.js";
 import {
   loadConfigFromEnv,
@@ -151,28 +148,6 @@ describe("nosql-create-index-typescript live integration tests", () => {
     expect(
       response.resource?.vectorEmbeddingPolicy?.vectorEmbeddings?.[0]?.dimensions
     ).toBe(config.expectedDimensions);
-  });
-
-  it("creates RBAC role definition and assignment (live)", async () => {
-    await createRbacAccess(armClient, config);
-
-    const roleDefinition = await armClient.sqlResources.getSqlRoleDefinition(
-      ROLE_DEFINITION_GUID,
-      config.azure.resourceGroup!,
-      config.cosmos.accountName!
-    );
-    const roleAssignment = await armClient.sqlResources.getSqlRoleAssignment(
-      ROLE_ASSIGNMENT_GUID,
-      config.azure.resourceGroup!,
-      config.cosmos.accountName!
-    );
-
-    expect(roleDefinition.roleName).toBe(
-      "Write to Azure Cosmos DB for NoSQL data plane"
-    );
-    expect(roleAssignment.principalId).toBe(config.azure.userPrincipalId);
-
-    await delay(15_000);
   });
 
   it("verifies embedding dimensions (live, hits OpenAI)", async () => {

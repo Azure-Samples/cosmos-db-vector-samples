@@ -1,11 +1,13 @@
 /**
  * Control-plane operations using @azure/arm-cosmosdb (ARM SDK).
  *
- *   1. Create container with vector index
- *   2. Clean up sample-created containers (not azd infra)
+ *   1. Create containers with vector indexes
+ *   2. Clean up sample-created containers
  *
- * Note: RBAC role definitions and assignments are created by `azd up` via Bicep templates.
- * This sample assumes the role already exists and uses passwordless (AAD) authentication.
+ * RBAC Setup:
+ * - Role definitions and assignments are created by `azd up` via Bicep (infra/database.bicep lines 195-226)
+ * - Sample code uses DefaultAzureCredential() for authentication
+ * - No RBAC creation code is needed in the sample
  */
 
 import { CosmosDBManagementClient } from "@azure/arm-cosmosdb";
@@ -151,93 +153,7 @@ export async function cleanupSampleContainers(
 }
 
 // ---------------------------------------------------------------------------
-// RBAC Role Definition and Assignment (SQL role, not database-level)
+// Exports for testing
 // ---------------------------------------------------------------------------
+export { CosmosDBManagementClient } from "@azure/arm-cosmosdb";
 
-// Static GUIDs for SQL role definition and assignment
-// These are predictable identifiers used for both creation and verification
-export const ROLE_DEFINITION_GUID = "3d3f2f24-7d5e-11ed-a1eb-0242ac120002";
-export const ROLE_ASSIGNMENT_GUID = "4d4f3f25-8e6f-12fe-b2fc-1353bd231113";
-
-/**
- * Create SQL role definition and assignment for the user principal.
- * This grants the user permission to read and write documents via Microsoft Entra ID (RBAC).
- *
- * Note: This is separate from container creation. The role is created once and shared
- * across all containers in the account. In production, azd up handles this via Bicep.
- */
-export async function createRbacAccess(
-  armClient: CosmosDBManagementClient,
-  config: SampleConfig
-) {
-  console.log("\n=== Step 0: Set Up RBAC (SQL Role) ===");
-
-  const resourceGroup = config.azure.resourceGroup!;
-  const accountName = config.cosmos.accountName!;
-  const principalId = config.azure.userPrincipalId!;
-
-  // Step 1: Create SQL role definition (if it doesn't exist)
-  // This role grants permission to read/write documents on the data plane
-  console.log("  Creating SQL role definition...");
-
-  try {
-    await armClient.sqlResources.beginCreateUpdateSqlRoleDefinitionAndWait(
-      resourceGroup,
-      accountName,
-      ROLE_DEFINITION_GUID,
-      {
-        roleName: "Write to Azure Cosmos DB for NoSQL data plane",
-        type: "CustomRole",
-        assignableScopes: [`/subscriptions/${config.azure.subscriptionId}/resourceGroups/${resourceGroup}/providers/Microsoft.DocumentDB/databaseAccounts/${accountName}`],
-        permissions: [
-          {
-            dataActions: ["Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers/items/*"],
-            notDataActions: [],
-          },
-        ],
-      }
-    );
-    console.log("  ✓ SQL role definition created");
-  } catch (error) {
-    // Role may already exist; check if it's the expected error
-    const errorMsg = (error as any).message?.toLowerCase() || "";
-    if (
-      errorMsg.includes("already exists") ||
-      errorMsg.includes("conflict") ||
-      (error as any).code === 409
-    ) {
-      console.log("  ✓ SQL role definition already exists");
-    } else {
-      throw error;
-    }
-  }
-
-  // Step 2: Create SQL role assignment
-  // This assigns the role to the user principal, granting them the permissions defined above
-  console.log("  Creating SQL role assignment...");
-
-  try {
-    await armClient.sqlResources.beginCreateUpdateSqlRoleAssignmentAndWait(
-      resourceGroup,
-      accountName,
-      ROLE_ASSIGNMENT_GUID,
-      {
-        roleDefinitionId: `/subscriptions/${config.azure.subscriptionId}/resourceGroups/${resourceGroup}/providers/Microsoft.DocumentDB/databaseAccounts/${accountName}/sqlRoleDefinitions/${ROLE_DEFINITION_GUID}`,
-        principalId: principalId,
-        scope: `/subscriptions/${config.azure.subscriptionId}/resourceGroups/${resourceGroup}/providers/Microsoft.DocumentDB/databaseAccounts/${accountName}`,
-      }
-    );
-    console.log(`  ✓ SQL role assignment created for principal: ${principalId}`);
-  } catch (error) {
-    const errorMsg = (error as any).message?.toLowerCase() || "";
-    if (
-      errorMsg.includes("already exists") ||
-      errorMsg.includes("conflict") ||
-      (error as any).code === 409
-    ) {
-      console.log("  ✓ SQL role assignment already exists");
-    } else {
-      throw error;
-    }
-  }
-}
