@@ -246,8 +246,10 @@ Cosmos DB allows querying with different distance functions on the same immutabl
 | `AZURE_OPENAI_EMBEDDING_API_VERSION` | embedding_api_version | Embedding API version (e.g., 2024-08-01-preview) | main.bicep var `embeddingModelApiVersion` |
 
 **Authentication:**
-- **Data Plane (Queries):** Uses Microsoft Entra ID (RBAC). No API keys needed. Credentials come from `DefaultAzureCredential()` / environment user login.
-- **ARM SDK (Control Plane):** Uses subscription context from Azure CLI / DefaultAzureCredential.
+- **SDK Authentication:** All SDKs (ARM, Cosmos DB, Azure OpenAI) use `DefaultAzureCredential()` in every language. This credential automatically detects the authenticated user from Azure CLI, MSI, environment, or VS Code Copilot context — no hardcoded keys, no passwords.
+- **Data Plane (Queries):** Cosmos DB queries use the credential from `DefaultAzureCredential()` to authenticate with Microsoft Entra ID (RBAC). No API keys needed.
+- **ARM SDK (Control Plane):** ARM SDK operations (create/delete containers) use the same `DefaultAzureCredential()` within the subscription context provided at client creation time.
+- **OpenAI Embedding API:** Azure OpenAI embedding requests use `DefaultAzureCredential()` for Entra ID authentication to the OpenAI endpoint.
 
 **NOT Output by Bicep (Do NOT use):**
 - `AZURE_COSMOS_KEY` — Not needed; ARM SDK and Data Plane both use RBAC
