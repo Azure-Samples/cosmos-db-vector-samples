@@ -188,7 +188,8 @@ export async function insertDocuments(
       resourceBody: {
         ...item,
         id: item.HotelId || randomUUID(), // Map HotelId to id (required for Cosmos bulk ops)
-        [embeddingField]: item.embedding, // Rename embedding field to match config
+        // Use the pre-computed embedding from the data file (DescriptionVector)
+        [embeddingField]: item.DescriptionVector || item.embedding,
       },
       partitionKey: [region],
     }));
@@ -321,6 +322,10 @@ export async function vectorQuery(
       .fetchAll();
 
      if (resources.length > 0) {
+       // DEBUG: Log first result to see what's actually returned
+       console.log(`    DEBUG: First result keys: ${Object.keys(resources[0]).join(', ')}`);
+       console.log(`    DEBUG: Full first result: ${JSON.stringify(resources[0], null, 2)}`);
+        
        const top1Name = (resources[0].HotelName || resources[0].Description || "").substring(0, 26);
        const top1Score = resources[0].similarity;
        const top2Name = resources.length > 1 ? (resources[1].HotelName || resources[1].Description || "").substring(0, 26) : "";
