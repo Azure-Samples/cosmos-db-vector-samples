@@ -218,48 +218,52 @@ Cosmos DB allows querying with different distance functions on the same immutabl
 
 ## ⚡ SOURCE OF TRUTH HIERARCHY (CRITICAL)
 
-**The following hierarchy is IMMUTABLE and ENFORCED:**
+**Bicep owns ONLY env variable names. Plan owns EVERYTHING ELSE.**
 
 ```
 ┌──────────────────────────────────────────────────────┐
-│ BICEP (infra/main.bicep lines 159-198)             │
-│ ✓ Infrastructure outputs (env vars, resource names) │
-│ ✓ NEVER modified based on plan or code             │
-│ ✓ SOURCE OF TRUTH for deployment                    │
+│ BICEP (infra/main.bicep lines 159-201)             │
+│ ✓ OUTPUT NAMES ONLY (what env vars are called)      │
+│ ✓ Examples: AZURE_COSMOSDB_CREATE_INDEX_DATABASENAME │
+│ ✓ NEVER modify bicep based on plan or code         │
+│ ✓ Plan & code must read the names bicep outputs    │
 └────────────┬─────────────────────────────────────────┘
-             │ (must match exactly)
+             │ (plan reads these names)
              ↓
 ┌──────────────────────────────────────────────────────┐
-│ PLAN (this document, section 5.1)                   │
-│ ✓ Documents WHAT bicep outputs                      │
-│ ✓ Defines expected env var names                    │
-│ ✓ NEVER invents names; always matches bicep        │
-│ ✓ Updated when bicep changes                        │
+│ PLAN (this document)                                │
+│ ✓ SOURCE OF TRUTH for goals, architecture, reqs    │
+│ ✓ Section 5.1: Maps bicep env var names to use    │
+│ ✓ Section 2-4: Defines what code must build        │
+│ ✓ Section 5.2: Defines how to validate             │
+│ ✓ PLAN is authoritative for everything except      │
+│   the literal env var names (those come from bicep) │
 └────────────┬─────────────────────────────────────────┘
-             │ (must match exactly)
+             │ (verification checks code against plan)
              ↓
 ┌──────────────────────────────────────────────────────┐
 │ VERIFICATION SCRIPT (.github/scripts/verify-...)   │
-│ ✓ Validates plan section 5.1 against bicep         │
-│ ✓ Runs test suites with env vars from plan         │
-│ ✓ Reports misalignment (plan vs bicep)             │
-│ ✓ GATES whether code samples can work               │
+│ ✓ Validates code against plan (not bicep)          │
+│ ✓ Uses env var names from bicep (via plan section) │
+│ ✓ Reports if code matches plan goals               │
 └────────────┬─────────────────────────────────────────┘
-             │ (plan & bicep must be aligned)
+             │ (if verification passes, code is correct)
              ↓
 ┌──────────────────────────────────────────────────────┐
 │ CODE SAMPLES (all 5 languages)                      │
-│ ✓ Read env vars named in plan section 5.1          │
-│ ✓ Use names exactly as plan specifies              │
-│ ✓ MUST pass verification when plan is correct      │
-│ ✓ If test fails, check plan ↔ bicep alignment first │
+│ ✓ Reads env var names from plan section 5.1       │
+│ ✓ Implements architecture from plan sections 2-4   │
+│ ✓ MUST pass verification to match plan            │
 └──────────────────────────────────────────────────────┘
 ```
 
 **Enforcement Rule:**
-- If verification script reports `PLAN AND BICEP ENV VARS ARE ALIGNED`, code samples MUST work
-- If code samples fail, the issue is in the samples, NOT the plan or bicep
-- If plan and bicep are NOT aligned, fix plan to match bicep (NEVER modify bicep to match plan)
+- Bicep outputs env var names → Plan documents them → Code reads them
+- Plan defines goals (Goal 1, Goal 2) → Verification checks code against them → Code implements them
+- If bicep env var name changes → Update plan section 5.1 only
+- If plan goals/architecture changes → Update all relevant sections → Verification updates → Code updates
+- If code fails verification → Code is wrong, not plan
+
 
 ---
 
@@ -338,10 +342,10 @@ However, bicep provides `AZURE_COSMOSDB_ACCOUNT_NAME` directly, so extraction is
    - Code inspection: Searches source code for forbidden patterns: `COSMOS_KEY`, `OPENAI_KEY`, `password`, `secret_key`, `api_key`
    - ✅ PASS if DefaultAzureCredential found and no forbidden patterns; ❌ FAIL otherwise
 
-**Result interpretation:**
-- If Bicep ↔ Plan check FAILS → Plan is wrong. Update plan to match bicep, do NOT change bicep.
-- If Bicep ↔ Plan check PASSES but Goal 1 or Goal 2 FAILs → Code is wrong. Update code to match plan.
+**Result interpretation (Verification validates code against PLAN, not bicep):**
+- If Goal 1, Goal 2, or Auth validation FAILS → Code is wrong. Update code to match plan.
 - If all checks PASS → Samples are correctly implemented and ready for article docs.
+- If env var names are wrong in test output → Check plan section 5.1 env var names against bicep (names only). Update plan to match bicep env var names, then re-run verification.
 
 ### 5.3 Data File Specification
 
