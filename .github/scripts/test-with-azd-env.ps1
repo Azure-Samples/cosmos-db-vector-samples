@@ -141,6 +141,7 @@ $dotnetWrapper = @"
 `$env:AZURE_COSMOSDB_DATABASENAME = `$args[1]
 `$env:AZURE_OPENAI_EMBEDDING_ENDPOINT = `$args[2]
 `$env:AZURE_OPENAI_EMBEDDING_DEPLOYMENT = `$args[3]
+`$env:AZURE_COSMOSDB_CREATE_INDEX_EMBEDDED_FIELD = `$args[4]
 
 Set-Location `"$dotnetDir`"
 dotnet test 2>&1 | Select-Object -First 30
@@ -153,6 +154,7 @@ $dotnetEndpoint = $azdVars["AZURE_COSMOSDB_ENDPOINT"] ?? "MISSING"
 $dotnetDb = $azdVars["AZURE_COSMOSDB_DATABASENAME"] ?? "MISSING"
 $dotnetOpenaiEndpoint = $azdVars["AZURE_OPENAI_EMBEDDING_ENDPOINT"] ?? "MISSING"
 $dotnetOpenaiDeployment = $azdVars["AZURE_OPENAI_EMBEDDING_DEPLOYMENT"] ?? "MISSING"
+$dotnetEmbeddingField = $azdVars["AZURE_COSMOSDB_CREATE_INDEX_EMBEDDED_FIELD"] ?? "embedding"
 
 if ($dotnetEndpoint -eq "MISSING" -or $dotnetDb -eq "MISSING" -or $dotnetOpenaiEndpoint -eq "MISSING" -or $dotnetOpenaiDeployment -eq "MISSING") {
     Write-Host "  ✗ Missing required env vars:" -ForegroundColor Red
@@ -163,7 +165,7 @@ if ($dotnetEndpoint -eq "MISSING" -or $dotnetDb -eq "MISSING" -or $dotnetOpenaiE
     $results["dotnet"] = "BLOCKED_MISSING_VARS"
 } else {
     Write-Host "  Running .NET tests with azd env vars..." -ForegroundColor Gray
-    & pwsh $dotnetScript $dotnetEndpoint $dotnetDb $dotnetOpenaiEndpoint $dotnetOpenaiDeployment 2>&1 | Tee-Object -Variable dotnetOutput | Select-Object -First 20
+    & pwsh $dotnetScript $dotnetEndpoint $dotnetDb $dotnetOpenaiEndpoint $dotnetOpenaiDeployment $dotnetEmbeddingField 2>&1 | Tee-Object -Variable dotnetOutput | Select-Object -First 20
     $results["dotnet"] = if ($LASTEXITCODE -eq 0) { "PASS" } else { "FAIL" }
     Write-Host "  Status: $($results["dotnet"])" -ForegroundColor $(if ($results["dotnet"] -eq "PASS") { "Green" } else { "Red" })
 }
