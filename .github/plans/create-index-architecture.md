@@ -216,34 +216,82 @@ Cosmos DB allows querying with different distance functions on the same immutabl
 
 ---
 
+## ⚡ SOURCE OF TRUTH HIERARCHY (CRITICAL)
+
+**The following hierarchy is IMMUTABLE and ENFORCED:**
+
+```
+┌──────────────────────────────────────────────────────┐
+│ BICEP (infra/main.bicep lines 159-198)             │
+│ ✓ Infrastructure outputs (env vars, resource names) │
+│ ✓ NEVER modified based on plan or code             │
+│ ✓ SOURCE OF TRUTH for deployment                    │
+└────────────┬─────────────────────────────────────────┘
+             │ (must match exactly)
+             ↓
+┌──────────────────────────────────────────────────────┐
+│ PLAN (this document, section 5.1)                   │
+│ ✓ Documents WHAT bicep outputs                      │
+│ ✓ Defines expected env var names                    │
+│ ✓ NEVER invents names; always matches bicep        │
+│ ✓ Updated when bicep changes                        │
+└────────────┬─────────────────────────────────────────┘
+             │ (must match exactly)
+             ↓
+┌──────────────────────────────────────────────────────┐
+│ VERIFICATION SCRIPT (.github/scripts/verify-...)   │
+│ ✓ Validates plan section 5.1 against bicep         │
+│ ✓ Runs test suites with env vars from plan         │
+│ ✓ Reports misalignment (plan vs bicep)             │
+│ ✓ GATES whether code samples can work               │
+└────────────┬─────────────────────────────────────────┘
+             │ (plan & bicep must be aligned)
+             ↓
+┌──────────────────────────────────────────────────────┐
+│ CODE SAMPLES (all 5 languages)                      │
+│ ✓ Read env vars named in plan section 5.1          │
+│ ✓ Use names exactly as plan specifies              │
+│ ✓ MUST pass verification when plan is correct      │
+│ ✓ If test fails, check plan ↔ bicep alignment first │
+└──────────────────────────────────────────────────────┘
+```
+
+**Enforcement Rule:**
+- If verification script reports `PLAN AND BICEP ENV VARS ARE ALIGNED`, code samples MUST work
+- If code samples fail, the issue is in the samples, NOT the plan or bicep
+- If plan and bicep are NOT aligned, fix plan to match bicep (NEVER modify bicep to match plan)
+
+---
+
 ## 5. Implementation Pattern (Language-Agnostic)
 
 ### 5.1 Configuration Management
 
 **Hard Constraint:** Environment variables come from Azure Developer CLI (`azd`) and are sourced directly from `infra/main.bicep` outputs. Code must use the exact env var names that bicep outputs; do NOT invent names or modify `.env` files.
 
-**Source of Truth:** `infra/main.bicep` lines 159-198 define all outputs. This section reflects those outputs exactly.
+**Source of Truth:** `infra/main.bicep` lines 159-201 define all outputs. This section reflects those outputs exactly.
 
 **Environment Variable Mapping (From Bicep Outputs):**
 
-| Bicep Output | Code Variable | Purpose | Source |
+| Bicep Output | Code Variable | Purpose | Bicep Source (lines 159-201) |
 |--------------|---------------|---------|---------| 
-| `AZURE_TENANT_ID` | tenant_id | Azure Entra ID tenant | `tenant().tenantId` |
-| `AZURE_LOCATION` | location | Azure region | main.bicep param `location` |
-| `AZURE_RESOURCE_GROUP` | resource_group | Azure resource group name | `resourceGroup().name` |
-| `AZURE_COSMOSDB_ACCOUNT_NAME` | cosmos_account_name | Cosmos DB account name | database.outputs.accountName |
-| `AZURE_COSMOSDB_ENDPOINT` | cosmos_endpoint | Cosmos DB service endpoint URL | database.outputs.endpoint |
-| `AZURE_COSMOSDB_DATABASENAME` | database_name | Database name (for regular vector search) | main.bicep param `databaseName` |
-| `AZURE_COSMOSDB_DISKANN_CONTAINER_NAME` | diskann_container | Regular DiskANN container name | database.outputs.containers[0].name |
-| `AZURE_COSMOSDB_QUANTIZEDFLAT_CONTAINER_NAME` | quantizedflat_container | Regular QuantizedFlat container name | database.outputs.containers[1].name |
-| `AZURE_COSMOSDB_CREATE_INDEX_DATABASENAME` | create_index_database | Create-index sample database name | main.bicep param `createIndexDatabaseName` |
-| `AZURE_COSMOSDB_CREATE_INDEX_DISKANN_CONTAINER_NAME` | create_index_diskann_container | Create-index DiskANN container | database.outputs.createIndexContainers[0].name |
-| `AZURE_COSMOSDB_CREATE_INDEX_QUANTIZEDFLAT_CONTAINER_NAME` | create_index_quantizedflat_container | Create-index QuantizedFlat container | database.outputs.createIndexContainers[1].name |
-| `AZURE_OPENAI_SERVICE` | openai_service_name | Azure OpenAI service name | openAi.outputs.name |
-| `AZURE_OPENAI_ENDPOINT` | openai_endpoint | Azure OpenAI service endpoint URL | openAi.outputs.endpoint |
-| `AZURE_OPENAI_EMBEDDING_DEPLOYMENT` | embedding_deployment | Embedding model deployment name | main.bicep var `embeddingModelName` |
-| `AZURE_OPENAI_EMBEDDING_ENDPOINT` | embedding_endpoint | Embedding API endpoint URL | openAi.outputs.endpoint |
-| `AZURE_OPENAI_EMBEDDING_API_VERSION` | embedding_api_version | Embedding API version (e.g., 2024-08-01-preview) | main.bicep var `embeddingModelApiVersion` |
+| `AZURE_TENANT_ID` | tenant_id | Azure Entra ID tenant | `tenant().tenantId` (line 160) |
+| `AZURE_LOCATION` | location | Azure region | `location` param (line 161) |
+| `AZURE_RESOURCE_GROUP` | resource_group | Azure resource group name | `resourceGroup().name` (line 162) |
+| `AZURE_COSMOSDB_ACCOUNT_NAME` | cosmos_account_name | Cosmos DB account name | database.outputs.accountName (line 172) |
+| `AZURE_COSMOSDB_ENDPOINT` | cosmos_endpoint | Cosmos DB service endpoint URL | database.outputs.endpoint (line 173) |
+| `AZURE_COSMOSDB_DATABASENAME` | database_name | Database name (for regular vector search) | `databaseName` param (line 179) |
+| `AZURE_COSMOSDB_DISKANN_CONTAINER_NAME` | diskann_container | Regular DiskANN container name | database.outputs.containers[0].name (line 176) |
+| `AZURE_COSMOSDB_QUANTIZEDFLAT_CONTAINER_NAME` | quantizedflat_container | Regular QuantizedFlat container name | database.outputs.containers[1].name (line 177) |
+| `AZURE_COSMOSDB_CREATE_INDEX_DATABASENAME` | create_index_database | Create-index sample database name | `createIndexDatabaseName` param (line 183) |
+| `AZURE_COSMOSDB_CREATE_INDEX_DISKANN_CONTAINER_NAME` | create_index_diskann_container | Create-index DiskANN container | database.outputs.createIndexContainers[0].name (line 186) |
+| `AZURE_COSMOSDB_CREATE_INDEX_QUANTIZEDFLAT_CONTAINER_NAME` | create_index_quantizedflat_container | Create-index QuantizedFlat container | database.outputs.createIndexContainers[1].name (line 187) |
+| `AZURE_OPENAI_SERVICE` | openai_service_name | Azure OpenAI service name | openAi.outputs.name (line 193) |
+| `AZURE_OPENAI_ENDPOINT` | openai_endpoint | Azure OpenAI service endpoint URL | openAi.outputs.endpoint (line 194) |
+| `AZURE_OPENAI_EMBEDDING_DEPLOYMENT` | embedding_deployment | Embedding model deployment name | `embeddingModelName` var (line 195) |
+| `AZURE_OPENAI_EMBEDDING_ENDPOINT` | embedding_endpoint | Embedding API endpoint URL | openAi.outputs.endpoint (line 194) |
+| `AZURE_OPENAI_EMBEDDING_API_VERSION` | embedding_api_version | Embedding API version (e.g., 2024-08-01-preview) | `embeddingModelApiVersion` var (line 196) |
+| `AZURE_USER_PRINCIPAL_ID` | user_principal_id | User object ID from RBAC (for role assignment) | `deploymentUserPrincipalId` param (line 200) |
 
 **Authentication:**
 - **SDK Authentication:** All SDKs (ARM, Cosmos DB, Azure OpenAI) use `DefaultAzureCredential()` in every language. This credential automatically detects the authenticated user from Azure CLI, MSI, environment, or VS Code Copilot context — no hardcoded keys, no passwords.
@@ -266,7 +314,36 @@ Pattern: https://{account-name}.documents.azure.com:443/
 ```
 However, bicep provides `AZURE_COSMOSDB_ACCOUNT_NAME` directly, so extraction is unnecessary.
 
-### 5.2 Data File Specification
+### 5.2 Verification Workflow
+
+**The verification script (`.github/scripts/verify-against-plan.ps1`) is the bridge between bicep and code samples:**
+
+1. **Bicep ↔ Plan Alignment Check**
+   - Reads bicep outputs from `infra/main.bicep` lines 159-201
+   - Compares against env var names listed in section 5.1 above
+   - Reports: ✅ ALIGNED or ❌ MISMATCH (stop here if misaligned; fix plan to match bicep)
+
+2. **Goal 1 Validation** (ARM SDK creates containers with correct configuration)
+   - Code inspection: Searches source code for `/Region`, `DISK_ANN|DiskANN`, `QuantizedFlat`, `1536`
+   - Verifies Goal 1 requirements are present in code (independent of env vars)
+   - ✅ PASS if all 4 patterns found; ❌ FAIL otherwise
+
+3. **Goal 2 Validation** (VectorDistance queries work with all 3 distance functions)
+   - Runs test suite with env vars from section 5.1
+   - Parses test output for distance function names: "cosine", "euclidean", "dot_product"
+   - ✅ PASS if all 3 functions tested and passed; ❌ FAIL if any missing or tests error
+
+4. **Authentication Validation** (DefaultAzureCredential only, no hardcoded keys)
+   - Code inspection: Searches source code for `DefaultAzureCredential`, `azure.identity`, `@azure/identity`, `Azure.Identity`
+   - Code inspection: Searches source code for forbidden patterns: `COSMOS_KEY`, `OPENAI_KEY`, `password`, `secret_key`, `api_key`
+   - ✅ PASS if DefaultAzureCredential found and no forbidden patterns; ❌ FAIL otherwise
+
+**Result interpretation:**
+- If Bicep ↔ Plan check FAILS → Plan is wrong. Update plan to match bicep, do NOT change bicep.
+- If Bicep ↔ Plan check PASSES but Goal 1 or Goal 2 FAILs → Code is wrong. Update code to match plan.
+- If all checks PASS → Samples are correctly implemented and ready for article docs.
+
+### 5.3 Data File Specification
 
 **Required Data File for Vector Samples:**
 ```

@@ -110,6 +110,92 @@ $Goal2 = @{
 }
 
 # ==============================================================================
+# AUTHENTICATION VALIDATION
+# ==============================================================================
+
+function Test-AuthenticationPatterns {
+    param([hashtable]$Results)
+    
+    Write-Host "`nValidating authentication patterns..." -ForegroundColor Cyan
+    
+    $authPatterns = @{
+        python = @{
+            path = "nosql-create-index-python/src"
+            filePattern = "*.py"
+            shouldHave = @("DefaultAzureCredential", "from azure.identity")
+            shouldNotHave = @("AZURE_COSMOS_KEY", "AZURE_OPENAI_KEY", "password", "secret_key", "api_key")
+        }
+        typescript = @{
+            path = "nosql-create-index-typescript/src"
+            filePattern = "*.ts"
+            shouldHave = @("DefaultAzureCredential", "from @azure/identity")
+            shouldNotHave = @("COSMOS_KEY", "OPENAI_KEY", "password", "apiKey", "secretKey")
+        }
+        dotnet = @{
+            path = "nosql-create-index-dotnet/src"
+            filePattern = "*.cs"
+            shouldHave = @("DefaultAzureCredential", "using Azure.Identity")
+            shouldNotHave = @("CosmosKeyCredential", "ApiKey", "password", "secretKey")
+        }
+    }
+    
+    foreach ($lang in $Results.languages.Keys) {
+        if (-not $authPatterns.ContainsKey($lang)) {
+            continue
+        }
+        
+        $langConfig = $authPatterns[$lang]
+        $srcPath = Join-Path $RepoRoot $langConfig.path
+        
+        if (-not (Test-Path $srcPath)) {
+            Write-Host "  ⚠ Skipping $lang — path not found" -ForegroundColor Yellow
+            continue
+        }
+        
+        # Find all source files
+        $files = @(Get-ChildItem -Path $srcPath -Filter $langConfig.filePattern -File -Recurse -ErrorAction SilentlyContinue)
+        $allContent = @($files | Get-Content -Raw) -join "`n"
+        
+        # Check for required auth pattern
+        $hasDefaultAzureCredential = $false
+        foreach ($pattern in $langConfig.shouldHave) {
+            if ($allContent -match [regex]::Escape($pattern)) {
+                $hasDefaultAzureCredential = $true
+                break
+            }
+        }
+        
+        # Check for forbidden patterns
+        $hasForbiddenPattern = $false
+        $forbiddenPatterns = @()
+        foreach ($pattern in $langConfig.shouldNotHave) {
+            if ($allContent -match [regex]::Escape($pattern)) {
+                $hasForbiddenPattern = $true
+                $forbiddenPatterns += $pattern
+            }
+        }
+        
+        $Results.languages[$lang]["auth_check"] = @{
+            status = if ($hasDefaultAzureCredential -and -not $hasForbiddenPattern) { "PASS" } else { "FAIL" }
+            uses_default_azure_credential = $hasDefaultAzureCredential
+            has_forbidden_patterns = $forbiddenPatterns
+        }
+        
+        if ($hasDefaultAzureCredential -and -not $hasForbiddenPattern) {
+            Write-Host "  ✓ $lang: Uses DefaultAzureCredential, no hardcoded keys" -ForegroundColor Green
+        } else {
+            Write-Host "  ✗ $lang: Auth validation failed" -ForegroundColor Red
+            if (-not $hasDefaultAzureCredential) {
+                Write-Host "    - Missing DefaultAzureCredential usage" -ForegroundColor Red
+            }
+            if ($hasForbiddenPattern) {
+                Write-Host "    - Found forbidden patterns: $($forbiddenPatterns -join ', ')" -ForegroundColor Red
+            }
+        }
+    }
+}
+
+# ==============================================================================
 # LANGUAGE-SPECIFIC TEST RUNNERS
 # ==============================================================================
 
@@ -294,6 +380,9 @@ if ($LanguagesToTest -match "dotnet") {
     Test-DotNet -Results $results.languages
 }
 
+# Validate authentication patterns
+Test-AuthenticationPatterns -Results $results
+
 # ==============================================================================
 # GENERATE RESULTS
 # ==============================================================================
@@ -309,9 +398,27 @@ if ($GenerateReport) {
 # CREATE-INDEX VERIFICATION REPORT
 Generated: $(Get-Date)
 
+## AUTHENTICATION
+Verify: All samples use DefaultAzureCredential, no hardcoded keys
+
+"@
+
+    foreach ($lang in $results.languages.Keys) {
+        $authStatus = $results.languages[$lang]["auth_check"]
+        if ($authStatus) {
+            $status = $authStatus.status
+            $emoji = if ($status -eq "PASS") { "[OK]" } else { "[FAIL]" }
+            $summary += "### $lang`n$emoji Auth check - $status`n"
+            if ($authStatus.has_forbidden_patterns) {
+                $summary += "⚠ Found forbidden patterns: $($authStatus.has_forbidden_patterns -join ', ')`n"
+            }
+            $summary += "`n"
+        }
+    }
+
+    $summary += @"
 ## GOAL 1: ARM SDK Control Plane
 Verify: Containers created with /Region partition key and both index types
-
 "@
     
     foreach ($lang in $LanguagesToTest.Split(',')) {
