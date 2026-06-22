@@ -44,6 +44,7 @@ type Config struct {
 	SubscriptionID            string
 	ResourceGroup             string
 	AccountName               string
+	Location                  string
 }
 
 func LoadConfig() (*Config, error) {
@@ -78,6 +79,7 @@ func LoadConfigFromEnv(getenv func(string) string) (*Config, error) {
 		SubscriptionID:            strings.TrimSpace(getenv("AZURE_SUBSCRIPTION_ID")),
 		ResourceGroup:             strings.TrimSpace(getenv("AZURE_RESOURCE_GROUP")),
 		AccountName:               strings.TrimSpace(getenv("AZURE_COSMOSDB_ACCOUNT_NAME")),
+		Location:                  strings.TrimSpace(getenv("AZURE_LOCATION")),
 	}
 
 	if cfg.DatabaseName == "" {
@@ -111,6 +113,7 @@ func validateConfig(cfg *Config) error {
 		"AZURE_SUBSCRIPTION_ID":             cfg.SubscriptionID,
 		"AZURE_RESOURCE_GROUP":              cfg.ResourceGroup,
 		"AZURE_COSMOSDB_ACCOUNT_NAME":       cfg.AccountName,
+		"AZURE_LOCATION":                    cfg.Location,
 	}
 
 	missing := make([]string, 0)

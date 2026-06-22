@@ -664,15 +664,21 @@ diff <(python output.txt) <(go output.txt)
 
 **Goal 1: ARM SDK Control Plane (Container + Vector Index Creation)**
 
-| Language | ARM SDK | Container Creation | Vector Index Creation | Status |
-|----------|---------|-------------------|----------------------|--------|
-| **Python** | `azure-mgmt-cosmosdb` | ✅ Complete | ✅ Complete | **VERIFIED** |
-| **TypeScript** | `@azure/arm-cosmosdb` | ✅ Complete | ✅ Complete | **VERIFIED** |
-| **Go** | `armcosmos` | ❌ Missing | ❌ Missing | **TODO** — Article 2 requires ARM SDK implementation |
-| **Java** | `azure-resourcemanager-cosmos` | ❌ Missing | ❌ Missing | **TODO** — Article 2 requires ARM SDK implementation |
-| **.NET** | `Azure.ResourceManager.CosmosDB` | ✅ Complete | ✅ Complete | **VERIFIED** |
+| Language | ARM SDK | Version | Container Creation | Vector Index Creation | Status |
+|----------|---------|---------|-------------------|----------------------|--------|
+| **Python** | `azure-mgmt-cosmosdb` | (latest) | ✅ Complete | ✅ Complete | **VERIFIED** |
+| **TypeScript** | `@azure/arm-cosmosdb` | (latest) | ✅ Complete | ✅ Complete | **VERIFIED** |
+| **Go** | `armcosmos` | **v3.4.0** (typed SDK) | ✅ In Progress | ✅ In Progress | **IN PROGRESS** — Using typed SDK with fluent API |
+| **Java** | `azure-resourcemanager-cosmos` | (latest) | ❌ TODO | ❌ TODO | **TODO** — Implement using typed SDK pattern |
+| **.NET** | `Azure.ResourceManager.CosmosDB` | (latest) | ✅ Complete | ✅ Complete | **VERIFIED** |
 
-**Note (2026-06-21):** Go and Java currently lack ARM SDK control-plane code. They have data-plane implementations (ingestion + queries) but do NOT create containers or vector indexes themselves—they assume pre-existing infrastructure. **Article 2's purpose requires demonstrating the control-plane pattern**, so Go and Java must be updated to use ARM SDK (like Python/TypeScript/.NET) to meet the stated goals.
+**Critical Architecture Decision (2026-06-22):** 
+- All implementations MUST use **typed fluent SDKs**, NOT raw REST API
+- **Go:** Upgrading from `armcosmos v1.0.0` (no vector support) → `armcosmos v3.4.0` (full typed support)
+  - Uses `BeginCreateUpdateSQLContainer()` with `VectorEmbeddingPolicy`, `VectorIndexType` enums
+  - Uses `.PollUntilDone()` for async container creation
+  - Matches Abhishek's recommended pattern (see example in research/go-arm-sdk-comparison.md)
+- **Java:** Will follow same typed SDK pattern as Go (not REST API)
 
 **Goal 2: Data Plane Implementation (Distance Functions Across All 5 SDKs)**
 
