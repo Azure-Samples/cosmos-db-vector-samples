@@ -32,6 +32,27 @@ The create-index samples demonstrate how **vector index creation decisions direc
 
 ---
 
+## 1.5 Responsibility Allocation (Infrastructure vs Application)
+
+This plan uses a **clear separation of concerns** between infrastructure (bicep) and application code (samples):
+
+| Concern | Owner | Details |
+|---------|-------|---------|
+| **Container Creation** | **Code (ARM SDK)** | Sample code creates containers with correct partition key and vector indexes |
+| **RBAC Role Definition** | **Bicep (azd up)** | Infrastructure creates SQL role definition with document CRUD permissions |
+| **RBAC Role Assignment** | **Bicep (azd up)** | Infrastructure assigns role to authenticated user/managed identity |
+| **Authentication** | **Code (DefaultAzureCredential)** | Sample code uses credential to obtain token; bicep role enables token to work |
+| **Data Ingestion** | **Code (Data Plane SDK)** | Sample code loads documents; RBAC role (from bicep) allows writes |
+| **Vector Queries** | **Code (Data Plane SDK)** | Sample code executes queries; RBAC role (from bicep) allows reads |
+
+**Key Point:** Code never creates, manages, or even knows about RBAC roles. Code only uses `DefaultAzureCredential()`. Bicep creates the role. Cosmos DB enforces the role. This pattern ensures:
+- ✅ Code is portable (works with any credential type)
+- ✅ Code has no hardcoded credentials
+- ✅ Infrastructure and code concerns are separated
+- ✅ Same architecture as production (Kubernetes, App Service, Functions)
+
+---
+
 ## 2. Problem Domain
 
 ### 2.1 Why This Matters
@@ -295,7 +316,42 @@ Cosmos DB allows querying with different distance functions on the same immutabl
 | `AZURE_OPENAI_EMBEDDING_DEPLOYMENT` | embedding_deployment | Embedding model deployment name | `embeddingModelName` var (line 195) |
 | `AZURE_OPENAI_EMBEDDING_ENDPOINT` | embedding_endpoint | Embedding API endpoint URL | openAi.outputs.endpoint (line 194) |
 | `AZURE_OPENAI_EMBEDDING_API_VERSION` | embedding_api_version | Embedding API version (e.g., 2024-08-01-preview) | `embeddingModelApiVersion` var (line 196) |
-| `AZURE_USER_PRINCIPAL_ID` | user_principal_id | User object ID from RBAC (for role assignment) | `deploymentUserPrincipalId` param (line 200) |
+
+**RBAC Setup (Infrastructure Responsibility — Bicep, NOT Code):**
+
+RBAC (Role-Based Access Control) enables `DefaultAzureCredential()` to work without API keys. This is an **infrastructure responsibility**, not an application responsibility.
+
+**What Bicep Does (`azd up`):**
+1. **Creates SQL Role Definition** (`infra/database.bicep` lines 195-199):
+   - Role name: "Write to Azure Cosmos DB for NoSQL data plane"
+   - Permissions: `Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers/items/*`
+   - This grants CRUD access to all documents in all containers
+
+2. **Assigns Role to User Principal** (`infra/database.bicep` lines 209-216):
+   - Assigns the role to the authenticated user (the person running `azd up`)
+   - Parameter: `deploymentUserPrincipalId` (passed by `azd up`)
+   - Result: User can now read/write documents using their Microsoft Entra ID identity
+
+3. **Assigns Role to Managed Identity (if applicable)** (`infra/database.bicep` lines 219-226):
+   - For CI/CD pipelines, assigns role to a managed identity
+   - Parameter: `managedIdentityPrincipalId` (optional)
+
+**What Code Does (Application, DefaultAzureCredential):**
+- Uses `DefaultAzureCredential()` to obtain an access token for the authenticated user
+- Cosmos DB validates the token against the RBAC role assignment created by bicep
+- If role is in place → Query succeeds. If role is missing → Query fails with 403 Forbidden.
+
+**Critical Distinction:**
+- **Bicep creates the role** (one-time infrastructure setup during `azd up`)
+- **Code uses the role** (every API call via DefaultAzureCredential)
+- **Code does NOT create, update, or manage the role** — that's bicep's job
+- **Code does NOT need AZURE_USER_PRINCIPAL_ID** — bicep resolved it during deployment
+
+**Why This Matters:**
+- Decouples infrastructure concerns (who can access what) from application concerns (what the app does)
+- Makes samples portable: same code works with managed identity, user identity, or service principal — bicep handles the role assignment
+- Eliminates hardcoded credentials from all sample code
+- Matches production architecture (Kubernetes, App Service, Functions all use managed identity + RBAC)
 
 **Authentication:**
 - **SDK Authentication:** All SDKs (ARM, Cosmos DB, Azure OpenAI) use `DefaultAzureCredential()` in every language. This credential automatically detects the authenticated user from Azure CLI, MSI, environment, or VS Code Copilot context — no hardcoded keys, no passwords.
