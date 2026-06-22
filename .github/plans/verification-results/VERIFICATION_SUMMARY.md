@@ -1,5 +1,5 @@
 # CREATE-INDEX VERIFICATION REPORT
-Generated: 06/21/2026 18:23:20
+Generated: 06/21/2026 18:40:59
 
 ## GOAL 1: ARM SDK Control Plane
 Verify: Containers created with /Region partition key and both index types

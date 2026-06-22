@@ -1,23 +1,23 @@
 {
-  "timestamp": "2026-06-22T01:23:10.7630539Z",
+  "plan_file": "C:\\project-dina-data-ai\\repos\\public-azuresamples-cosmos-db-vector-samples\\.github\\plans\\create-index-architecture.md",
   "languages": {
-    "typescript": {
-      "goal_2": {},
+    "python": {
+      "G1-2": {
+        "status": "PASS"
+      },
+      "G2-2": {
+        "status": "FAIL"
+      },
       "G1-4": {
         "status": "PASS"
       },
-      "G1-1": {
-        "status": "PASS"
-      },
-      "G2-3": {
-        "status": "NOT_TESTED"
-      },
+      "goal_2": {},
       "build_test": {
-        "output": "\r\n> nosql-create-index-typescript@1.0.0 test\r\n> vitest run\r\n\r\n\r\n\u001b[1m\u001b[46m RUN \u001b[49m\u001b[22m \u001b[36mv4.1.0 \u001b[39m\u001b[90mC:/project-dina-data-ai/repos/public-azuresamples-cosmos-db-vector-samples/nosql-create-index-typescript\u001b[39m\r\n\r\n \u001b[31m❯\u001b[39m test/live.integration.test.ts \u001b[2m(\u001b[22m\u001b[2m7 tests\u001b[22m\u001b[2m | \u001b[22m\u001b[33m7 skipped\u001b[39m\u001b[2m)\u001b[22m\u001b[32m 8\u001b[2mms\u001b[22m\u001b[39m\r\n     \u001b[2m\u001b[90m↓\u001b[39m\u001b[22m loads config from env vars\r\n     \u001b[2m\u001b[90m↓\u001b[39m\u001b[22m creates an ARM client\r\n     \u001b[2m\u001b[90m↓\u001b[39m\u001b[22m creates a container with a vector index (live)\r\n     \u001b[2m\u001b[90m↓\u001b[39m\u001b[22m creates RBAC role definition and assignment (live)\r\n     \u001b[2m\u001b[90m↓\u001b[39m\u001b[22m verifies embedding dimensions (live, hits OpenAI)\r\n     \u001b[2m\u001b[90m↓\u001b[39m\u001b[22m inserts documents (live, hits Cosmos DB)\r\n     \u001b[2m\u001b[90m↓\u001b[39m\u001b[22m runs a vector similarity query (live, hits OpenAI and Cosmos DB)\r\n\r\n⎯⎯⎯⎯⎯⎯ Failed Suites 1 ⎯⎯⎯⎯⎯⎯⎯\r\n\r\n FAIL  test/live.integration.test.ts > nosql-create-index-typescript live integration tests\r\nError: AZURE_USER_PRINCIPAL_ID is required for the live RBAC integration test.\r\n ❯ test/live.integration.test.ts:79:13\r\n     77|\r\n     78|     if (!baseConfig.azure.userPrincipalId) {\r\n     79|       throw new Error(\r\n       |             ^\r\n     80|         \"AZURE_USER_PRINCIPAL_ID is required for the live RBAC integra…\r\n     81|       );\r\n\r\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\r\n\r\n\r\n\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[31m1 failed\u001b[39m\u001b[22m\u001b[90m (1)\u001b[39m\r\n\u001b[2m      Tests \u001b[22m \u001b[33m7 skipped\u001b[39m\u001b[90m (7)\u001b[39m\r\n\u001b[2m   Start at \u001b[22m 18:23:15\r\n\u001b[2m   Duration \u001b[22m 2.54s\u001b[2m (transform 141ms, setup 0ms, import 2.17s, tests 8ms, environment 0ms)\u001b[22m\r\n\r\n",
+        "output": "============================= test session starts =============================\r\nplatform win32 -- Python 3.13.14, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\diberry\\AppData\\Local\\Programs\\Python\\Python313\\python.exe\r\ncachedir: .pytest_cache\r\nrootdir: C:\\project-dina-data-ai\\repos\\public-azuresamples-cosmos-db-vector-samples\r\nplugins: anyio-4.13.0, cov-7.1.0\r\ncollecting ... collected 5 items\r\n\r\nnosql-create-index-python/tests/test_config.py::ConfigTests::test_load_config_defaults_to_both_containers PASSED [ 20%]\r\nnosql-create-index-python/tests/test_config.py::ConfigTests::test_load_config_resolves_shared_data_file PASSED [ 40%]\r\nnosql-create-index-python/tests/test_config.py::ConfigTests::test_validate_config_accepts_single_algorithm FAILED [ 60%]\r\nnosql-create-index-python/tests/test_config.py::ConfigTests::test_validate_config_rejects_inconsistent_container_and_algorithm PASSED [ 80%]\r\nnosql-create-index-python/tests/test_config.py::ConfigTests::test_validate_config_rejects_missing_required_values PASSED [100%]\r\n\r\n================================== FAILURES ===================================\r\n__________ ConfigTests.test_validate_config_accepts_single_algorithm __________\r\nnosql-create-index-python\\tests\\test_config.py:54: in test_validate_config_accepts_single_algorithm\r\n    validate_config(config)\r\nnosql-create-index-python\\src\\config.py:110: in validate_config\r\n    raise ConfigError(\r\nE   src.config.ConfigError: Missing required environment variables: AZURE_COSMOSDB_DATABASENAME\r\n=========================== short test summary info ===========================\r\nFAILED nosql-create-index-python/tests/test_config.py::ConfigTests::test_validate_config_accepts_single_algorithm\r\n========================= 1 failed, 4 passed in 0.16s =========================\r\n",
         "status": "FAIL"
       },
-      "G2-2": {
-        "status": "NOT_TESTED"
+      "G1-1": {
+        "status": "PASS"
       },
       "goal_1": {},
       "G2-1": {
@@ -26,33 +26,33 @@
       "G1-3": {
         "status": "PASS"
       },
-      "G1-2": {
-        "status": "PASS"
-      },
-      "G2-4": {
-        "status": "NOT_TESTED"
-      },
       "G2-5": {
         "status": "NOT_TESTED"
+      },
+      "G2-4": {
+        "status": "FAIL"
+      },
+      "G2-3": {
+        "status": "FAIL"
       }
     },
     "dotnet": {
-      "goal_2": {},
+      "G1-2": {
+        "status": "PASS"
+      },
+      "G2-2": {
+        "status": "NOT_TESTED"
+      },
       "G1-4": {
         "status": "PASS"
       },
-      "G1-1": {
-        "status": "PASS"
-      },
-      "G2-3": {
-        "status": "NOT_TESTED"
-      },
+      "goal_2": {},
       "build_test": {
         "output": "  Determining projects to restore...\r\n  All projects are up-to-date for restore.\r\n",
         "status": "PASS"
       },
-      "G2-2": {
-        "status": "NOT_TESTED"
+      "G1-1": {
+        "status": "PASS"
       },
       "goal_1": {},
       "G2-1": {
@@ -61,34 +61,34 @@
       "G1-3": {
         "status": "PASS"
       },
-      "G1-2": {
-        "status": "PASS"
+      "G2-5": {
+        "status": "NOT_TESTED"
       },
       "G2-4": {
         "status": "NOT_TESTED"
       },
-      "G2-5": {
+      "G2-3": {
         "status": "NOT_TESTED"
       }
     },
-    "python": {
-      "goal_2": {},
+    "typescript": {
+      "G1-2": {
+        "status": "PASS"
+      },
+      "G2-2": {
+        "status": "NOT_TESTED"
+      },
       "G1-4": {
         "status": "PASS"
+      },
+      "goal_2": {},
+      "build_test": {
+        "output": "\r\n> nosql-create-index-typescript@1.0.0 test\r\n> vitest run\r\n\r\n\r\n\u001b[1m\u001b[46m RUN \u001b[49m\u001b[22m \u001b[36mv4.1.0 \u001b[39m\u001b[90mC:/project-dina-data-ai/repos/public-azuresamples-cosmos-db-vector-samples/nosql-create-index-typescript\u001b[39m\r\n\r\n \u001b[31m❯\u001b[39m test/live.integration.test.ts \u001b[2m(\u001b[22m\u001b[2m7 tests\u001b[22m\u001b[2m | \u001b[22m\u001b[33m7 skipped\u001b[39m\u001b[2m)\u001b[22m\u001b[32m 8\u001b[2mms\u001b[22m\u001b[39m\r\n     \u001b[2m\u001b[90m↓\u001b[39m\u001b[22m loads config from env vars\r\n     \u001b[2m\u001b[90m↓\u001b[39m\u001b[22m creates an ARM client\r\n     \u001b[2m\u001b[90m↓\u001b[39m\u001b[22m creates a container with a vector index (live)\r\n     \u001b[2m\u001b[90m↓\u001b[39m\u001b[22m creates RBAC role definition and assignment (live)\r\n     \u001b[2m\u001b[90m↓\u001b[39m\u001b[22m verifies embedding dimensions (live, hits OpenAI)\r\n     \u001b[2m\u001b[90m↓\u001b[39m\u001b[22m inserts documents (live, hits Cosmos DB)\r\n     \u001b[2m\u001b[90m↓\u001b[39m\u001b[22m runs a vector similarity query (live, hits OpenAI and Cosmos DB)\r\n\r\n⎯⎯⎯⎯⎯⎯ Failed Suites 1 ⎯⎯⎯⎯⎯⎯⎯\r\n\r\n FAIL  test/live.integration.test.ts > nosql-create-index-typescript live integration tests\r\nError: AZURE_USER_PRINCIPAL_ID is required for the live RBAC integration test.\r\n ❯ test/live.integration.test.ts:79:13\r\n     77|\r\n     78|     if (!baseConfig.azure.userPrincipalId) {\r\n     79|       throw new Error(\r\n       |             ^\r\n     80|         \"AZURE_USER_PRINCIPAL_ID is required for the live RBAC integra…\r\n     81|       );\r\n\r\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\r\n\r\n\r\n\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[31m1 failed\u001b[39m\u001b[22m\u001b[90m (1)\u001b[39m\r\n\u001b[2m      Tests \u001b[22m \u001b[33m7 skipped\u001b[39m\u001b[90m (7)\u001b[39m\r\n\u001b[2m   Start at \u001b[22m 18:40:55\r\n\u001b[2m   Duration \u001b[22m 2.63s\u001b[2m (transform 149ms, setup 0ms, import 2.26s, tests 8ms, environment 0ms)\u001b[22m\r\n\r\n",
+        "status": "FAIL"
       },
       "G1-1": {
         "status": "PASS"
       },
-      "G2-3": {
-        "status": "FAIL"
-      },
-      "build_test": {
-        "output": "============================= test session starts =============================\r\nplatform win32 -- Python 3.13.14, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\diberry\\AppData\\Local\\Programs\\Python\\Python313\\python.exe\r\ncachedir: .pytest_cache\r\nrootdir: C:\\project-dina-data-ai\\repos\\public-azuresamples-cosmos-db-vector-samples\r\nplugins: anyio-4.13.0, cov-7.1.0\r\ncollecting ... collected 5 items\r\n\r\nnosql-create-index-python/tests/test_config.py::ConfigTests::test_load_config_defaults_to_both_containers PASSED [ 20%]\r\nnosql-create-index-python/tests/test_config.py::ConfigTests::test_load_config_resolves_shared_data_file PASSED [ 40%]\r\nnosql-create-index-python/tests/test_config.py::ConfigTests::test_validate_config_accepts_single_algorithm FAILED [ 60%]\r\nnosql-create-index-python/tests/test_config.py::ConfigTests::test_validate_config_rejects_inconsistent_container_and_algorithm PASSED [ 80%]\r\nnosql-create-index-python/tests/test_config.py::ConfigTests::test_validate_config_rejects_missing_required_values PASSED [100%]\r\n\r\n================================== FAILURES ===================================\r\n__________ ConfigTests.test_validate_config_accepts_single_algorithm __________\r\nnosql-create-index-python\\tests\\test_config.py:54: in test_validate_config_accepts_single_algorithm\r\n    validate_config(config)\r\nnosql-create-index-python\\src\\config.py:110: in validate_config\r\n    raise ConfigError(\r\nE   src.config.ConfigError: Missing required environment variables: AZURE_COSMOSDB_DATABASENAME\r\n=========================== short test summary info ===========================\r\nFAILED nosql-create-index-python/tests/test_config.py::ConfigTests::test_validate_config_accepts_single_algorithm\r\n========================= 1 failed, 4 passed in 0.25s =========================\r\n",
-        "status": "FAIL"
-      },
-      "G2-2": {
-        "status": "FAIL"
-      },
       "goal_1": {},
       "G2-1": {
         "status": "NOT_TESTED"
@@ -96,16 +96,16 @@
       "G1-3": {
         "status": "PASS"
       },
-      "G1-2": {
-        "status": "PASS"
+      "G2-5": {
+        "status": "NOT_TESTED"
       },
       "G2-4": {
-        "status": "FAIL"
+        "status": "NOT_TESTED"
       },
-      "G2-5": {
+      "G2-3": {
         "status": "NOT_TESTED"
       }
     }
   },
-  "plan_file": "C:\\project-dina-data-ai\\repos\\public-azuresamples-cosmos-db-vector-samples\\.github\\plans\\create-index-architecture.md"
+  "timestamp": "2026-06-22T01:40:50.8727965Z"
 }

@@ -9,7 +9,7 @@ class ConfigTests(unittest.TestCase):
     def setUp(self) -> None:
         self.valid_env = {
             "AZURE_COSMOSDB_ENDPOINT": "https://example.documents.azure.com:443/",
-            "AZURE_COSMOSDB_DATABASENAME": "Hotels",
+            "AZURE_COSMOSDB_CREATE_INDEX_DATABASENAME": "Hotels",
             "AZURE_COSMOSDB_CONTAINER_NAME": "",
             "AZURE_OPENAI_EMBEDDING_ENDPOINT": "https://example.openai.azure.com/",
             "AZURE_OPENAI_EMBEDDING_DEPLOYMENT": "text-embedding-3-small",
