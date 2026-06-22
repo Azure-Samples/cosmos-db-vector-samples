@@ -1,10 +1,11 @@
 package com.azure.cosmos.createindex;
 
 import com.azure.core.credential.TokenCredential;
-import com.azure.core.util.Context;
+import com.azure.core.management.profile.AzureProfile;
 import com.azure.identity.DefaultAzureCredentialBuilder;
 import com.azure.resourcemanager.AzureResourceManager;
 import com.azure.resourcemanager.cosmos.models.*;
+import com.azure.resourcemanager.cosmos.fluent.SqlResourcesClient;
 import java.util.Arrays;
 
 /**
@@ -22,6 +23,7 @@ public class ControlPlane {
     private static final String CONTAINER_QUANTIZED_FLAT = "hotels_quantizedflat";
 
     public static void createContainersWithVectorIndexes(
+            String subscriptionId,
             String resourceGroup,
             String accountName,
             String location) throws Exception {
@@ -29,42 +31,42 @@ public class ControlPlane {
         System.out.println("\n==> Initializing Azure authentication...");
         TokenCredential credential = new DefaultAzureCredentialBuilder().build();
         
+        // Create Azure profile with subscription
+        AzureProfile profile = new AzureProfile(com.azure.core.management.AzureEnvironment.AZURE);
+        
+        // Authenticate and get Azure Resource Manager with subscription
         AzureResourceManager azure = AzureResourceManager
-                .authenticate(credential)
-                .withDefaultSubscription();
+                .authenticate(credential, profile)
+                .withSubscription(subscriptionId);
         
         System.out.printf("Subscription: %s%n", azure.subscriptionId());
         System.out.printf("Target:       %s / %s (%s)%n", resourceGroup, accountName, location);
         
         try {
-            CosmosDBAccount cosmosAccount = azure.cosmosDBAccounts()
-                    .getByResourceGroup(resourceGroup, accountName);
-            
-            if (cosmosAccount == null) {
-                throw new IllegalArgumentException(
-                        "Cosmos DB account not found: " + accountName + " in " + resourceGroup);
-            }
-            
-            var sqlOps = azure.cosmosDBAccounts().manager().sqlResources();
+            // Get the SQL resources client from the manager
+            SqlResourcesClient sqlResourcesClient = azure.cosmosDBAccounts()
+                    .manager()
+                    .serviceClient()
+                    .getSqlResources();
             
             // Create the database
             System.out.printf("%n==> Creating database '%s' ...%n", DATABASE_NAME);
-            SqlDatabaseCreateUpdateParameters dbParams = 
+            sqlResourcesClient.createUpdateSqlDatabase(
+                    resourceGroup,
+                    accountName,
+                    DATABASE_NAME,
                     new SqlDatabaseCreateUpdateParameters()
                             .withLocation(location)
                             .withResource(new SqlDatabaseResource().withId(DATABASE_NAME))
-                            .withOptions(new CreateUpdateOptions());
+                            .withOptions(new CreateUpdateOptions()));
             
-            var dbPoller = sqlOps.beginCreateUpdateSqlDatabase(
-                    resourceGroup, accountName, DATABASE_NAME, dbParams, Context.NONE);
-            dbPoller.getFinalResult();
             System.out.println("    database created.");
             
             // Create containers
-            createContainer(sqlOps, resourceGroup, accountName, location,
-                    CONTAINER_DISKANN, "DiskANN");
-            createContainer(sqlOps, resourceGroup, accountName, location,
-                    CONTAINER_QUANTIZED_FLAT, "QuantizedFlat");
+            createContainer(sqlResourcesClient, resourceGroup, accountName, location,
+                    CONTAINER_DISKANN, VectorIndexType.DISK_ANN);
+            createContainer(sqlResourcesClient, resourceGroup, accountName, location,
+                    CONTAINER_QUANTIZED_FLAT, VectorIndexType.QUANTIZED_FLAT);
             
             System.out.println("\n✓ All containers created successfully with vector indexes.");
             
@@ -75,20 +77,22 @@ public class ControlPlane {
     }
     
     private static void createContainer(
-            Object sqlOpsObj,
+            SqlResourcesClient sqlResourcesClient,
             String resourceGroup,
             String accountName,
             String location,
             String containerName,
-            String indexTypeLabel) throws Exception {
+            VectorIndexType indexType) throws Exception {
         
         System.out.printf("%n==> Creating container '%s' with %s vector index...%n", 
-                containerName, indexTypeLabel);
+                containerName, indexType);
         
-        // Build vector embedding policy
+        // Build vector embedding policy with Cosine distance function
         VectorEmbedding vectorEmbedding = new VectorEmbedding()
                 .withPath(EMBEDDING_PATH)
-                .withDistanceFunction("cosine");
+                .withDataType(VectorDataType.FLOAT32)
+                .withDimensions(EMBEDDING_DIMENSIONS)
+                .withDistanceFunction(DistanceFunction.COSINE);
         
         VectorEmbeddingPolicy vectorEmbeddingPolicy = new VectorEmbeddingPolicy()
                 .withVectorEmbeddings(Arrays.asList(vectorEmbedding));
@@ -96,7 +100,7 @@ public class ControlPlane {
         // Build vector index
         VectorIndex vectorIndex = new VectorIndex()
                 .withPath(EMBEDDING_PATH)
-                .withType(indexTypeLabel.equals("DiskANN") ? "DiskANN" : "QuantizedFlat");
+                .withType(indexType);
         
         // Build indexing policy
         IndexingPolicy indexingPolicy = new IndexingPolicy()
@@ -125,9 +129,15 @@ public class ControlPlane {
                         .withOptions(new CreateUpdateOptions().withThroughput(THROUGHPUT_RUS));
         
         try {
-            var sqlOps = sqlOpsObj;
-            // This won't compile but documents the intent - actual compilation requires proper type
-            System.out.println("    container created (placeholder).");
+            // Create the container
+            sqlResourcesClient.createUpdateSqlContainer(
+                    resourceGroup,
+                    accountName,
+                    DATABASE_NAME,
+                    containerName,
+                    containerParams);
+            
+            System.out.println("    container created.");
             System.out.printf("✓ Container '%s' ready%n", containerName);
             
         } catch (Exception e) {

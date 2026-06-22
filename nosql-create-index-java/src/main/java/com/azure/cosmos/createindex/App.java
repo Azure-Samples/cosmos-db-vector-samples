@@ -28,6 +28,15 @@ public final class App {
         Config.validate(config);
 
         var credential = new DefaultAzureCredentialBuilder().build();
+        
+        // --- Control Plane: Create containers with vector indexes (ARM SDK) ---
+        System.out.println("\n=== Control Plane: Creating containers with vector indexes ===");
+        ControlPlane.createContainersWithVectorIndexes(
+                config.subscriptionId(),
+                config.resourceGroup(),
+                config.accountName(),
+                config.location());
+        
         try (var cosmosClient = DataPlane.createCosmosClient(credential, config)) {
             var openAiClient = DataPlane.createAzureOpenAIClient(credential, config);
             var database = cosmosClient.getDatabase(config.databaseName());
