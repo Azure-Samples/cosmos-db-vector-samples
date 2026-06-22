@@ -1,9 +1,19 @@
 # CREATE-INDEX VERIFICATION REPORT
-Generated: 06/21/2026 18:40:59
+Generated: 06/21/2026 19:10:58
+
+## AUTHENTICATION
+Verify: All samples use DefaultAzureCredential, no hardcoded keys
+### typescript
+[OK] Auth check - PASS
+
+### python
+[OK] Auth check - PASS
+
+### dotnet
+[OK] Auth check - PASS
 
 ## GOAL 1: ARM SDK Control Plane
 Verify: Containers created with /Region partition key and both index types
-
 ### PYTHON
 [OK] G1-1: Container Creation with /Region Partition Key - PASS
 [OK] G1-2: DiskANN Index Creation - PASS
