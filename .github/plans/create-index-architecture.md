@@ -53,6 +53,39 @@ This plan uses a **clear separation of concerns** between infrastructure (bicep)
 
 ---
 
+## 1.6 Embedding Field Name Strategy (Vector-Search vs Create-Index Separation)
+
+**Critical Design Decision:** Create-index and vector-search samples co-exist in the same repository but must use **different embedding field names** to avoid data model collisions.
+
+### Why This Matters
+
+- **Vector-search samples** use pre-computed embeddings from the data file with field name: `DescriptionVector`
+- **Create-index samples** create their own containers and define their own schema with field name: `embedding`
+- Both samples read the same `.env` file, but need different field names to function independently
+
+### How It Works
+
+**Bicep outputs two separate environment variables:**
+- `AZURE_COSMOSDB_EMBEDDED_FIELD_VECTOR_SEARCH` = `"DescriptionVector"` (for vector-search samples)
+- `AZURE_COSMOSDB_CREATE_INDEX_EMBEDDED_FIELD` = `"embedding"` (for create-index samples)
+
+**Config modules in each language:**
+- Read `AZURE_COSMOSDB_CREATE_INDEX_EMBEDDED_FIELD` from environment (set by `azd up`)
+- Default to `"embedding"` if not set
+- **NO hardcoding** — all 5 languages (Python, TypeScript, Go, Java, .NET) read from the env var
+
+**Data file structure:**
+- Has `embedding` field (1536 dimensions) for create-index samples to populate and query
+- Does NOT have `DescriptionVector` (that's in the separate vector-search data file)
+
+**Result:**
+- Create-index and vector-search samples remain independent
+- Each can be run without interfering with the other
+- Field naming is centralized in bicep, not scattered across 5 language implementations
+- Easy to update field names in the future (one bicep change, auto-propagates to all samples via env vars)
+
+---
+
 ## 2. Problem Domain
 
 ### 2.1 Why This Matters
