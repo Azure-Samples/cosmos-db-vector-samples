@@ -170,6 +170,80 @@ if ($dotnetEndpoint -eq "MISSING" -or $dotnetDb -eq "MISSING" -or $dotnetOpenaiE
     Write-Host "  Status: $($results["dotnet"])" -ForegroundColor $(if ($results["dotnet"] -eq "PASS") { "Green" } else { "Red" })
 }
 
+# Go
+Write-Host "`nTesting Go sample..." -ForegroundColor Cyan
+$goDir = Join-Path $RepoRoot "nosql-create-index-go"
+$goWrapper = @"
+`$env:AZURE_COSMOSDB_ENDPOINT = `$args[0]
+`$env:AZURE_COSMOSDB_CREATE_INDEX_DATABASENAME = `$args[1]
+`$env:AZURE_OPENAI_EMBEDDING_ENDPOINT = `$args[2]
+`$env:AZURE_OPENAI_EMBEDDING_DEPLOYMENT = `$args[3]
+`$env:AZURE_COSMOSDB_CREATE_INDEX_EMBEDDED_FIELD = `$args[4]
+
+Set-Location `"$goDir`"
+go test ./... 2>&1 | Select-Object -First 30
+"@
+
+$goScript = Join-Path $env:TEMP "test_go_create_index.ps1"
+$goWrapper | Set-Content $goScript
+
+$goEndpoint = $azdVars["AZURE_COSMOSDB_ENDPOINT"] ?? "MISSING"
+$goDb = $azdVars["AZURE_COSMOSDB_DATABASENAME"] ?? "MISSING"
+$goOpenaiEndpoint = $azdVars["AZURE_OPENAI_EMBEDDING_ENDPOINT"] ?? "MISSING"
+$goOpenaiDeployment = $azdVars["AZURE_OPENAI_EMBEDDING_DEPLOYMENT"] ?? "MISSING"
+$goEmbeddingField = $azdVars["AZURE_COSMOSDB_CREATE_INDEX_EMBEDDED_FIELD"] ?? "embedding"
+
+if ($goEndpoint -eq "MISSING" -or $goDb -eq "MISSING" -or $goOpenaiEndpoint -eq "MISSING" -or $goOpenaiDeployment -eq "MISSING") {
+    Write-Host "  ✗ Missing required env vars:" -ForegroundColor Red
+    if ($goEndpoint -eq "MISSING") { Write-Host "    - AZURE_COSMOSDB_ENDPOINT" }
+    if ($goDb -eq "MISSING") { Write-Host "    - AZURE_COSMOSDB_DATABASENAME" }
+    if ($goOpenaiEndpoint -eq "MISSING") { Write-Host "    - AZURE_OPENAI_EMBEDDING_ENDPOINT" }
+    if ($goOpenaiDeployment -eq "MISSING") { Write-Host "    - AZURE_OPENAI_EMBEDDING_DEPLOYMENT" }
+    $results["go"] = "BLOCKED_MISSING_VARS"
+} else {
+    Write-Host "  Running Go tests with azd env vars..." -ForegroundColor Gray
+    & pwsh $goScript $goEndpoint $goDb $goOpenaiEndpoint $goOpenaiDeployment $goEmbeddingField 2>&1 | Tee-Object -Variable goOutput | Select-Object -First 20
+    $results["go"] = if ($LASTEXITCODE -eq 0) { "PASS" } else { "FAIL" }
+    Write-Host "  Status: $($results["go"])" -ForegroundColor $(if ($results["go"] -eq "PASS") { "Green" } else { "Red" })
+}
+
+# Java
+Write-Host "`nTesting Java sample..." -ForegroundColor Cyan
+$javaDir = Join-Path $RepoRoot "nosql-create-index-java"
+$javaWrapper = @"
+`$env:AZURE_COSMOSDB_ENDPOINT = `$args[0]
+`$env:AZURE_COSMOSDB_CREATE_INDEX_DATABASENAME = `$args[1]
+`$env:AZURE_OPENAI_EMBEDDING_ENDPOINT = `$args[2]
+`$env:AZURE_OPENAI_EMBEDDING_DEPLOYMENT = `$args[3]
+`$env:AZURE_COSMOSDB_CREATE_INDEX_EMBEDDED_FIELD = `$args[4]
+
+Set-Location `"$javaDir`"
+mvn test 2>&1 | Select-Object -First 30
+"@
+
+$javaScript = Join-Path $env:TEMP "test_java_create_index.ps1"
+$javaWrapper | Set-Content $javaScript
+
+$javaEndpoint = $azdVars["AZURE_COSMOSDB_ENDPOINT"] ?? "MISSING"
+$javaDb = $azdVars["AZURE_COSMOSDB_DATABASENAME"] ?? "MISSING"
+$javaOpenaiEndpoint = $azdVars["AZURE_OPENAI_EMBEDDING_ENDPOINT"] ?? "MISSING"
+$javaOpenaiDeployment = $azdVars["AZURE_OPENAI_EMBEDDING_DEPLOYMENT"] ?? "MISSING"
+$javaEmbeddingField = $azdVars["AZURE_COSMOSDB_CREATE_INDEX_EMBEDDED_FIELD"] ?? "embedding"
+
+if ($javaEndpoint -eq "MISSING" -or $javaDb -eq "MISSING" -or $javaOpenaiEndpoint -eq "MISSING" -or $javaOpenaiDeployment -eq "MISSING") {
+    Write-Host "  ✗ Missing required env vars:" -ForegroundColor Red
+    if ($javaEndpoint -eq "MISSING") { Write-Host "    - AZURE_COSMOSDB_ENDPOINT" }
+    if ($javaDb -eq "MISSING") { Write-Host "    - AZURE_COSMOSDB_CREATE_INDEX_DATABASENAME" }
+    if ($javaOpenaiEndpoint -eq "MISSING") { Write-Host "    - AZURE_OPENAI_EMBEDDING_ENDPOINT" }
+    if ($javaOpenaiDeployment -eq "MISSING") { Write-Host "    - AZURE_OPENAI_EMBEDDING_DEPLOYMENT" }
+    $results["java"] = "BLOCKED_MISSING_VARS"
+} else {
+    Write-Host "  Running Java tests with azd env vars..." -ForegroundColor Gray
+    & pwsh $javaScript $javaEndpoint $javaDb $javaOpenaiEndpoint $javaOpenaiDeployment $javaEmbeddingField 2>&1 | Tee-Object -Variable javaOutput | Select-Object -First 20
+    $results["java"] = if ($LASTEXITCODE -eq 0) { "PASS" } else { "FAIL" }
+    Write-Host "  Status: $($results["java"])" -ForegroundColor $(if ($results["java"] -eq "PASS") { "Green" } else { "Red" })
+}
+
 # Step 3: Compare expected env var names
 Write-Host "`n========================================" -ForegroundColor Green
 Write-Host "ENV VAR NAME ANALYSIS" -ForegroundColor Green
@@ -188,6 +262,7 @@ $planExpected = @(
     "AZURE_COSMOSDB_CREATE_INDEX_DATABASENAME"
     "AZURE_COSMOSDB_CREATE_INDEX_DISKANN_CONTAINER_NAME"
     "AZURE_COSMOSDB_CREATE_INDEX_QUANTIZEDFLAT_CONTAINER_NAME"
+    "AZURE_COSMOSDB_CREATE_INDEX_EMBEDDED_FIELD"
     "AZURE_OPENAI_SERVICE"
     "AZURE_OPENAI_ENDPOINT"
     "AZURE_OPENAI_EMBEDDING_DEPLOYMENT"
