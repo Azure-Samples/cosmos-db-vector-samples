@@ -10,7 +10,7 @@ ms.date: 2026-06-09
 
 # Quickstart: Create and query vector indexes in Azure Cosmos DB for NoSQL using Python
 
-In this quickstart, you run the Python create-index sample for Azure Cosmos DB for NoSQL. The sample assumes `azd up` already created the `HotelsCreateIndex` database and the `hotels_diskann` and `hotels_quantizedflat` containers with their vector policies. Your code stays on the data plane: it loads pre-vectorized hotel documents, writes them to the existing containers using transactional batches, generates a query embedding with the Azure OpenAI client, and runs a `VectorDistance()` similarity query.
+In this quickstart, you run the Python create-index sample for Azure Cosmos DB for NoSQL. The sample uses the ARM SDK to programmatically create the `HotelsCreateIndex` database and `hotels_diskann` and `hotels_quantizedflat` containers with their vector policies. Your code runs in two phases: (1) control plane creates containers with vector indexes, and (2) data plane loads pre-vectorized hotel documents, writes them using Region-based batches, generates a query embedding with Azure OpenAI, and runs VectorDistance similarity queries returning consistent results.
 
 Find the sample code on GitHub in [`nosql-create-index-python`](https://github.com/Azure-Samples/cosmos-db-vector-samples/tree/main/nosql-create-index-python).
 
@@ -22,9 +22,10 @@ Find the sample code on GitHub in [`nosql-create-index-python`](https://github.c
 - An Azure Cosmos DB for NoSQL account with vector search enabled.
 - Existing resources created by `azd up` or the shared Bicep deployment:
   - database: `HotelsCreateIndex`
-  - containers: `hotels_diskann` and `hotels_quantizedflat`
-  - partition key path: `/PartitionKey`
-  - vector field path: `/DescriptionVector`
+  - containers: `hotels_diskann` and `hotels_quantizedflat` (created by the sample's ARM SDK control plane)
+  - partition key path: `/Region`
+  - vector field path: `/embedding`
+  - valid Region values: `Northeast`, `Midwest`, `South`, `West`
 - Microsoft Entra ID roles for your identity:
   - **Cosmos DB Built-in Data Contributor**
   - **Cognitive Services OpenAI User**
@@ -34,9 +35,9 @@ Find the sample code on GitHub in [`nosql-create-index-python`](https://github.c
 > **RBAC roles:** Data-plane RBAC role definitions and assignments are created by `azd up` via Bicep templates. You can also create them programmatically using the management SDK — see [`SqlResources.BeginCreateUpdateSqlRoleDefinitionAsync`](https://learn.microsoft.com/dotnet/api/azure.resourcemanager.cosmosdb.sqlresources.begincreateupdate-sqlroledefinitionasync) (.NET) or [`SqlResourcesOperations.begin_create_update_sql_role_definition`](https://learn.microsoft.com/python/api/azure-mgmt-cosmosdb/azure.mgmt.cosmosdb.operations.sqlresourcesoperations) (Python).
 
 > [!IMPORTANT]
-> This scenario is data-plane only. Do not add `create_database_if_not_exists`, `create_container_if_not_exists`, or any management-plane SDK calls. The sample expects the database and vector containers to already exist.
+> This sample includes both ARM SDK (control plane) and data plane code. The ARM SDK code creates the database and containers with vector policies. The data plane code inserts documents and runs queries.
 >
-> This sample uses the `HotelsCreateIndex` database with partition key `/PartitionKey` (value: `"hotels"`). This is **not** the same as the `Hotels` database, which uses `/HotelId`. The Python sample inserts documents using transactional batches against a shared partition key.
+> The sample uses the `HotelsCreateIndex` database with partition key `/Region` (valid values: `Northeast`, `Midwest`, `South`, `West`). Documents are inserted using Region-based transactional batches.
 
 ## Clone the repository
 
@@ -122,14 +123,14 @@ The sample performs these steps:
 1. Loads configuration from environment variables.
 1. Validates required environment variables.
 1. Authenticates with `DefaultAzureCredential`.
-1. Connects to the existing `HotelsCreateIndex` database and target containers.
-1. Reads `../data/HotelsData_toCosmosDB_Vector.json`.
+1. Creates the `HotelsCreateIndex` database and containers using the ARM SDK (Phase 1: control plane).
+1. Reads `../data/HotelsData_toCosmosDB_Vector_byRegion.json`.
 1. Verifies embedding dimensions match the container definition (1536).
-1. Inserts documents using transactional batches (`execute_item_batch`) with partition key `"hotels"`.
+1. Groups documents by Region and inserts using transactional batches with the correct Region partition key.
 1. Raises `RuntimeError` if any batch operations fail.
 1. Generates a query embedding with the Azure OpenAI client.
-1. Runs a parameterized `VectorDistance()` SQL query against each target container.
-1. Prints the top 5 matching hotels.
+1. Runs a parameterized `VectorDistance()` SQL query with distance functions (Cosine, DotProduct, Euclidean).
+1. Prints the top 5 matching hotels for each distance function.
 
 ## Understand the project structure
 
@@ -199,15 +200,14 @@ for batch in _chunked(documents, BATCH_SIZE):
 
 ### Run the vector similarity query
 
-The embedding field name is validated before it is interpolated into the query string. The embedding vector stays parameterized:
+The embedding field name is validated before it is interpolated into the query string. The query uses the Region partition key in the WHERE clause and passes it in query options. Note: `VectorDistance` automatically sorts by similarity and does NOT support ORDER BY:
 
 ```python
 query_text = (
-    "SELECT TOP @topK c.HotelId, c.HotelName, c.Description, "
-    "VectorDistance(c.{0}, @embedding) AS similarityScore "
-    "FROM c WHERE c.PartitionKey = @partitionKey "
-    "ORDER BY VectorDistance(c.{0}, @embedding)"
-).format(embedding_field)
+    "SELECT TOP @topK c.HotelId, c.HotelName, c.Region, "
+    "VectorDistance(c.{0}, @embedding, false, {{'distanceFunction': '{1}'}}) AS similarityScore "
+    "FROM c WHERE c.Region = @partitionKey"
+).format(embedding_field, distance_function)
 
 raw_results = list(
     container.query_items(

@@ -6,11 +6,11 @@ This sample demonstrates **data-plane only** vector search operations against Az
 
 The sample:
 - authenticates with `DefaultAzureCredential`
-- connects to the existing `Hotels` database and existing vector containers
-- loads pre-vectorized hotel documents from `..\data\HotelsData_toCosmosDB_Vector.json`
-- inserts documents into `hotels_diskann` and `hotels_quantizedflat` by using bulk-friendly parallel `CreateItemAsync` calls with `AllowBulkExecution = true`
+- connects to the existing `HotelsCreateIndex` database and existing vector containers
+- loads pre-vectorized hotel documents from `.\data\HotelsData_toCosmosDB_Vector_byRegion.json`
+- validates `Region` values and upserts one transactional batch per region (`Northeast`, `Midwest`, `South`, `West`)
 - generates a query embedding with the Azure OpenAI client
-- runs a `VectorDistance()` query for similarity search
+- runs single-partition `VectorDistance()` queries for `Cosine`, `DotProduct`, and `Euclidean`
 - prints the top 5 matches for each container
 
 The sample never creates databases, containers, or vector indexes in code.
@@ -63,8 +63,9 @@ The sample never creates databases, containers, or vector indexes in code.
    - `VECTOR_ALGORITHM` accepts `diskann` or `quantizedflat`.
    - Leave `VECTOR_ALGORITHM` empty to run **both** containers.
    - Leave `AZURE_COSMOSDB_CONTAINER_NAME` empty unless you want to target one container by name.
+   - `PARTITION_KEY_VALUE` must be one of `Northeast`, `Midwest`, `South`, or `West`.
    - `AZURE_OPENAI_EMBEDDING_API_VERSION` is kept for cross-language consistency with the other samples.
-   - `DATA_FILE_WITH_VECTORS` points to the shared repo-root dataset.
+   - `DATA_FILE_WITH_VECTORS` defaults to the region-partitioned dataset used by the create-index samples.
 
 4. Restore dependencies.
 

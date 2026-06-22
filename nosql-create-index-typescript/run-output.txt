@@ -1,0 +1,173 @@
+Using Azure OpenAI Embedding Deployment/Model: text-embedding-3-small
+
+=== Step 1: Create Container with Vector Index ===
+  Container:      hotels_diskann
+  Index type:     diskANN
+  Dimensions:     1536
+  Distance func:  cosine (queried with all 3 metrics)
+  Deleting existing container if present...
+  Deleted existing container
+  Created in 7.7s
+  Vector index is IMMUTABLE — cannot be changed after creation
+
+=== Step 1: Create Container with Vector Index ===
+  Container:      hotels_quantizedflat
+  Index type:     quantizedFlat
+  Dimensions:     1536
+  Distance func:  cosine (queried with all 3 metrics)
+  Deleting existing container if present...
+  Deleted existing container
+  Created in 10.5s
+  Vector index is IMMUTABLE — cannot be changed after creation
+
+==================================================
+Index type: diskANN
+Container: hotels_diskann
+==================================================
+
+Reading JSON file from C:\project-dina-data-ai\repos\public-azuresamples-cosmos-db-vector-samples\nosql-create-index-typescript\data\HotelsData_toCosmosDB_Vector_byRegion.json
+Loaded 50 documents
+✓ Region validation passed. Found regions: Midwest, Northeast, South, West
+  Region 'Midwest': 10 documents
+  Region 'Northeast': 10 documents
+  Region 'South': 14 documents
+  Region 'West': 16 documents
+Processing by region...
+  ✓ hotels_diskann: 50 inserted (33039.73 RUs)
+
+  [DEBUG] Verifying document structure...
+  [DEBUG] Sample document keys: id, HotelName, Description, DescriptionVector
+  [DEBUG] DescriptionVector field exists: YES
+  [DEBUG] DescriptionVector type: object, length: 1536
+  [DEBUG] First 3 values: [-0.04886505380272865, -0.020307425409555435, 0.01763356477022171]
+
+Query: "hotel near the ocean"
+Embedding generated (1536 dimensions)
+
+Running search (top 5 results for each distance function)...
+  [DEBUG] Query for Cosine:
+    Full query: SELECT TOP 5
+                c.id,
+                c.HotelName,
+                c.Description,
+               VectorDistance(c.DescriptionVector, @embedding, false, {'distanceFunction': 'Cosine'}) AS similarity
+              FROM c
+              WHERE c.Region = @partitionKey
+    Embedding: [-0.05133056640625, 0.0308990478515625, 0.006427764892578125...] (length: 1536)
+    [DIAGNOSTIC] Testing basic SELECT without VectorDistance...
+    [DIAGNOSTIC] Basic SELECT worked - found 3 docs
+    [DIAGNOSTIC] First doc has DescriptionVector:  ✓ 1536 dims
+    ✓ Cosine: top1=0.2628, top2=0.3952, diff=0.1324
+  [DEBUG] Query for DotProduct:
+    Full query: SELECT TOP 5
+                c.id,
+                c.HotelName,
+                c.Description,
+               VectorDistance(c.DescriptionVector, @embedding, false, {'distanceFunction': 'DotProduct'}) AS similarity
+              FROM c
+              WHERE c.Region = @partitionKey
+    Embedding: [-0.05133056640625, 0.0308990478515625, 0.006427764892578125...] (length: 1536)
+    [DIAGNOSTIC] Testing basic SELECT without VectorDistance...
+    [DIAGNOSTIC] Basic SELECT worked - found 3 docs
+    [DIAGNOSTIC] First doc has DescriptionVector:  ✓ 1536 dims
+    ✓ DotProduct: top1=0.2630, top2=0.3954, diff=0.1324
+  [DEBUG] Query for Euclidean:
+    Full query: SELECT TOP 5
+                c.id,
+                c.HotelName,
+                c.Description,
+               VectorDistance(c.DescriptionVector, @embedding, false, {'distanceFunction': 'Euclidean'}) AS similarity
+              FROM c
+              WHERE c.Region = @partitionKey
+    Embedding: [-0.05133056640625, 0.0308990478515625, 0.006427764892578125...] (length: 1536)
+    [DIAGNOSTIC] Testing basic SELECT without VectorDistance...
+    [DIAGNOSTIC] Basic SELECT worked - found 3 docs
+    [DIAGNOSTIC] First doc has DescriptionVector:  ✓ 1536 dims
+    ✓ Euclidean: top1=1.2145, top2=1.1000, diff=0.1144
+  ✓ hotels_diskann queried with 3 distance functions (9.90 RUs)
+
+==================================================
+Index type: quantizedFlat
+Container: hotels_quantizedflat
+==================================================
+
+Reading JSON file from C:\project-dina-data-ai\repos\public-azuresamples-cosmos-db-vector-samples\nosql-create-index-typescript\data\HotelsData_toCosmosDB_Vector_byRegion.json
+Loaded 50 documents
+✓ Region validation passed. Found regions: Midwest, Northeast, South, West
+  Region 'Midwest': 10 documents
+  Region 'Northeast': 10 documents
+  Region 'South': 14 documents
+  Region 'West': 16 documents
+Processing by region...
+  ✓ hotels_quantizedflat: 50 inserted (16519.86 RUs)
+
+  [DEBUG] Verifying document structure...
+  [DEBUG] Sample document keys: id, HotelName, Description, DescriptionVector
+  [DEBUG] DescriptionVector field exists: YES
+  [DEBUG] DescriptionVector type: object, length: 1536
+  [DEBUG] First 3 values: [-0.04886505380272865, -0.020307425409555435, 0.01763356477022171]
+
+Query: "hotel near the ocean"
+Embedding generated (1536 dimensions)
+
+Running search (top 5 results for each distance function)...
+  [DEBUG] Query for Cosine:
+    Full query: SELECT TOP 5
+                c.id,
+                c.HotelName,
+                c.Description,
+               VectorDistance(c.DescriptionVector, @embedding, false, {'distanceFunction': 'Cosine'}) AS similarity
+              FROM c
+              WHERE c.Region = @partitionKey
+    Embedding: [-0.05133056640625, 0.0308990478515625, 0.006427764892578125...] (length: 1536)
+    [DIAGNOSTIC] Testing basic SELECT without VectorDistance...
+    [DIAGNOSTIC] Basic SELECT worked - found 3 docs
+    [DIAGNOSTIC] First doc has DescriptionVector:  ✓ 1536 dims
+    ✓ Cosine: top1=0.2628, top2=0.3952, diff=0.1324
+  [DEBUG] Query for DotProduct:
+    Full query: SELECT TOP 5
+                c.id,
+                c.HotelName,
+                c.Description,
+               VectorDistance(c.DescriptionVector, @embedding, false, {'distanceFunction': 'DotProduct'}) AS similarity
+              FROM c
+              WHERE c.Region = @partitionKey
+    Embedding: [-0.05133056640625, 0.0308990478515625, 0.006427764892578125...] (length: 1536)
+    [DIAGNOSTIC] Testing basic SELECT without VectorDistance...
+    [DIAGNOSTIC] Basic SELECT worked - found 3 docs
+    [DIAGNOSTIC] First doc has DescriptionVector:  ✓ 1536 dims
+    ✓ DotProduct: top1=0.2630, top2=0.3954, diff=0.1324
+  [DEBUG] Query for Euclidean:
+    Full query: SELECT TOP 5
+                c.id,
+                c.HotelName,
+                c.Description,
+               VectorDistance(c.DescriptionVector, @embedding, false, {'distanceFunction': 'Euclidean'}) AS similarity
+              FROM c
+              WHERE c.Region = @partitionKey
+    Embedding: [-0.05133056640625, 0.0308990478515625, 0.006427764892578125...] (length: 1536)
+    [DIAGNOSTIC] Testing basic SELECT without VectorDistance...
+    [DIAGNOSTIC] Basic SELECT worked - found 3 docs
+    [DIAGNOSTIC] First doc has DescriptionVector:  ✓ 1536 dims
+    ✓ Euclidean: top1=1.2145, top2=1.1000, diff=0.1144
+  ✓ hotels_quantizedflat queried with 3 distance functions (9.90 RUs)
+
+================================================================================
+CONSOLIDATED RESULTS — Vector Query with All Metrics & Index Types
+================================================================================
+
+| Container          | Metric     | Top 1 Result               | Score  | Top 2 Result               | Score  | Diff   |
+|--------------------|------------|----------------------------|--------|----------------------------|--------|--------|
+| hotels_diskann     | Cosine     | Winter Panorama Resort     | 0.2628 | Double Sanctuary Resort    | 0.3952 | 0.1324 |
+| hotels_diskann     | DotProduct | Winter Panorama Resort     | 0.2630 | Double Sanctuary Resort    | 0.3954 | 0.1324 |
+| hotels_diskann     | Euclidean  | Winter Panorama Resort     | 1.2145 | Double Sanctuary Resort    | 1.1000 | 0.1144 |
+| hotels_quantizedflat | Cosine     | Winter Panorama Resort     | 0.2628 | Double Sanctuary Resort    | 0.3952 | 0.1324 |
+| hotels_quantizedflat | DotProduct | Winter Panorama Resort     | 0.2630 | Double Sanctuary Resort    | 0.3954 | 0.1324 |
+| hotels_quantizedflat | Euclidean  | Winter Panorama Resort     | 1.2145 | Double Sanctuary Resort    | 1.1000 | 0.1144 |
+
+
+=== Cleanup: Remove Sample Containers ===
+  ✓ Deleted container: hotels_diskann
+  ✓ Deleted container: hotels_quantizedflat
+
+Complete

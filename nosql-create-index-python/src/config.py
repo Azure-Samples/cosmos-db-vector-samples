@@ -23,7 +23,7 @@ DEFAULT_QUERY_TEXT = "hotel near the ocean"
 DEFAULT_EMBEDDING_API_VERSION = "2024-08-01-preview"
 DEFAULT_EMBEDDING_MODEL = "text-embedding-3-small"
 DEFAULT_EMBEDDING_FIELD = "embedding"
-DEFAULT_PARTITION_KEY_VALUE = "hotels"
+DEFAULT_PARTITION_KEY_VALUE = "Northeast"  # Region partition key (one of: Northeast, Midwest, South, West)
 DEFAULT_TOP_COUNT = 5
 EXPECTED_DIMENSIONS = 1536
 
@@ -84,6 +84,8 @@ def load_config(env: Optional[Mapping[str, str]] = None) -> SampleConfig:
     if not data_file_value:
         data_file_value = "./data/HotelsData_toCosmosDB_Vector_byRegion.json"
 
+    partition_key_value = _clean(environment.get("PARTITION_KEY_VALUE")) or DEFAULT_PARTITION_KEY_VALUE
+
     return SampleConfig(
         cosmos_endpoint=_clean(environment.get("AZURE_COSMOSDB_ENDPOINT")) or "",
         database_name=_clean(environment.get("AZURE_COSMOSDB_CREATE_INDEX_DATABASENAME")) or "",
@@ -98,6 +100,7 @@ def load_config(env: Optional[Mapping[str, str]] = None) -> SampleConfig:
             (_clean(environment.get("VECTOR_ALGORITHM")) or "").lower() or None
         ),
         data_file_with_vectors=_resolve_data_file(data_file_value),
+        partition_key_value=partition_key_value,
     )
 
 
@@ -126,6 +129,14 @@ def validate_config(config: SampleConfig) -> None:
             raise ConfigError(
                 "AZURE_COSMOSDB_CONTAINER_NAME and VECTOR_ALGORITHM refer to different containers."
             )
+
+    valid_regions = {"Northeast", "Midwest", "South", "West"}
+    if config.partition_key_value not in valid_regions:
+        raise ConfigError(
+            "partition_key_value must be one of: {0}. Got: {1}".format(
+                ", ".join(sorted(valid_regions)), config.partition_key_value
+            )
+        )
 
     if not config.data_file_with_vectors.exists():
         raise ConfigError(

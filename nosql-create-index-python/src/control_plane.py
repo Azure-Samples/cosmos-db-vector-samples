@@ -81,7 +81,7 @@ def create_containers(credential: DefaultAzureCredential, config: SampleConfig) 
     embedding_path = f"/{config.embedding_field_name}"
     containers_config = [
         {"type": "diskANN", "container_name": "hotels_diskann"},
-        {"type": "quantizedflat", "container_name": "hotels_quantizedflat"},
+        {"type": "QuantizedFlat", "container_name": "hotels_quantizedflat"},
     ]
 
     for container_config in containers_config:

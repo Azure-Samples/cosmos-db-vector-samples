@@ -14,16 +14,28 @@
 - Embedding generation: ✅ Works correctly (1536-dim vectors)
 - VectorDistance queries (all 3 distance functions): ✅ All working and returning correct results
 
+### C# Implementation Status (2026-06-21)
+- **Status:** Phase 1 ARM SDK control plane added for `.NET`
+- Added `nosql-create-index-dotnet/src/ControlPlane.cs` using `Azure.ResourceManager.CosmosDB` 1.4.0 and `Azure.Identity` 1.18.0
+- `Program.cs` now calls `ControlPlane.CreateContainersAsync()` before data-plane ingestion/query steps
+- ARM container definitions use `/Region` partition key, 1536-dimension `/embedding` vector policy, cosine distance, and a vector index policy that includes both `diskANN` and `quantizedFlat`
+- Cross-language note: the .NET control-plane flow now mirrors the TypeScript/Python ARM sequence (delete existing container, recreate, then continue with data-plane operations), but the .NET sample still depends on management-plane permissions that differ from the repo-level passwordless data-plane guidance
+
+### Reverification Update (2026-06-21)
+- **Static 2-part goal check:** Goal 1 ✅ pass, Goal 2 ✅ pass (static) — see `.github/plans/TYPESCRIPT_REVERIFICATION_REPORT.md`.
+- **New issue:** Cross-language parity is only partial because TypeScript hardcodes `partitionKeyValue = "West"` in `src/data-plane.ts:299-320`, while Python defaults to `Northeast` in `nosql-create-index-python/src/config.py:26`.
+- **New issue:** The existing TypeScript test suite is stale/brittle. `npm test` currently exits 1 because `test/live.integration.test.ts:72-81` requires `AZURE_USER_PRINCIPAL_ID`, and the same test still references RBAC helpers (`createRbacAccess`, `ROLE_ASSIGNMENT_GUID`, `ROLE_DEFINITION_GUID`) that are not exported by the current `src/control-plane.ts:1-151`.
+
 ### Key Finding: ARM SDK Status Across Languages
 
 Based on current branch state:
 - **TypeScript:** ✅ Goal 1 COMPLETE (control-plane.ts exists, verified working)
-- **Python:** ❌ Goal 1 MISSING (no control_plane.py with ARM SDK)
+- **Python:** ⚠️ Goal 1 PRESENT BUT NEEDS REVERIFICATION (`src/control_plane.py` exists; `QuantizedFlat` index-type spelling differs from TypeScript/spec)
 - **Go:** ❌ Goal 1 MISSING (no control_plane.go with ARM SDK)
 - **Java:** ❌ Goal 1 MISSING (no ControlPlane.java with ARM SDK)
-- **.NET:** ❌ Goal 1 MISSING (no ControlPlane.cs with ARM SDK)
+- **.NET:** ✅ Goal 1 COMPLETE (`src/ControlPlane.cs` now uses `Azure.ResourceManager.CosmosDB`)
 
-**Note:** The user mentioned "there was a time when all ARM SDK code was working for every language except Go" - but current branch shows only TypeScript has Phase 1 (ARM SDK) implemented. Either this regressed or the memory refers to a different branch/commit point.
+**Note:** The current branch now contains Phase 1 control-plane code in TypeScript, Python, and .NET. Python still needs follow-up reverification because its `QuantizedFlat` index-type spelling does not match the TypeScript sample/spec. Go and Java still appear to be missing Phase 1 code in this branch snapshot.
 
 ---
 
@@ -169,8 +181,8 @@ There were THREE issues with the initial VectorDistance query:
 - Embedding formatting (array of numbers) correct
 
 ### ✓ Cross-Language Consistency
-- No language-specific issues identified in TypeScript implementation
-- Both SDK paths (ARM + data-plane) follow same architectural patterns as Python
+- Shared dataset, Region batching, and distance-function names align with Python
+- Direct result-ranking comparison is still blocked by the TypeScript hardcoded `"West"` query partition vs Python default `"Northeast"`
 
 ---
 
@@ -185,7 +197,7 @@ There were THREE issues with the initial VectorDistance query:
 | **Goal 2** | Query with Cosine distance | ✅ Complete | None |
 | **Goal 2** | Query with DotProduct distance | ✅ Complete | None |
 | **Goal 2** | Query with Euclidean distance | ✅ Complete | None |
-| **Goal 2** | Compare results across all languages | 🔄 Ready for cross-language validation | None |
+| **Goal 2** | Compare results across all languages | ⚠️ Partial | Align TypeScript query partition value with Python before claiming ranking parity |
 
 ---
 
@@ -219,3 +231,149 @@ There were THREE issues with the initial VectorDistance query:
 - **Data:** 50 hotel documents, 1536-dimensional vectors
 - **Azure Region:** eastus2
 - **Cosmos DB Account:** db-dib-cos-4bpmnkpp4662v4
+
+---
+
+## Python Implementation Status
+
+### Python Sample Fixes Applied (VERIFIED)
+
+**Session Date:** 2026-06-21  
+**Branch:** `diberry/article-2`  
+**Target Language:** Python (nosql-create-index-python sample)
+
+#### Issue: Wrong Partition Key in VectorDistance Query [FIXED ✅]
+**Category:** Data Plane Query / Partition Key Mismatch  
+**Severity:** CRITICAL  
+**Status:** FIXED  
+
+**Problem:**
+- Container created with `/Region` as partition key (control_plane.py line 112)
+- Query used `WHERE c.HotelId = @partitionKey` instead of `WHERE c.Region = @partitionKey`
+- Query included `ORDER BY VectorDistance(...)` which violates Cosmos DB constraints
+- Config default `partition_key_value = "hotels"` doesn't match any Region value
+
+**Root Cause:**
+1. Partition key is defined as `/Region` in container creation
+2. Valid Region values are: "Northeast", "Midwest", "South", "West"
+3. Query code and config were inconsistent with this design
+
+**Solution Applied:**
+1. **Fixed prepare_document()** (data_plane.py line 73-77):
+   - Removed artificial setting of HotelId as partition key
+   - Let Region field pass through as-is from data
+
+2. **Fixed query_top_matches()** (data_plane.py line 161-204):
+   - Removed `ORDER BY VectorDistance(...)` clause (lines 169-174 original)
+   - Changed WHERE clause from `c.HotelId = @partitionKey` to `c.Region = @partitionKey`
+   - Query now correctly targets Region partition key
+   - Added comment explaining the VectorDistance constraint
+
+3. **Fixed config defaults** (config.py line 22-28):
+   - Changed `DEFAULT_PARTITION_KEY_VALUE` from "hotels" to "Northeast"
+   - Added comment noting valid values are Region names
+
+**Files Modified:**
+- `src/data_plane.py` (lines 73-77, 161-204)
+- `src/config.py` (line 26)
+
+**Verification:**
+- [OK] Imports successful
+- [OK] Field validation passed  
+- [OK] Document preparation works (id and region fields correct)
+- [OK] Default partition key is now valid Region value
+- [OK] Data file loads correctly (50 documents, 4 regions)
+
+**Next Steps for Python E2E Verification:**
+- Phase 1: Verify ARM SDK container creation
+- Phase 2: Verify data ingestion with Region partition key
+- Phase 3: Run queries with all 3 distance functions
+- Phase 4: Compare results with TypeScript implementation
+
+---
+
+### Python Cross-Language Consistency Notes
+
+| Aspect | TypeScript | Python | Status |
+|--------|-----------|--------|--------|
+| Control Plane (ARM SDK) | ✅ control-plane.ts | ✅ control_plane.py | COMPLETE |
+| Partition Key | `/Region` | `/Region` | CONSISTENT |
+| Partition Key Filter | `c.Region = @partitionKey` | `c.Region = @partitionKey` | CONSISTENT |
+| Distance Function Call | `VectorDistance(..., false, {'distanceFunction': 'X'})` | `VectorDistance(..., false, {'distanceFunction': 'X'})` | CONSISTENT |
+| ORDER BY Constraint | Removed ✅ | Removed ✅ | CONSISTENT |
+| Embedding Field Name | `embedding` | `embedding` | CONSISTENT |
+| Index Types | DiskANN, QuantizedFlat | DiskANN, `quantizedflat` | NEEDS ALIGNMENT |
+
+#### Reverification Addendum (2026-06-21)
+
+- **Offline test execution:** ✅ `python test_vectordistance_fixes.py` passed with exit code `0` and printed `13 [PASS]` checks.
+- **Goal 2 query constraints:** ✅ Reverified in `src/data_plane.py`:
+  - no `ORDER BY`
+  - `WHERE c.Region = @partitionKey`
+  - `partition_key=config.partition_key_value`
+  - `{'distanceFunction': 'Cosine'|'DotProduct'|'Euclidean'}`
+- **New finding - Goal 1 still needs follow-up:** ⚠️ `src/control_plane.py` uses `quantizedflat` for the second vector index type, while the TypeScript sample uses `quantizedFlat` and the plan refers to `QuantizedFlat`.
+- **New finding - cross-language ranking comparison is not yet apples-to-apples:** ⚠️ Python defaults to `DEFAULT_PARTITION_KEY_VALUE = "Northeast"` (`src/config.py`), but TypeScript hardcodes `partitionKeyValue = "West"` for its query path.
+- **New finding - Python quickstart is stale:** ⚠️ `nosql-create-index-python/quickstart-create-index-python.md` still references the old data file, the `"hotels"` partition key, and an `ORDER BY VectorDistance(...)` query, so docs no longer match the reverified code.
+
+---
+
+## C# Implementation Status
+
+### .NET Sample Fixes Applied (VERIFIED OFFLINE)
+
+**Session Date:** 2026-06-21  
+**Branch:** `diberry/article-2`  
+**Target Language:** .NET (`nosql-create-index-dotnet`)
+
+#### Phase 1: ARM SDK Control Plane [FIXED ✅]
+**Status:** COMPLETE (offline verified)  
+
+**Changes Applied:**
+- Added `nosql-create-index-dotnet\src\ControlPlane.cs`
+- Added `Azure.ResourceManager.CosmosDB` 1.4.0 and updated `Azure.Identity` to 1.18.0
+- `Program.cs` now calls `ControlPlane.CreateContainersAsync()` before data-plane ingestion/query
+- ARM container definitions use `/Region` partition key, `/embedding` vector field, `1536` dimensions, `cosine` distance, and a vector index policy that includes both `diskANN` and `quantizedFlat`
+- Existing containers are deleted and recreated so immutable vector index settings are refreshed consistently with the TypeScript/Python sample flow
+
+**Known Runtime Risk:**
+- This .NET flow now intentionally uses management-plane permissions, which conflicts with the repo-level data-plane-only guidance. Build/test verification passed offline, but live execution still depends on the caller having ARM access in addition to Cosmos DB data-plane access.
+
+#### Phase 2: Region-Based Ingestion [FIXED ✅]
+**Status:** COMPLETE  
+
+**Changes Applied:**
+- Switched ingestion to `TransactionalBatch` grouped by `/Region`
+- Added `GroupDocumentsByRegion()` helper for deterministic region batching
+- Preserved `Region` while continuing to map `HotelId` to `id`
+- Updated defaults to use `HotelsData_toCosmosDB_Vector_byRegion.json`
+
+#### Phase 3: VectorDistance Query Fixes [FIXED ✅]
+**Status:** COMPLETE  
+
+**Changes Applied:**
+- Removed `ORDER BY` from the query
+- Added `WHERE c.Region = @partitionKey`
+- Added `QueryRequestOptions.PartitionKey = new PartitionKey(config.PartitionKeyValue)`
+- Added the required 4th `VectorDistance` argument: `{'distanceFunction': 'Cosine'|'DotProduct'|'Euclidean'}`
+- Added reusable helpers so the query shape can be validated offline
+
+#### Phase 4: Offline Verification [ADDED ✅]
+**Status:** COMPLETE  
+
+**Added:**
+- `nosql-create-index-dotnet\tests\test_vectordistance_fixes\test_vectordistance_fixes.csproj`
+- `nosql-create-index-dotnet\tests\test_vectordistance_fixes\Program.cs`
+
+**Validation Coverage:**
+1. Partition key default is a valid `Region`
+2. Data file contains `Northeast`, `Midwest`, `South`, `West`
+3. Document preparation preserves `Region`
+4. Region grouping counts match the shared dataset
+5. Field-name validation and supported distance functions are correct
+6. Query text and query options satisfy the VectorDistance constraints
+
+#### Additional .NET-Specific Issues Found
+- `appsettings.json` still pointed to the old non-region dataset
+- `ClearContainerDataAsync()` deleted with the wrong partition key (`"hotels"`)
+- `quickstart-create-index-dotnet.md` still documented `/HotelId`, `DescriptionVector`, and an invalid `ORDER BY VectorDistance(...)` query pattern

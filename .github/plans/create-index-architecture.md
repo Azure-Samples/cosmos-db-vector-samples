@@ -220,28 +220,49 @@ Cosmos DB allows querying with different distance functions on the same immutabl
 
 ### 5.1 Configuration Management
 
-**Hard Constraint:** Environment variables come from Azure Developer CLI (`azd`), which follows a specific naming convention. Code must adapt to `azd` naming; never modify the `.env` file that `azd` produces.
+**Hard Constraint:** Environment variables come from Azure Developer CLI (`azd`) and are sourced directly from `infra/main.bicep` outputs. Code must use the exact env var names that bicep outputs; do NOT invent names or modify `.env` files.
 
-**Environment Variable Mapping:**
+**Source of Truth:** `infra/main.bicep` lines 159-198 define all outputs. This section reflects those outputs exactly.
 
-| azd Env Variable | Code Uses | Extracted From | Notes |
-|------------------|-----------|-----------------|-------|
-| `AZURE_SUBSCRIPTION_ID` | subscription_id | Direct | Required for ARM SDK |
-| `AZURE_RESOURCE_GROUP` | resource_group | Direct | Required for ARM SDK |
-| `AZURE_COSMOS_ENDPOINT` | cosmos_endpoint | Direct | Full endpoint URL |
-| `AZURE_COSMOS_KEY` | cosmos_key | Inferred from connection string OR ARM SDK | Read-only key |
-| `AZURE_OPENAI_ENDPOINT` | openai_endpoint | Direct | Azure OpenAI resource |
-| `AZURE_OPENAI_KEY` | openai_key | Direct | Azure OpenAI API key |
-| `AZURE_OPENAI_EMBEDDING_DEPLOYMENT` | embedding_deployment | Direct | Deployment name (e.g., "text-embedding-3-small") |
+**Environment Variable Mapping (From Bicep Outputs):**
 
-**Account Name Extraction:**
-The Cosmos DB account name is NOT provided as an env var. Extract from the endpoint URL:
+| Bicep Output | Code Variable | Purpose | Source |
+|--------------|---------------|---------|---------| 
+| `AZURE_TENANT_ID` | tenant_id | Azure Entra ID tenant | `tenant().tenantId` |
+| `AZURE_LOCATION` | location | Azure region | main.bicep param `location` |
+| `AZURE_RESOURCE_GROUP` | resource_group | Azure resource group name | `resourceGroup().name` |
+| `AZURE_COSMOSDB_ACCOUNT_NAME` | cosmos_account_name | Cosmos DB account name | database.outputs.accountName |
+| `AZURE_COSMOSDB_ENDPOINT` | cosmos_endpoint | Cosmos DB service endpoint URL | database.outputs.endpoint |
+| `AZURE_COSMOSDB_DATABASENAME` | database_name | Database name (for regular vector search) | main.bicep param `databaseName` |
+| `AZURE_COSMOSDB_DISKANN_CONTAINER_NAME` | diskann_container | Regular DiskANN container name | database.outputs.containers[0].name |
+| `AZURE_COSMOSDB_QUANTIZEDFLAT_CONTAINER_NAME` | quantizedflat_container | Regular QuantizedFlat container name | database.outputs.containers[1].name |
+| `AZURE_COSMOSDB_CREATE_INDEX_DATABASENAME` | create_index_database | Create-index sample database name | main.bicep param `createIndexDatabaseName` |
+| `AZURE_COSMOSDB_CREATE_INDEX_DISKANN_CONTAINER_NAME` | create_index_diskann_container | Create-index DiskANN container | database.outputs.createIndexContainers[0].name |
+| `AZURE_COSMOSDB_CREATE_INDEX_QUANTIZEDFLAT_CONTAINER_NAME` | create_index_quantizedflat_container | Create-index QuantizedFlat container | database.outputs.createIndexContainers[1].name |
+| `AZURE_OPENAI_SERVICE` | openai_service_name | Azure OpenAI service name | openAi.outputs.name |
+| `AZURE_OPENAI_ENDPOINT` | openai_endpoint | Azure OpenAI service endpoint URL | openAi.outputs.endpoint |
+| `AZURE_OPENAI_EMBEDDING_DEPLOYMENT` | embedding_deployment | Embedding model deployment name | main.bicep var `embeddingModelName` |
+| `AZURE_OPENAI_EMBEDDING_ENDPOINT` | embedding_endpoint | Embedding API endpoint URL | openAi.outputs.endpoint |
+| `AZURE_OPENAI_EMBEDDING_API_VERSION` | embedding_api_version | Embedding API version (e.g., 2024-08-01-preview) | main.bicep var `embeddingModelApiVersion` |
+
+**Authentication:**
+- **Data Plane (Queries):** Uses Microsoft Entra ID (RBAC). No API keys needed. Credentials come from `DefaultAzureCredential()` / environment user login.
+- **ARM SDK (Control Plane):** Uses subscription context from Azure CLI / DefaultAzureCredential.
+
+**NOT Output by Bicep (Do NOT use):**
+- `AZURE_COSMOS_KEY` — Not needed; ARM SDK and Data Plane both use RBAC
+- `AZURE_OPENAI_KEY` — Not needed; Azure OpenAI uses RBAC via Entra ID
+- `AZURE_SUBSCRIPTION_ID` — Not output by bicep; available from `az` CLI or DefaultAzureCredential context
+
+**Account Name Extraction (if needed):**
+If a sample needs the Cosmos DB account name and only has the endpoint, extract from URL:
 ```
 Endpoint URL: https://db-dib-cos-4bpmnkpp4662v4.documents.azure.com:443/
 Account name: db-dib-cos-4bpmnkpp4662v4
 
 Pattern: https://{account-name}.documents.azure.com:443/
 ```
+However, bicep provides `AZURE_COSMOSDB_ACCOUNT_NAME` directly, so extraction is unnecessary.
 
 ### 5.2 Data File Specification
 

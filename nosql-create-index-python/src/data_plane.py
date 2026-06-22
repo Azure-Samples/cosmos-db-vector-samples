@@ -73,7 +73,7 @@ def read_documents(data_file: Path) -> List[Dict[str, Any]]:
 def prepare_document(item: Dict[str, Any]) -> Dict[str, Any]:
     document = dict(item)
     document["id"] = str(item["HotelId"])
-    document["HotelId"] = item.get("HotelId", "hotels")  # Ensure HotelId is partition key
+    # Region is the partition key (already in document from data file)
     return document
 
 
@@ -166,11 +166,13 @@ def query_top_matches(
     distance_function: str = "Cosine",
 ) -> QuerySummary:
     embedding_field = validate_field_name(config.embedding_field_name)
+    # Critical constraint: VectorDistance CANNOT use ORDER BY clause
+    # VectorDistance automatically sorts results by similarity (highest first)
+    # Must filter by Region (the actual partition key), not HotelId
     query_text = (
         "SELECT TOP @topK c.HotelId, c.HotelName, c.Description, "
         "VectorDistance(c.{0}, @embedding, false, {{'distanceFunction': '{1}'}}) AS similarityScore "
-        "FROM c WHERE c.HotelId = @partitionKey "
-        "ORDER BY VectorDistance(c.{0}, @embedding, false, {{'distanceFunction': '{1}'}})"
+        "FROM c WHERE c.Region = @partitionKey"
     ).format(embedding_field, distance_function)
 
     raw_results = list(

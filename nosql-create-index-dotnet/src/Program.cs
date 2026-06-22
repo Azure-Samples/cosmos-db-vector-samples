@@ -9,6 +9,7 @@ try
     Config.Validate(config);
 
     var credential = new DefaultAzureCredential();
+    await ControlPlane.CreateContainersAsync(config, credential, cancellationToken);
     using var cosmosClient = DataPlane.CreateCosmosClient(config, credential);
     var azureOpenAIClient = DataPlane.CreateAzureOpenAIClient(config, credential);
     var database = cosmosClient.GetDatabase(config.DatabaseName);

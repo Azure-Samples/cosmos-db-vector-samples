@@ -17,6 +17,8 @@ public static partial class DataPlane
     {
         PropertyNameCaseInsensitive = true
     };
+    public static readonly string[] ValidRegions = ["Northeast", "Midwest", "South", "West"];
+    public static readonly string[] SupportedDistanceFunctions = ["Cosine", "DotProduct", "Euclidean"];
 
     [GeneratedRegex("^[A-Za-z_][A-Za-z0-9_]*$", RegexOptions.Compiled)]
     private static partial Regex EmbeddingFieldNamePattern();
@@ -46,7 +48,7 @@ public static partial class DataPlane
         var documents = await JsonSerializer.DeserializeAsync<List<HotelDocument>>(stream, JsonOptions, cancellationToken)
             ?? throw new InvalidOperationException("The shared hotel dataset must be a JSON array.");
 
-        var validRegions = new HashSet<string> { "Northeast", "Midwest", "South", "West" };
+        var validRegions = new HashSet<string>(ValidRegions, StringComparer.Ordinal);
         var regionsFound = new HashSet<string>();
 
         for (int idx = 0; idx < documents.Count; idx++)
@@ -98,6 +100,14 @@ public static partial class DataPlane
         return documents;
     }
 
+    public static IReadOnlyDictionary<string, List<HotelDocument>> GroupDocumentsByRegion(IEnumerable<HotelDocument> documents)
+    {
+        return documents
+            .GroupBy(document => document.Region, StringComparer.Ordinal)
+            .OrderBy(group => group.Key, StringComparer.Ordinal)
+            .ToDictionary(group => group.Key, group => group.ToList(), StringComparer.Ordinal);
+    }
+
     public static async Task<float[]> VerifyEmbeddingDimensionsAsync(AzureOpenAIClient azureOpenAIClient, SampleConfig config, CancellationToken cancellationToken)
     {
         var embedding = await GenerateEmbeddingAsync(azureOpenAIClient, config, "dimension check", cancellationToken);
@@ -126,49 +136,52 @@ public static partial class DataPlane
             return new IngestionSummary(containerName, documents.Count, 0, existingCount, true, 0);
         }
 
-        var requestChargeLock = new object();
-        var failures = new ConcurrentBag<Exception>();
+        var documentsByRegion = GroupDocumentsByRegion(documents);
+        var failures = new ConcurrentBag<string>();
         var insertedDocuments = 0;
         var skippedDocuments = 0;
         var totalRequestCharge = 0d;
 
-        var tasks = documents.Select(async document =>
+        foreach (var regionGroup in documentsByRegion)
         {
-            try
+            var transactionalBatch = container.CreateTransactionalBatch(new PartitionKey(regionGroup.Key));
+            foreach (var document in regionGroup.Value)
             {
-                // Extract Region from document for partition key
                 if (string.IsNullOrWhiteSpace(document.Region))
                 {
                     throw new InvalidOperationException($"Document {document.HotelId} missing Region property");
                 }
 
-                var response = await container.CreateItemAsync(
-                    document,
-                    new PartitionKey(document.Region),  // Use Region as partition key
-                    new ItemRequestOptions { EnableContentResponseOnWrite = false },
-                    cancellationToken);
+                transactionalBatch.UpsertItem(document);
+            }
 
-                Interlocked.Increment(ref insertedDocuments);
-                lock (requestChargeLock)
+            using TransactionalBatchResponse response = await transactionalBatch.ExecuteAsync(cancellationToken);
+            totalRequestCharge += response.RequestCharge;
+
+            if (response.IsSuccessStatusCode)
+            {
+                insertedDocuments += regionGroup.Value.Count;
+                Console.WriteLine($"  Region '{regionGroup.Key}': {regionGroup.Value.Count} documents");
+                continue;
+            }
+
+            for (var operationIndex = 0; operationIndex < response.Count; operationIndex++)
+            {
+                var operationResult = response[operationIndex];
+                if ((int)operationResult.StatusCode is >= 200 and < 300)
                 {
-                    totalRequestCharge += response.RequestCharge;
+                    continue;
                 }
-            }
-            catch (CosmosException exception) when (exception.StatusCode == HttpStatusCode.Conflict)
-            {
-                Interlocked.Increment(ref skippedDocuments);
-            }
-            catch (Exception exception)
-            {
-                failures.Add(exception);
-            }
-        });
 
-        await Task.WhenAll(tasks);
+                failures.Add(
+                    $"Region '{regionGroup.Key}', document '{regionGroup.Value[operationIndex].HotelId}': {operationResult.StatusCode}");
+            }
+        }
 
         if (!failures.IsEmpty)
         {
-            throw new AggregateException($"Failed to insert {failures.Count} documents into {containerName}.", failures);
+            throw new InvalidOperationException(
+                $"Failed to ingest one or more region batches into {containerName}: {string.Join("; ", failures.Take(5))}");
         }
 
         return new IngestionSummary(containerName, documents.Count, insertedDocuments, skippedDocuments, false, totalRequestCharge);
@@ -182,13 +195,18 @@ public static partial class DataPlane
         string distanceFunction,
         CancellationToken cancellationToken)
     {
-        var embeddingFieldName = ValidateEmbeddingFieldName(config.EmbeddingFieldName);
-        var queryDefinition = new QueryDefinition(
-                $"SELECT TOP @topK c.HotelId, c.HotelName, c.Description, VectorDistance(c.{embeddingFieldName}, @embedding, false, {{distanceFunction: '{distanceFunction}'}}) AS SimilarityScore FROM c ORDER BY VectorDistance(c.{embeddingFieldName}, @embedding, false, {{distanceFunction: '{distanceFunction}'}})")
+        var queryDefinition = new QueryDefinition(BuildVectorDistanceQueryText(config.EmbeddingFieldName, distanceFunction))
             .WithParameter("@topK", config.TopCount)
-            .WithParameter("@embedding", queryEmbedding);
+            .WithParameter("@embedding", queryEmbedding)
+            .WithParameter("@partitionKey", config.PartitionKeyValue);
 
-        using var iterator = container.GetItemQueryIterator<VectorSearchRow>(queryDefinition);
+        var queryRequestOptions = new QueryRequestOptions
+        {
+            PartitionKey = new PartitionKey(config.PartitionKeyValue)
+        };
+        using var iterator = container.GetItemQueryIterator<VectorSearchRow>(
+            queryDefinition,
+            requestOptions: queryRequestOptions);
 
         var results = new List<QueryResult>();
         var totalRequestCharge = 0d;
@@ -233,7 +251,7 @@ public static partial class DataPlane
         return exception;
     }
 
-    private static string ValidateEmbeddingFieldName(string fieldName)
+    public static string ValidateEmbeddingFieldName(string fieldName)
     {
         if (!EmbeddingFieldNamePattern().IsMatch(fieldName))
         {
@@ -241,6 +259,21 @@ public static partial class DataPlane
         }
 
         return fieldName;
+    }
+
+    public static string BuildVectorDistanceQueryText(string embeddingFieldName, string distanceFunction)
+    {
+        var validatedFieldName = ValidateEmbeddingFieldName(embeddingFieldName);
+        if (!SupportedDistanceFunctions.Contains(distanceFunction, StringComparer.Ordinal))
+        {
+            throw new InvalidOperationException(
+                $"Unsupported distance function: {distanceFunction}. Expected one of: {string.Join(", ", SupportedDistanceFunctions)}.");
+        }
+
+        return
+            $"SELECT TOP @topK c.HotelId, c.HotelName, c.Description, " +
+            $"VectorDistance(c.{validatedFieldName}, @embedding, false, {{'distanceFunction': '{distanceFunction}'}}) AS SimilarityScore " +
+            "FROM c WHERE c.Region = @partitionKey";
     }
 
     private static AzureOpenAIClientOptions CreateAzureOpenAIClientOptions(string apiVersion)
@@ -270,14 +303,17 @@ public static partial class DataPlane
     {
         try
         {
-            using var iterator = container.GetItemQueryIterator<VectorSearchRow>(new QueryDefinition("SELECT c.id FROM c"));
+            using var iterator = container.GetItemQueryIterator<ContainerItemIdentityRow>(new QueryDefinition("SELECT c.id, c.Region FROM c"));
             
             while (iterator.HasMoreResults)
             {
                 var response = await iterator.ReadNextAsync(cancellationToken);
                 foreach (var item in response)
                 {
-                    await container.DeleteItemAsync<VectorSearchRow>(item.HotelId, new PartitionKey("hotels"), null, cancellationToken);
+                    await container.DeleteItemAsync<ContainerItemIdentityRow>(
+                        item.Id,
+                        new PartitionKey(item.Region),
+                        cancellationToken: cancellationToken);
                 }
             }
         }
@@ -320,5 +356,14 @@ public static partial class DataPlane
 
         [JsonPropertyName("SimilarityScore")]
         public double SimilarityScore { get; set; }
+    }
+
+    private sealed class ContainerItemIdentityRow
+    {
+        [JsonPropertyName("id")]
+        public string Id { get; set; } = string.Empty;
+
+        [JsonPropertyName("Region")]
+        public string Region { get; set; } = string.Empty;
     }
 }

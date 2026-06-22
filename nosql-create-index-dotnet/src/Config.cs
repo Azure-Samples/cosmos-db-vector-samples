@@ -16,6 +16,7 @@ public sealed record SampleConfig(
     string? VectorAlgorithm,
     string DataFileWithVectors,
     string EmbeddingFieldName,
+    string PartitionKeyValue,
     string QueryText,
     int ExpectedDimensions,
     int TopCount)
@@ -34,6 +35,7 @@ public static class Config
     private const string DefaultDataFile = "./data/HotelsData_toCosmosDB_Vector_byRegion.json";
     private const string DefaultQueryText = "hotel near the ocean";
     private const string DefaultEmbeddingFieldName = "embedding";
+    private const string DefaultPartitionKeyValue = "Northeast";
     private const string DefaultOpenAIEmbeddingApiVersion = "2024-08-01-preview";
 
     public static SampleConfig Load()
@@ -62,6 +64,7 @@ public static class Config
             VectorAlgorithm: Normalize(configuration["VECTOR_ALGORITHM"])?.ToLowerInvariant(),
             DataFileWithVectors: ResolvePath(sampleRoot, dataFileValue),
             EmbeddingFieldName: DefaultEmbeddingFieldName,
+            PartitionKeyValue: Normalize(configuration["PARTITION_KEY_VALUE"]) ?? DefaultPartitionKeyValue,
             QueryText: DefaultQueryText,
             ExpectedDimensions: 1536,
             TopCount: 5);
@@ -70,6 +73,9 @@ public static class Config
     public static void Validate(SampleConfig config)
     {
         var missing = new List<string>();
+        if (string.IsNullOrWhiteSpace(config.SubscriptionId)) missing.Add("AZURE_SUBSCRIPTION_ID");
+        if (string.IsNullOrWhiteSpace(config.ResourceGroup)) missing.Add("AZURE_RESOURCE_GROUP");
+        if (string.IsNullOrWhiteSpace(config.AccountName)) missing.Add("AZURE_COSMOSDB_ACCOUNT_NAME");
         if (string.IsNullOrWhiteSpace(config.CosmosEndpoint)) missing.Add("AZURE_COSMOSDB_ENDPOINT");
         if (string.IsNullOrWhiteSpace(config.DatabaseName)) missing.Add("AZURE_COSMOSDB_DATABASENAME");
         if (string.IsNullOrWhiteSpace(config.OpenAIEmbeddingEndpoint)) missing.Add("AZURE_OPENAI_EMBEDDING_ENDPOINT");
@@ -99,6 +105,11 @@ public static class Config
             {
                 throw new InvalidOperationException("AZURE_COSMOSDB_CONTAINER_NAME and VECTOR_ALGORITHM refer to different containers.");
             }
+        }
+
+        if (!DataPlane.ValidRegions.Contains(config.PartitionKeyValue, StringComparer.Ordinal))
+        {
+            throw new InvalidOperationException("PARTITION_KEY_VALUE must be one of: Northeast, Midwest, South, West.");
         }
 
         if (!File.Exists(config.DataFileWithVectors))
