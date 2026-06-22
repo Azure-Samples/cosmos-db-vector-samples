@@ -1,36 +1,47 @@
 ---
 title: Quickstart: Create and query vector indexes in Azure Cosmos DB for NoSQL using Java
-description: Use Java and the Azure SDK to load pre-vectorized hotel data into existing Azure Cosmos DB for NoSQL vector containers and run similarity queries with Azure OpenAI embeddings.
+description: Create vector indexes in Azure Cosmos DB for NoSQL using Java and the ARM SDK. Load pre-vectorized hotel documents and compare vector distance functions (Cosine, DotProduct, Euclidean).
 author: diberry
 ms.author: diberry
 ms.service: azure-cosmos-db
 ms.topic: quickstart
-ms.date: 2026-06-08
+ms.date: 2026-06-22
 ---
 
 # Quickstart: Create and query vector indexes in Azure Cosmos DB for NoSQL using Java
 
-In this quickstart, you use the Java sample in `Azure-Samples/cosmos-db-vector-samples` to load pre-vectorized hotel documents into existing Azure Cosmos DB for NoSQL containers and run vector similarity queries. The sample uses `DefaultAzureCredential` for Azure Cosmos DB and the Azure OpenAI client, so you don't need API keys.
+In this quickstart, you run the Java create-index sample for Azure Cosmos DB for NoSQL to demonstrate two key goals:
 
-The sample is data-plane only. It assumes `azd up` already created the database, the `hotels_diskann` container, and the `hotels_quantizedflat` container with vector policies and indexes.
-
-Find the sample code on GitHub: `nosql-create-index-java/` in `Azure-Samples/cosmos-db-vector-samples`.
+- **Goal 1 (Control Plane):** Use the ARM SDK to create the `HotelsCreateIndex` database and two vector-indexed containers: `hotels_diskann` (approximate search) and `hotels_quantizedflat` (exact search).
+- **Goal 2 (Distance Functions):** Compare how the same query embedding produces different scores and rankings when using different vector distance functions: Cosine, DotProduct, and Euclidean.
 
 ## Prerequisites
 
 - An Azure subscription. If you don't have one, create a [free account](https://azure.microsoft.com/free/).
-- An Azure Cosmos DB for NoSQL account provisioned by the sample repo's Bicep templates:
-  - Vector search enabled
-  - Serverless enabled
-  - `Hotels` database created
-  - `hotels_diskann` and `hotels_quantizedflat` containers created with `/HotelId` as the partition key path
-- Microsoft Entra ID role assignments for your identity:
+- [Java 17 LTS](https://learn.microsoft.com/java/openjdk/download)
+- [Apache Maven 3.9](https://maven.apache.org/download.cgi) or later
+- [Azure CLI](/cli/azure/install-azure-cli) installed and signed in with `az login`.
+- An Azure Cosmos DB for NoSQL account with vector search enabled.
+- Microsoft Entra ID roles for your identity:
   - **Cosmos DB Built-in Data Contributor**
   - **Cognitive Services OpenAI User**
 - An Azure OpenAI resource with a `text-embedding-3-small` deployment.
-- [Java 17 LTS](https://learn.microsoft.com/java/openjdk/download)
-- [Apache Maven 3.9](https://maven.apache.org/download.cgi) or later
-- [!INCLUDE [Azure CLI](~/reusable-content/azure-cli/azure-cli-prepare-your-environment-no-header.md)]
+
+> [!IMPORTANT]
+> **Two Phases:**
+>
+> 1. **Control Plane (Goal 1):** The sample uses the ARM SDK (azure-resourcemanager-cosmos 2.54.3) with `DefaultAzureCredential` to create:
+>    - Database: `HotelsCreateIndex`
+>    - Containers: `hotels_diskann` (DiskANN index) and `hotels_quantizedflat` (QuantizedFlat index)
+>    - Partition key path: `/Region` (valid values: `Northeast`, `Midwest`, `South`, `West`)
+>    - Vector field path: `/embedding` (1536 dimensions, float32)
+>
+> 2. **Data Plane (Goal 2):** After containers are created, the sample:
+>    - Loads pre-vectorized hotel documents
+>    - Inserts them using bulk-upsert operations
+>    - Generates a query embedding with Azure OpenAI
+>    - Runs `VectorDistance()` queries with three distance functions: **Cosine**, **DotProduct**, and **Euclidean**
+>    - Displays rankings for each distance function to show how results differ
 
 ## Clone the repository
 
@@ -55,17 +66,17 @@ The sample expects the data file at: `./data/HotelsData_toCosmosDB_Vector.json`
 
 ## Understand what the sample does
 
-Azure Cosmos DB for NoSQL follows an infra-first pattern for vector indexes:
+The Java create-index sample demonstrates both control plane and data plane operations:
 
 | Layer | Tool | Responsibility |
 |---|---|---|
-| Provisioning | `azd up` + Bicep | Creates the Azure Cosmos DB account, database, containers, vector policies, and RBAC |
-| Runtime | Java sample | Loads documents, generates a query embedding, and runs `VectorDistance()` queries |
+| Provisioning | Java ARM SDK | Creates the Azure Cosmos DB database and containers with vector policies |
+| Runtime | Java data plane SDK | Loads documents, generates query embeddings, and runs `VectorDistance()` queries |
 
-The Java code does **not** create containers or indexes. Vector indexes for Azure Cosmos DB for NoSQL are provisioned when the containers are created.
+Both phases use `DefaultAzureCredential` for authentication, so you don't need to manage API keys or connection strings.
 
 > [!NOTE]
-> **RBAC roles:** Data-plane RBAC role definitions and assignments are created by `azd up` via Bicep templates. You can also create them programmatically using the management SDK — see [`SqlResources.BeginCreateUpdateSqlRoleDefinitionAsync`](https://learn.microsoft.com/dotnet/api/azure.resourcemanager.cosmosdb.sqlresources.begincreateupdate-sqlroledefinitionasync) (.NET) or [`SqlResources.createUpdateSqlRoleDefinition`](https://learn.microsoft.com/java/api/com.azure.resourcemanager.cosmos.models.sqlresources.createupdatesqlroledefinition) (Java).
+> **RBAC roles:** Data-plane RBAC role definitions and assignments are created by `azd up` via Bicep templates (if using it), or can be created programmatically using the management SDK — see [`SqlResources.beginCreateUpdateSqlRoleDefinition`](https://learn.microsoft.com/java/api/com.azure.resourcemanager.cosmos.models.sqlresources.begincreateupdate-sqlroledefinition) (Java).
 
 ## Configure environment variables
 
@@ -73,27 +84,28 @@ The Java code does **not** create containers or indexes. Vector indexes for Azur
 
    **If you deployed with `azd up`:**
 
-   ```powershell
+   ```bash
    azd env get-values > .env
    ```
 
    **Otherwise**, copy the template and fill in values from the Azure portal:
 
-   ```powershell
-   Copy-Item sample.env .env
+   ```bash
+   cp sample.env .env
    ```
 
-1. Update `.env` with your Azure resource values.
+2. Update `.env` with your Azure resource values:
 
    ```dotenv
    AZURE_COSMOSDB_ENDPOINT="https://<your-account>.documents.azure.com:443/"
-   AZURE_COSMOSDB_DATABASENAME="Hotels"
+   AZURE_COSMOSDB_DATABASENAME="HotelsCreateIndex"
    AZURE_COSMOSDB_CONTAINER_NAME=""
    AZURE_OPENAI_EMBEDDING_ENDPOINT="https://<your-openai-resource>.openai.azure.com/"
    AZURE_OPENAI_EMBEDDING_DEPLOYMENT="text-embedding-3-small"
    AZURE_OPENAI_EMBEDDING_API_VERSION="2024-08-01-preview"
    VECTOR_ALGORITHM=""
    DATA_FILE_WITH_VECTORS="./data/HotelsData_toCosmosDB_Vector.json"
+   AZURE_COSMOSDB_CREATE_INDEX_EMBEDDED_FIELD="embedding"
    ```
 
 Leave `AZURE_COSMOSDB_CONTAINER_NAME` and `VECTOR_ALGORITHM` empty to run both containers. Set `VECTOR_ALGORITHM` to `diskann` or `quantizedflat` if you want to target one algorithm.
@@ -102,24 +114,38 @@ Leave `AZURE_COSMOSDB_CONTAINER_NAME` and `VECTOR_ALGORITHM` empty to run both c
 
 Compile the sample:
 
-```powershell
+```bash
 mvn compile
 ```
 
 Run it:
 
-```powershell
+```bash
 mvn exec:java
 ```
 
-The sample performs these steps:
+**What the sample does:**
 
-1. Loads configuration from environment variables and validates required values.
-1. Creates one `DefaultAzureCredential` and passes it directly to `CosmosClient`.
-1. Reads `..\data\HotelsData_toCosmosDB_Vector.json`.
-1. Bulk-upserts documents into `hotels_diskann` and `hotels_quantizedflat`.
-1. Uses the Azure OpenAI client to generate a query embedding.
-1. Executes a parameterized `VectorDistance()` query and prints the top matches.
+The sample demonstrates both goals in sequence:
+
+**Goal 1 - Control Plane (create containers with vector indexes):**
+1. Loads configuration from environment variables
+2. Authenticates with `DefaultAzureCredential`
+3. Creates an Azure Resource Manager client
+4. Creates the `HotelsCreateIndex` database (if needed)
+5. Creates the `hotels_diskann` container with DiskANN vector index on `/embedding`
+6. Creates the `hotels_quantizedflat` container with QuantizedFlat vector index on `/embedding`
+
+**Goal 2 - Data Plane (load and query with distance functions):**
+1. Creates a Cosmos DB data plane client using `DefaultAzureCredential`
+2. Reads `.../data/HotelsData_toCosmosDB_Vector.json`
+3. Bulk-upserts documents into both containers
+4. Uses the Azure OpenAI client to generate a query embedding
+5. Executes **three separate** parameterized `VectorDistance()` queries with different distance functions:
+   - **Cosine:** Measures angle between vectors (values: 0 to 2)
+   - **DotProduct:** Inner product of vectors (values: any real number)
+   - **Euclidean:** Straight-line distance between vectors (values: 0 to √6144)
+6. Prints the top 5 matching hotels for each distance function, showing how rankings differ
 
 ## Review the Java project structure
 
@@ -137,6 +163,10 @@ nosql-create-index-java/
     └── DataPlane.java
 ```
 
+### ControlPlane.java
+
+`ControlPlane.java` uses the ARM SDK (azure-resourcemanager-cosmos 2.54.3) to create the database and containers with vector indexes. This demonstrates **Goal 1** (control plane).
+
 ### App.java
 
 `App.java` orchestrates the sample. It loads configuration, creates the shared credential, verifies embedding dimensions, ingests the hotel dataset, and runs vector queries for each target container.
@@ -153,6 +183,117 @@ nosql-create-index-java/
 - embedding generation with `EmbeddingsOptions`
 - field-name validation before interpolating the embedding field into `VectorDistance()`
 - parameterized SQL queries for the embedding vector and `TOP` value
+
+## Key implementation details
+
+### Goal 1: Create containers using ARM SDK (azure-resourcemanager-cosmos 2.54.3)
+
+The control-plane phase uses the ARM SDK with `DefaultAzureCredential` to create containers with vector policies:
+
+```java
+// Create Azure credential
+TokenCredential credential = new DefaultAzureCredentialBuilder().build();
+
+// Authenticate and get Azure Resource Manager with subscription
+AzureResourceManager azure = AzureResourceManager
+    .authenticate(credential, profile)
+    .withSubscription(subscriptionId);
+
+// Get the SQL resources client
+SqlResourcesClient sqlResourcesClient = azure.cosmosDBAccounts()
+    .manager()
+    .serviceClient()
+    .getSqlResources();
+
+// Create database
+sqlResourcesClient.createUpdateSqlDatabase(
+    resourceGroup,
+    accountName,
+    DATABASE_NAME,
+    new SqlDatabaseCreateUpdateParameters()
+        .withLocation(location)
+        .withResource(new SqlDatabaseResource().withId(DATABASE_NAME))
+        .withOptions(new CreateUpdateOptions()));
+
+// Build vector embedding policy
+VectorEmbedding vectorEmbedding = new VectorEmbedding()
+    .withPath(EMBEDDING_PATH)
+    .withDataType(VectorDataType.FLOAT32)
+    .withDimensions(EMBEDDING_DIMENSIONS)
+    .withDistanceFunction(DistanceFunction.COSINE);
+
+VectorEmbeddingPolicy vectorEmbeddingPolicy = new VectorEmbeddingPolicy()
+    .withVectorEmbeddings(Arrays.asList(vectorEmbedding));
+
+// Build vector index
+VectorIndex vectorIndex = new VectorIndex()
+    .withPath(EMBEDDING_PATH)
+    .withType(indexType);  // VectorIndexType.DISK_ANN or QUANTIZED_FLAT
+
+// Create container with vector policies
+sqlResourcesClient.createUpdateSqlContainer(
+    resourceGroup,
+    accountName,
+    DATABASE_NAME,
+    containerName,
+    new SqlContainerCreateUpdateParameters()
+        .withLocation(location)
+        .withResource(new SqlContainerResource()
+            .withId(containerName)
+            .withPartitionKey(new ContainerPartitionKey()
+                .withPaths(Arrays.asList(REGION_PARTITION_KEY))
+                .withKind(PartitionKind.HASH))
+            .withVectorEmbeddingPolicy(vectorEmbeddingPolicy)
+            .withIndexingPolicy(buildIndexingPolicy(vectorIndex)))
+        .withOptions(new CreateUpdateOptions()
+            .withThroughput(THROUGHPUT_RUS)));
+```
+
+### Goal 2: Bulk-insert documents and query with distance functions
+
+After creating containers, bulk-insert documents and generate query embeddings:
+
+```java
+// Create Azure Cosmos DB client
+CosmosClient cosmosClient = new CosmosClientBuilder()
+    .endpoint(cosmosEndpoint)
+    .credential(credential)
+    .buildClient();
+
+// Load and bulk-insert documents
+List<HotelDocument> documents = loadDocuments();
+container.executeBulkOperations(
+    documents.stream()
+        .map(doc -> new CosmosItemOperation(CosmosItemOperationType.UPSERT, doc.getId(), doc))
+        .collect(Collectors.toList())
+);
+
+// Generate query embedding using Azure OpenAI
+EmbeddingsOptions embeddingOptions = new EmbeddingsOptions(Arrays.asList(queryText))
+    .setDimensions(EMBEDDING_DIMENSIONS);
+EmbeddingsUsage embeddingUsage = openaiClient.getEmbeddings(EMBEDDING_DEPLOYMENT, embeddingOptions);
+List<Float> queryEmbedding = embeddingUsage.getData().get(0).getEmbedding();
+
+// Query with each distance function
+String[] distanceFunctions = {"Cosine", "DotProduct", "Euclidean"};
+for (String distanceFunc : distanceFunctions) {
+    String query = String.format(
+        "SELECT TOP 5 c.HotelId, c.HotelName, c.Description, " +
+        "VectorDistance(c.embedding, @embedding, false, {'distanceFunction': '%s'}) AS similarityScore " +
+        "FROM c WHERE c.Region = @partitionKey",
+        distanceFunc);
+
+    SqlQuerySpec querySpec = new SqlQuerySpec(query)
+        .withParameters(Arrays.asList(
+            new SqlParameter("@embedding", queryEmbedding),
+            new SqlParameter("@partitionKey", "Northeast")));
+
+    container.queryItems(querySpec, new CosmosQueryRequestOptions().setPartitionKey(new PartitionKey("Northeast")), HotelDocument.class)
+        .stream()
+        .limit(5)
+        .forEach(doc -> System.out.printf("  %s (score: %.4f)%n", doc.getHotelName(), doc.getSimilarityScore()));
+}
+```
 
 ## Expected output
 

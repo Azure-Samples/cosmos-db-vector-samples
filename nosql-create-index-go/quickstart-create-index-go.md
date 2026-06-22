@@ -1,18 +1,19 @@
 ---
 title: "Quickstart: Create and query vector indexes in Azure Cosmos DB for NoSQL using Go"
-description: Use Go and Azure SDK libraries to load pre-vectorized hotel documents into existing Azure Cosmos DB for NoSQL vector containers and query them with VectorDistance.
+description: Create vector indexes in Azure Cosmos DB for NoSQL using Go and the ARM SDK. Load pre-vectorized hotel documents and compare vector distance functions (Cosine, DotProduct, Euclidean).
 author: diberry
 ms.author: diberry
 ms.service: azure-cosmos-db
 ms.topic: quickstart
-ms.date: 2026-06-09
+ms.date: 2026-06-22
 ---
 
 # Quickstart: Create and query vector indexes in Azure Cosmos DB for NoSQL using Go
 
-This sample loads pre-vectorized hotel documents into existing Azure Cosmos DB for NoSQL containers and queries them using `VectorDistance`. It uses data-plane operations only and assumes the database, containers, and Azure OpenAI resource were already created by `azd up` or a shared Bicep deployment.
+In this quickstart, you run the Go create-index sample for Azure Cosmos DB for NoSQL to demonstrate two key goals:
 
-The full source code is available on GitHub: [cosmos-db-vector-samples/nosql-create-index-go](https://github.com/Azure-Samples/cosmos-db-vector-samples/tree/main/nosql-create-index-go).
+- **Goal 1 (Control Plane):** Use the ARM SDK (armcosmos/v3) to create the `HotelsCreateIndex` database and two vector-indexed containers: `hotels_diskann` (approximate search) and `hotels_quantizedflat` (exact search).
+- **Goal 2 (Distance Functions):** Compare how the same query embedding produces different scores and rankings when using different vector distance functions: Cosine, DotProduct, and Euclidean.
 
 ## Prerequisites
 
@@ -20,21 +21,26 @@ The full source code is available on GitHub: [cosmos-db-vector-samples/nosql-cre
 - [Azure CLI](/cli/azure/install-azure-cli) installed and signed in (`az login`).
 - [Go 1.23 or later](https://go.dev/dl/) installed.
 - An Azure Cosmos DB for NoSQL account with vector search enabled.
-- Existing resources created by `azd up` or the shared Bicep deployment:
-  - Database: `HotelsCreateIndex`
-  - Containers: `hotels_diskann` and `hotels_quantizedflat`
-  - Partition key path: `/PartitionKey`
-  - Vector field path: `/DescriptionVector`
-- Microsoft Entra ID role assignments:
+- Microsoft Entra ID roles for your identity:
   - **Cosmos DB Built-in Data Contributor** on the Azure Cosmos DB account
   - **Cognitive Services OpenAI User** on the Azure OpenAI resource
 - An Azure OpenAI resource with a `text-embedding-3-small` deployment.
 
-> [!NOTE]
-> **RBAC roles:** Data-plane RBAC role definitions and assignments are created by `azd up` via Bicep templates. You can also create them programmatically using the management SDK — see [`SqlResources.BeginCreateUpdateSqlRoleDefinitionAsync`](https://learn.microsoft.com/dotnet/api/azure.resourcemanager.cosmosdb.sqlresources.begincreateupdate-sqlroledefinitionasync) (.NET) or [`SqlResources.BeginCreateUpdateSqlRoleDefinition`](https://pkg.go.dev/github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/cosmosdb/armcosmosdb#SqlResourcesClient.BeginCreateUpdateSqlRoleDefinition) (Go).
-
 > [!IMPORTANT]
-> This sample targets the **`HotelsCreateIndex`** database with partition key `/PartitionKey` (value: `"hotels"`). It is **not** the `Hotels` database that uses `/HotelId` as the partition key. The Go sample uses concurrent individual inserts where every document shares the same partition key value.
+> **Two Phases:**
+>
+> 1. **Control Plane (Goal 1):** The sample uses the ARM SDK (armcosmos/v3) with `DefaultAzureCredential` to create:
+>    - Database: `HotelsCreateIndex`
+>    - Containers: `hotels_diskann` (DiskANN index) and `hotels_quantizedflat` (QuantizedFlat index)
+>    - Partition key path: `/Region` (valid values: `Northeast`, `Midwest`, `South`, `West`)
+>    - Vector field path: `/embedding` (1536 dimensions, float32)
+>
+> 2. **Data Plane (Goal 2):** After containers are created, the sample:
+>    - Loads pre-vectorized hotel documents
+>    - Inserts them concurrently using Region-based batches
+>    - Generates a query embedding with Azure OpenAI
+>    - Runs `VectorDistance()` queries with three distance functions: **Cosine**, **DotProduct**, and **Euclidean**
+>    - Displays rankings for each distance function to show how results differ
 
 ## Clone the repository
 
@@ -103,18 +109,27 @@ go run .
 
 ## The sample performs these steps
 
-1. Loads configuration from environment variables.
-1. Validates required environment variables and container names.
-1. Authenticates with `DefaultAzureCredential`.
-1. Creates an Azure Cosmos DB client and accesses the existing database.
-1. Reads `data/HotelsData_toCosmosDB_Vector.json` and prepares documents (adds `id` from `HotelId`, sets `PartitionKey` to `"hotels"`).
-1. Generates a query embedding by calling the Azure OpenAI REST API with a bearer token.
-1. For each target container:
-   - Inserts documents concurrently (max 10 goroutines) using `CreateItem`.
-   - Skips documents that already exist (HTTP 409 Conflict).
-   - Fails if any insert returns an unexpected error.
-   - Runs a `VectorDistance()` SQL query with a parameterized embedding.
-   - Prints the top 5 matching hotels.
+The sample demonstrates both goals in sequence:
+
+**Goal 1 - Control Plane (create containers with vector indexes):**
+1. Authenticates with `DefaultAzureCredential`
+2. Creates a management client for Azure Resource Manager
+3. Creates the `HotelsCreateIndex` database (if needed)
+4. Creates the `hotels_diskann` container with DiskANN vector index on `/embedding`
+5. Creates the `hotels_quantizedflat` container with QuantizedFlat vector index on `/embedding`
+
+**Goal 2 - Data Plane (load and query with distance functions):**
+1. Loads configuration from environment variables
+2. Creates an Azure Cosmos DB data plane client
+3. Reads `data/HotelsData_toCosmosDB_Vector.json` and prepares documents
+4. Generates a query embedding by calling the Azure OpenAI REST API
+5. For each target container:
+   - Inserts documents concurrently (max 10 goroutines) using `CreateItem`
+   - Runs **three separate** `VectorDistance()` SQL queries with different distance functions:
+     - **Cosine:** Measures angle between vectors (values: 0 to 2)
+     - **DotProduct:** Inner product of vectors (values: any real number)
+     - **Euclidean:** Straight-line distance between vectors (values: 0 to √6144)
+   - Prints the top 5 matching hotels for each distance function, showing how rankings differ
 
 ## Understand the project structure
 
@@ -143,9 +158,60 @@ nosql-create-index-go/
 
 ## Key implementation details
 
-### Load configuration and validate
+### Goal 1: Create containers using ARM SDK (armcosmos/v3)
 
-The sample uses `godotenv` to populate environment variables from `.env` and then validates that all required values are present before connecting to any Azure service.
+The control-plane phase uses the ARM SDK to create containers with vector policies. Authentication is handled by `DefaultAzureCredential`:
+
+```go
+credential, err := azidentity.NewDefaultAzureCredential(nil)
+if err != nil {
+    log.Fatalf("failed to create DefaultAzureCredential: %v", err)
+}
+
+client, err := armcosmos.NewSQLResourcesClient(subscriptionID, cred, nil)
+if err != nil {
+    log.Fatalf("failed to client: %v", err)
+}
+
+// Create container with vector index
+containerPoller, err := client.BeginCreateUpdateSQLContainer(ctx, resourceGroup, accountName, databaseName, containerName,
+    armcosmos.SQLContainerCreateUpdateParameters{
+        Location: ptr(location),
+        Properties: &armcosmos.SQLContainerCreateUpdateProperties{
+            Resource: &armcosmos.SQLContainerResource{
+                ID: ptr(containerName),
+                PartitionKey: &armcosmos.ContainerPartitionKey{
+                    Paths: []*string{ptr("/Region")},
+                    Kind:  ptr(armcosmos.PartitionKindHash),
+                },
+                VectorEmbeddingPolicy: &armcosmos.VectorEmbeddingPolicy{
+                    VectorEmbeddings: []*armcosmos.VectorEmbedding{
+                        {
+                            Path:             ptr("/embedding"),
+                            DataType:         ptr(armcosmos.VectorDataTypeFloat32),
+                            Dimensions:       ptr(int32(1536)),
+                            DistanceFunction: ptr(armcosmos.DistanceFunctionCosine),
+                        },
+                    },
+                },
+                IndexingPolicy: &armcosmos.IndexingPolicy{
+                    Automatic:    ptr(true),
+                    IndexingMode: ptr(armcosmos.IndexingModeConsistent),
+                    VectorIndexes: []*armcosmos.VectorIndex{
+                        {Path: ptr("/embedding"), Type: ptr(armcosmos.VectorIndexTypeQuantizedFlat)},
+                    },
+                },
+            },
+            Options: &armcosmos.CreateUpdateOptions{
+                Throughput: ptr(int32(400)),
+            },
+        },
+    }, nil)
+```
+
+### Goal 2: Load configuration and generate embeddings
+
+Configuration is loaded from environment variables using `godotenv`:
 
 ```go
 cfg, err := LoadConfig()
@@ -154,25 +220,22 @@ if err != nil {
 }
 ```
 
-### Connect with Microsoft Entra ID
-
-Authentication uses `DefaultAzureCredential`, which transparently supports the Azure CLI, environment variables, managed identity, and other credential sources without code changes.
+Go uses the Azure OpenAI REST API directly for embedding generation (no SDK dependency):
 
 ```go
-credential, err := azidentity.NewDefaultAzureCredential(nil)
-if err != nil {
-    log.Fatalf("failed to create DefaultAzureCredential: %v", err)
-}
+// Acquire bearer token for Azure OpenAI
+token, err := credential.GetToken(ctx, policy.TokenRequestOptions{
+    Scopes: []string{"https://cognitiveservices.azure.com/.default"},
+})
 
-cosmosClient, err := azcosmos.NewClient(cfg.CosmosEndpoint, credential, nil)
-if err != nil {
-    log.Fatalf("failed to create Azure Cosmos DB client: %v", err)
-}
+// POST to Azure OpenAI embeddings endpoint
+request.Header.Set("Authorization", "Bearer "+token.Token)
+resp, err := http.DefaultClient.Do(request)
 ```
 
 ### Insert documents concurrently
 
-To maximize throughput the sample fans out document inserts across up to 10 goroutines using a semaphore channel. HTTP 409 Conflict responses are treated as safe-to-skip so the sample is idempotent.
+The sample fans out document inserts across up to 10 goroutines using a semaphore channel. HTTP 409 Conflict responses (duplicate IDs) are treated as safe-to-skip:
 
 ```go
 partitionKey := azcosmos.NewPartitionKey().AppendString(partitionKeyFieldValue)
@@ -192,29 +255,16 @@ for _, document := range documents {
 }
 ```
 
-### Generate embedding via Azure OpenAI REST API
+### Run vector similarity queries with different distance functions
 
-The sample acquires a bearer token from `DefaultAzureCredential` and calls the Azure OpenAI embeddings endpoint directly over HTTP, avoiding a dependency on the OpenAI SDK.
-
-```go
-token, err := credential.GetToken(ctx, policy.TokenRequestOptions{
-    Scopes: []string{"https://cognitiveservices.azure.com/.default"},
-})
-
-// POST to /openai/deployments/{deployment}/embeddings?api-version=...
-request.Header.Set("Authorization", "Bearer "+token.Token)
-```
-
-### Run the vector similarity query
-
-The query uses `VectorDistance()` to rank documents by similarity to the generated embedding. The embedding is passed as a parameterized value to avoid string interpolation of large arrays.
+After inserting documents, the sample generates a query embedding and executes **three separate** SQL queries with different distance functions. Each query passes the embedding as a parameterized value:
 
 ```go
+// Query with Cosine distance
 queryText := fmt.Sprintf(`SELECT TOP 5
     c.HotelId, c.HotelName, c.Description,
-    VectorDistance(c.%s, @embedding) AS score
-FROM c
-ORDER BY VectorDistance(c.%s, @embedding)`, embeddingField, embeddingField)
+    VectorDistance(c.embedding, @embedding, false, {'distanceFunction': 'Cosine'}) AS score
+FROM c WHERE c.Region = @partitionKey`)
 
 options := azcosmos.QueryOptions{
     QueryParameters: []azcosmos.QueryParameter{{
@@ -225,6 +275,8 @@ options := azcosmos.QueryOptions{
 
 partitionKey := azcosmos.NewPartitionKey().AppendString(partitionKeyFieldValue)
 pager := container.NewQueryItemsPager(queryText, partitionKey, &options)
+
+// Repeat with 'DotProduct' and 'Euclidean' distance functions to compare rankings
 ```
 
 ## Example output

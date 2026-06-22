@@ -1,9 +1,9 @@
 ---
 title: Quickstart: Create and query vector indexes in Azure Cosmos DB for NoSQL using TypeScript
-description: In this quickstart, create an Azure Cosmos DB for NoSQL container with a vector index, load pre-vectorized data, and run a VectorDistance query by using TypeScript.
+description: Create vector indexes in Azure Cosmos DB for NoSQL using TypeScript and the ARM SDK. Load pre-vectorized hotel documents and compare vector distance functions (Cosine, DotProduct, Euclidean).
 author: diberry
 ms.author: diberry
-ms.date: 06/08/2026
+ms.date: 2026-06-22
 ms.service: azure-cosmos-db
 ms.subservice: nosql
 ms.topic: quickstart
@@ -13,7 +13,10 @@ ms.custom: msecd-doc-authoring-1013
 
 # Quickstart: Create and query vector indexes in Azure Cosmos DB for NoSQL using TypeScript
 
-In this quickstart, you create an Azure Cosmos DB for NoSQL container with a vector index by using the Azure Resource Manager SDK for JavaScript. Then you use the Azure Cosmos DB SDK and an Azure OpenAI client to verify embedding dimensions, load pre-vectorized hotel data, and run a `VectorDistance()` similarity query. The sample uses `DefaultAzureCredential` throughout, so you don't need API keys.
+In this quickstart, you run the TypeScript create-index sample for Azure Cosmos DB for NoSQL to demonstrate two key goals:
+
+- **Goal 1 (Control Plane):** Use the ARM SDK to create the `HotelsCreateIndex` database and two vector-indexed containers: `hotels_diskann` (approximate search) and `hotels_quantizedflat` (exact search).
+- **Goal 2 (Distance Functions):** Compare how the same query embedding produces different scores and rankings when using different vector distance functions: Cosine, DotProduct, and Euclidean.
 
 ## Prerequisites
 
@@ -106,17 +109,38 @@ Run the sample.
 npm start
 ```
 
-The sample compiles TypeScript, runs `dist/index.js`, creates the container and RBAC, loads the shared data file at `../data/HotelsData_toCosmosDB_Vector.json`, and runs a vector similarity query.
+**What the sample does:**
+
+The sample demonstrates both goals in sequence:
+
+**Goal 1 - Control Plane (create containers with vector indexes):**
+1. Compiles TypeScript source code
+2. Authenticates with `DefaultAzureCredential`
+3. Creates the `HotelsCreateIndex` database (if needed)
+4. Creates the `hotels_diskann` container with DiskANN vector index on `/embedding`
+5. Creates the `hotels_quantizedflat` container with QuantizedFlat vector index on `/embedding`
+6. Creates RBAC role definitions and assigns data-plane access to your identity
+
+**Goal 2 - Data Plane (load and query with distance functions):**
+1. Verifies embedding dimensions from Azure OpenAI match the container definition (1536 dimensions)
+2. Loads pre-vectorized hotel documents from `../data/HotelsData_toCosmosDB_Vector.json`
+3. Bulk-inserts documents into both containers
+4. Generates a query embedding with the Azure OpenAI client
+5. Runs **three separate `VectorDistance()` queries** with different distance functions:
+   - **Cosine:** Measures angle between vectors (values: 0 to 2)
+   - **DotProduct:** Inner product of vectors (values: any real number)
+   - **Euclidean:** Straight-line distance between vectors (values: 0 to √6144)
+6. Displays the top 5 matching hotels for each distance function, showing how rankings differ
 
 ## Understand the output
 
-When the sample runs, the console shows five steps.
+When the sample runs, you see results from both goals:
 
-1. **Create container with vector index**: `src/control-plane.ts` creates the container and sets `vectorIndexes` and `vectorEmbeddingPolicy`. The index type is `diskANN` or `quantizedFlat`, and the container definition is immutable after creation.
-1. **Create data-plane RBAC access**: `src/control-plane.ts` creates a SQL role definition and assigns it to your current identity.
-1. **Verify embedding dimensions**: `src/data-plane.ts` uses the Azure OpenAI client to generate a test embedding and confirms that the returned dimension count matches `EMBEDDING_DIMENSIONS`.
-1. **Insert documents**: `src/data-plane.ts` loads pre-vectorized hotel documents and inserts them with `executeBulkOperations()`.
-1. **Run vector similarity query**: `src/data-plane.ts` generates a query embedding and runs a SQL query that orders results by `VectorDistance()`.
+1. **Create container with vector index**: `src/control-plane.ts` creates the containers and sets `vectorIndexes` and `vectorEmbeddingPolicy`. The index type is `diskANN` or `quantizedFlat`, and the container definition is immutable after creation.
+2. **Create data-plane RBAC access**: `src/control-plane.ts` creates a SQL role definition and assigns it to your current identity.
+3. **Verify embedding dimensions**: `src/data-plane.ts` uses the Azure OpenAI client to generate a test embedding and confirms that the returned dimension count matches `EMBEDDING_DIMENSIONS`.
+4. **Insert documents**: `src/data-plane.ts` loads pre-vectorized hotel documents and inserts them with `executeBulkOperations()` into both containers.
+5. **Run vector similarity queries**: `src/data-plane.ts` generates a query embedding and runs **three separate** SQL queries that order results by `VectorDistance()` using different distance functions.
 
 ## Explore the code
 
@@ -126,6 +150,103 @@ The sample is organized into four main files.
 - **`src/index.ts`** creates a shared `DefaultAzureCredential` and calls the control-plane and data-plane functions in order.
 - **`src/control-plane.ts`** creates the Azure Cosmos DB management client, creates the container with a vector index, and creates the SQL role definition and assignment for data-plane access.
 - **`src/data-plane.ts`** creates the Azure Cosmos DB client with the account endpoint and `DefaultAzureCredential`, creates the Azure OpenAI client, checks embedding dimensions, bulk inserts documents, and runs the vector query.
+
+### Goal 1: Create containers using ARM SDK
+
+The control-plane module creates an ARM client and builds containers with vector policies:
+
+```typescript
+export async function createContainer(
+  armClient: CosmosDBManagementClient,
+  config: SampleConfig
+) {
+  const indexTypes = [
+    { type: "diskANN", containerName: "hotels_diskann" },
+    { type: "quantizedFlat", containerName: "hotels_quantizedflat" },
+  ];
+
+  const embeddingPath = `/${config.embeddingField}`;
+
+  for (const indexConfig of indexTypes) {
+    console.log(`\n=== Creating ${indexConfig.containerName} with ${indexConfig.type} ===`);
+
+    await armClient.sqlResources.beginCreateUpdateSqlContainerAndWait(
+      config.azure.resourceGroup!,
+      config.cosmos.accountName!,
+      config.cosmos.databaseName,
+      indexConfig.containerName,
+      {
+        location: config.azure.location,
+        resource: {
+          id: indexConfig.containerName,
+          partitionKey: { paths: ["/Region"], kind: "Hash" },
+          vectorEmbeddingPolicy: {
+            vectorEmbeddings: [
+              {
+                path: embeddingPath,
+                dataType: "float32",
+                dimensions: config.expectedDimensions,
+                distanceFunction: "cosine",
+              },
+            ],
+          },
+          indexingPolicy: {
+            indexingMode: "Consistent",
+            automatic: true,
+            includedPaths: [{ path: "/*" }],
+            excludedPaths: [{ path: `/"_etag"/?` }],
+            vectorIndexes: [{ path: embeddingPath, type: indexConfig.type }],
+          },
+        },
+        options: { throughput: 400 },
+      }
+    );
+
+    console.log(`  ✓ Container created with vector index`);
+  }
+}
+```
+
+### Goal 2: Run vector distance queries with all three distance functions
+
+After bulk-inserting documents, the sample generates a query embedding and executes **three separate** SQL queries using different distance functions:
+
+```typescript
+// Generate embedding from query text
+const embeddingResponse = await openaiClient.getEmbeddings(
+  config.cosmos.embeddingDeployment,
+  [queryText]
+);
+const queryEmbedding = embeddingResponse.data[0].embedding;
+
+// Query with each distance function
+const distanceFunctions = ["Cosine", "DotProduct", "Euclidean"];
+
+for (const distanceFunc of distanceFunctions) {
+  console.log(`\n=== Query Results using ${distanceFunc} ===`);
+
+  const query = `SELECT TOP 5 c.HotelId, c.HotelName, c.Description,
+    VectorDistance(c.${config.embeddingField}, @embedding, false, 
+      {'distanceFunction': '${distanceFunc}'}) AS similarityScore
+    FROM c WHERE c.Region = @partitionKey
+    ORDER BY VectorDistance(c.${config.embeddingField}, @embedding)`;
+
+  const { resources } = await container.items
+    .query(query, {
+      parameters: [
+        { name: "@embedding", value: queryEmbedding },
+        { name: "@partitionKey", value: "Northeast" },
+      ],
+    })
+    .fetchAll();
+
+  resources.forEach((doc, i) => {
+    console.log(
+      `${i + 1}. ${doc.HotelName} (score: ${doc.similarityScore.toFixed(4)})`
+    );
+  });
+}
+```
 
 The vector query validates the embedding field name before it injects that field into the SQL string. The query uses string interpolation for the field name because Azure Cosmos DB for NoSQL doesn't support parameter placeholders for field names in `VectorDistance()`.
 

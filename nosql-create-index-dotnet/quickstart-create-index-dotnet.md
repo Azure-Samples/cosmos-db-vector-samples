@@ -1,18 +1,19 @@
 ---
 title: Quickstart: Create and query vector indexes in Azure Cosmos DB for NoSQL using .NET
-description: Use .NET and Azure SDK libraries to load pre-vectorized hotel documents into existing Azure Cosmos DB for NoSQL vector containers and query them with VectorDistance.
+description: Create vector indexes in Azure Cosmos DB for NoSQL using .NET and the ARM SDK. Load pre-vectorized hotel documents and compare vector distance functions (Cosine, DotProduct, Euclidean).
 author: diberry
 ms.author: diberry
 ms.service: cosmos-db
 ms.topic: quickstart
-ms.date: 2026-06-08
+ms.date: 2026-06-22
 ---
 
 # Quickstart: Create and query vector indexes in Azure Cosmos DB for NoSQL using .NET
 
-In this quickstart, you run the `.NET` create-index sample for Azure Cosmos DB for NoSQL. The sample assumes `azd up` already created the `HotelsCreateIndex` database and the `hotels_diskann` and `hotels_quantizedflat` containers with their vector policies. Your code stays on the data plane: it loads pre-vectorized hotel documents, writes them to the existing containers, generates a query embedding with the Azure OpenAI client, and runs `VectorDistance()` similarity queries.
+In this quickstart, you run the .NET create-index sample for Azure Cosmos DB for NoSQL to demonstrate two key goals:
 
-Find the sample code on GitHub in [`nosql-create-index-dotnet`](https://github.com/Azure-Samples/cosmos-db-vector-samples/tree/main/nosql-create-index-dotnet).
+- **Goal 1 (Control Plane):** Use the ARM SDK to create the `HotelsCreateIndex` database and two vector-indexed containers: `hotels_diskann` (approximate search) and `hotels_quantizedflat` (exact search).
+- **Goal 2 (Distance Functions):** Compare how the same query embedding produces different scores and rankings when using different vector distance functions: Cosine, DotProduct, and Euclidean.
 
 ## Prerequisites
 
@@ -20,21 +21,26 @@ Find the sample code on GitHub in [`nosql-create-index-dotnet`](https://github.c
 - [Azure CLI](https://learn.microsoft.com/cli/azure/install-azure-cli) installed and signed in with `az login`.
 - [.NET 8.0 SDK](https://dotnet.microsoft.com/download/dotnet/8.0).
 - An Azure Cosmos DB for NoSQL account with vector search enabled.
-- Existing resources created by `azd up` or the shared Bicep deployment:
-  - database: `HotelsCreateIndex`
-  - containers: `hotels_diskann` and `hotels_quantizedflat`
-  - partition key path: `/Region`
-  - vector field path: `/embedding`
 - Microsoft Entra ID roles for your identity:
   - **Cosmos DB Built-in Data Contributor**
   - **Cognitive Services OpenAI User**
 - An Azure OpenAI resource with a `text-embedding-3-small` deployment.
 
-> [!NOTE]
-> **RBAC roles:** Data-plane RBAC role definitions and assignments are created by `azd up` via Bicep templates. You can also create them programmatically using the management SDK — see [`SqlResources.CreateUpdateSqlRoleDefinitionAsync`](https://learn.microsoft.com/dotnet/api/azure.resourcemanager.cosmosdb.sqlresources.createupdatesqlroledefinitionasync) (.NET) or [`SqlResourcesClient.BeginCreateUpdateSqlRoleDefinition`](https://pkg.go.dev/github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/cosmosdb/armcosmosdb#SqlResourcesClient.BeginCreateUpdateSqlRoleDefinition) (Go).
-
 > [!IMPORTANT]
-> This scenario is data-plane only. Do not add `CreateDatabaseIfNotExistsAsync`, `CreateContainerIfNotExistsAsync`, or any management-plane SDK calls. The sample expects the database and vector containers to already exist.
+> **Two Phases:**
+>
+> 1. **Control Plane (Goal 1):** The sample uses the ARM SDK with `DefaultAzureCredential` to create:
+>    - Database: `HotelsCreateIndex`
+>    - Containers: `hotels_diskann` (DiskANN index) and `hotels_quantizedflat` (QuantizedFlat index)
+>    - Partition key path: `/Region` (valid values: `Northeast`, `Midwest`, `South`, `West`)
+>    - Vector field path: `/embedding` (1536 dimensions, float32)
+>
+> 2. **Data Plane (Goal 2):** After containers are created, the sample:
+>    - Loads pre-vectorized hotel documents
+>    - Groups them by Region and upserts using transactional batches
+>    - Generates a query embedding with Azure OpenAI
+>    - Runs `VectorDistance()` queries with three distance functions: **Cosine**, **DotProduct**, and **Euclidean**
+>    - Displays rankings for each distance function to show how results differ
 
 ## Clone the repository
 
@@ -67,27 +73,30 @@ The sample expects the data file at: `./data/HotelsData_toCosmosDB_Vector_byRegi
    azd env get-values | ForEach-Object { if ($_ -match '^([^=]+)=["'']?(.+?)["'']?$') { [Environment]::SetEnvironmentVariable($matches[1], $matches[2]) } }
    ```
 
-   **Otherwise**, edit `appsettings.json` with values from the Azure portal:
+   **Otherwise**, edit `appsettings.json` with values from the Azure portal.
 
-   ```powershell
-   # Edit appsettings.json with your endpoint values
+2. Update `appsettings.json` with your values:
+
+   ```json
+   {
+     "CosmosDbSettings": {
+       "Endpoint": "https://<your-account>.documents.azure.com:443/",
+       "DatabaseName": "HotelsCreateIndex",
+       "ContainerName": "",
+       "PartitionKeyValue": "Northeast"
+     },
+     "OpenAiSettings": {
+       "Endpoint": "https://<your-openai-resource>.openai.azure.com/",
+       "Deployment": "text-embedding-3-small",
+       "ApiVersion": "2024-08-01-preview"
+     },
+     "VectorAlgorithm": "",
+     "EmbeddedField": "embedding",
+     "DataFilePath": "./data/HotelsData_toCosmosDB_Vector_byRegion.json"
+   }
    ```
 
-1. Update `appsettings.json` with your values:
-
-   ```dotenv
-   AZURE_COSMOSDB_ENDPOINT="https://<your-account>.documents.azure.com:443/"
-   AZURE_COSMOSDB_CREATE_INDEX_DATABASENAME="HotelsCreateIndex"
-   AZURE_COSMOSDB_CONTAINER_NAME=""
-   AZURE_OPENAI_EMBEDDING_ENDPOINT="https://<your-openai-resource>.openai.azure.com/"
-   AZURE_OPENAI_EMBEDDING_DEPLOYMENT="text-embedding-3-small"
-   AZURE_OPENAI_EMBEDDING_API_VERSION="2024-08-01-preview"
-   VECTOR_ALGORITHM=""
-   PARTITION_KEY_VALUE="Northeast"
-   DATA_FILE_WITH_VECTORS="./data/HotelsData_toCosmosDB_Vector_byRegion.json"
-   ```
-
-Leave `AZURE_COSMOSDB_CONTAINER_NAME` and `VECTOR_ALGORITHM` empty to run both containers. If you set `VECTOR_ALGORITHM`, use one of these values:
+Leave `ContainerName` and `VectorAlgorithm` empty to run both containers. If you set `VectorAlgorithm`, use one of these values:
 
 - `diskann`
 - `quantizedflat`
@@ -106,16 +115,28 @@ Run the sample:
 dotnet run --project .\nosql-create-index-dotnet.csproj
 ```
 
-The sample performs these steps:
+**What the sample does:**
 
-1. Loads configuration from `appsettings.json`.
-1. Authenticates with `DefaultAzureCredential`.
-1. Connects to the existing `HotelsCreateIndex` database and target containers.
-1. Reads `.\data\HotelsData_toCosmosDB_Vector_byRegion.json` by using `System.Text.Json`.
-1. Groups documents by `Region` and upserts one transactional batch per region.
-1. Generates a query embedding with the Azure OpenAI client.
-1. Runs `VectorDistance()` SQL queries filtered by `Region` and scoped with `QueryRequestOptions.PartitionKey`.
-1. Prints the top 5 matching hotels.
+The sample demonstrates both goals in sequence:
+
+**Goal 1 - Control Plane (create containers with vector indexes):**
+1. Loads configuration from `appsettings.json`
+2. Authenticates with `DefaultAzureCredential`
+3. Creates an Azure Resource Manager client
+4. Creates the `HotelsCreateIndex` database (if needed)
+5. Creates the `hotels_diskann` container with DiskANN vector index on `/embedding`
+6. Creates the `hotels_quantizedflat` container with QuantizedFlat vector index on `/embedding`
+
+**Goal 2 - Data Plane (load and query with distance functions):**
+1. Connects to the data plane SDK using `DefaultAzureCredential`
+2. Reads `./data/HotelsData_toCosmosDB_Vector_byRegion.json` using `System.Text.Json`
+3. Groups documents by `Region` and upserts one transactional batch per region
+4. Generates a query embedding with the Azure OpenAI client
+5. Runs **three separate** `VectorDistance()` SQL queries with different distance functions:
+   - **Cosine:** Measures angle between vectors (values: 0 to 2)
+   - **DotProduct:** Inner product of vectors (values: any real number)
+   - **Euclidean:** Straight-line distance between vectors (values: 0 to √6144)
+6. Prints the top 5 matching hotels for each distance function, showing how rankings differ
 
 ## Understand the project structure
 
@@ -137,22 +158,73 @@ nosql-create-index-dotnet/
 
 ## Key implementation details
 
-### Load configuration and validate target containers
+### Goal 1: Create containers using ARM SDK
 
-`Config.cs` loads configuration from `appsettings.json`, resolves the shared data file path, and validates the supported container names:
-
-```csharp
-var config = Config.Load();
-Config.Validate(config);
-var targetContainers = Config.TargetContainers(config);
-```
-
-### Connect with Microsoft Entra ID
-
-The sample passes `DefaultAzureCredential` directly to `CosmosClient` and `AzureOpenAIClient`:
+The control-plane module uses the ARM SDK with `DefaultAzureCredential` to create containers with vector policies. The `ArmClient` connects to the resource, database, and containers collection:
 
 ```csharp
 var credential = new DefaultAzureCredential();
+var armClient = new ArmClient(credential);
+
+// Get the resource and database
+var accountIdentifier = CosmosDBAccountResource.CreateResourceIdentifier(
+    config.SubscriptionId,
+    config.ResourceGroup,
+    config.AccountName);
+var accountResource = armClient.GetCosmosDBAccountResource(accountIdentifier);
+var account = await accountResource.GetAsync();
+var database = await account.Value.GetCosmosDBSqlDatabaseAsync(config.DatabaseName);
+var containers = database.Value.GetCosmosDBSqlContainers();
+
+// Build container definition with vector policies
+var containerDefinition = new CosmosDBSqlContainerCreateOrUpdateContent
+{
+    Resource = new CosmosDBSqlContainerResourceInfo(containerName)
+    {
+        PartitionKey = new CosmosDBContainerPartitionKey
+        {
+            Paths = { "/Region" },
+            Kind = CosmosDBPartitionKind.Hash
+        },
+        VectorEmbeddingPolicy = new CosmosDBVectorEmbeddingPolicy
+        {
+            VectorEmbeddings =
+            {
+                new CosmosDBVectorEmbedding
+                {
+                    Path = "/embedding",
+                    DataType = CosmosDBVectorDataType.Float32,
+                    Dimensions = config.ExpectedDimensions,
+                    DistanceFunction = CosmosDBVectorDistanceFunction.Cosine
+                }
+            }
+        },
+        IndexingPolicy = new CosmosDBIndexingPolicy
+        {
+            IsAutomatic = true,
+            IndexingMode = CosmosDBIndexingMode.Consistent,
+            IncludedPaths = { new CosmosDBIncludedPath { Path = "/*" } },
+            ExcludedPaths = { new CosmosDBExcludedPath { Path = "/_etag/?" } },
+            VectorIndexes =
+            {
+                new CosmosDBVectorIndex("/embedding", CosmosDBVectorIndexType.DiskAnn),
+                new CosmosDBVectorIndex("/embedding", CosmosDBVectorIndexType.QuantizedFlat)
+            }
+        }
+    }
+};
+
+// Create or update container
+await containers.CreateOrUpdateAsync(WaitUntil.Completed, containerName, containerDefinition);
+```
+
+### Goal 2: Load configuration and connect with Microsoft Entra ID
+
+Configuration is loaded from `appsettings.json` and `DefaultAzureCredential` is passed directly to both `CosmosClient` and `AzureOpenAIClient`:
+
+```csharp
+var credential = new DefaultAzureCredential();
+
 using var cosmosClient = new CosmosClient(
     config.CosmosEndpoint,
     credential,
@@ -165,10 +237,11 @@ var azureOpenAIClient = new AzureOpenAIClient(
 
 ### Insert documents into existing containers
 
-The sample adds `id` from `HotelId`, preserves `Region`, and upserts one transactional batch per `/Region` partition:
+The sample groups documents by Region and upserts one transactional batch per partition:
 
 ```csharp
 var documentsByRegion = DataPlane.GroupDocumentsByRegion(documents);
+
 foreach (var regionGroup in documentsByRegion)
 {
     var batch = container.CreateTransactionalBatch(new PartitionKey(regionGroup.Key));
@@ -181,18 +254,44 @@ foreach (var regionGroup in documentsByRegion)
 }
 ```
 
-### Run the vector similarity query
+### Run vector similarity queries with different distance functions
 
-The embedding field name is validated before it is interpolated into the query string. `VectorDistance()` has no `ORDER BY`, includes the distance function options object, and filters to a single `Region` partition:
+After inserting documents, the sample generates a query embedding and executes **three separate** SQL queries with different distance functions. Each uses a parameterized value for the embedding:
 
 ```csharp
-var query = new QueryDefinition(
-        $"SELECT TOP @topK c.HotelId, c.HotelName, c.Description, " +
-        $"VectorDistance(c.{embeddingFieldName}, @embedding, false, {{'distanceFunction': 'Cosine'}}) AS SimilarityScore " +
+// Generate query embedding
+var embeddingResponse = await azureOpenAIClient.GetEmbeddingsAsync(
+    new EmbeddingsOptions
+    {
+        Input = { queryText },
+        Dimensions = config.ExpectedDimensions
+    });
+var queryEmbedding = embeddingResponse.Value.Data[0].Embedding.ToList();
+
+// Query with each distance function
+string[] distanceFunctions = { "Cosine", "DotProduct", "Euclidean" };
+
+foreach (var distanceFunc in distanceFunctions)
+{
+    Console.WriteLine($"\n=== Query Results using {distanceFunc} ===");
+
+    var query = new QueryDefinition(
+        $"SELECT TOP 5 c.HotelId, c.HotelName, c.Description, " +
+        $"VectorDistance(c.embedding, @embedding, false, {{'distanceFunction': '{distanceFunc}'}}) AS SimilarityScore " +
         "FROM c WHERE c.Region = @partitionKey")
-    .WithParameter("@topK", 5)
-    .WithParameter("@embedding", queryEmbedding)
-    .WithParameter("@partitionKey", "Northeast");
+        .WithParameter("@embedding", queryEmbedding)
+        .WithParameter("@partitionKey", "Northeast");
+
+    var iterator = container.GetItemQueryIterator<HotelDocument>(query, requestOptions: new QueryRequestOptions { PartitionKey = new PartitionKey("Northeast") });
+
+    while (iterator.HasMoreResults)
+    {
+        foreach (var doc in await iterator.ReadNextAsync())
+        {
+            Console.WriteLine($"  {doc.HotelName} (score: {doc.SimilarityScore:F4})");
+        }
+    }
+}
 ```
 
 ## Example output
