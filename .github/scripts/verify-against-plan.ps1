@@ -182,9 +182,9 @@ function Test-AuthenticationPatterns {
         }
         
         if ($hasDefaultAzureCredential -and -not $hasForbiddenPattern) {
-            Write-Host "  ✓ $lang: Uses DefaultAzureCredential, no hardcoded keys" -ForegroundColor Green
+            Write-Host "  ✓ $($lang): Uses DefaultAzureCredential, no hardcoded keys" -ForegroundColor Green
         } else {
-            Write-Host "  ✗ $lang: Auth validation failed" -ForegroundColor Red
+            Write-Host "  ✗ $($lang): Auth validation failed" -ForegroundColor Red
             if (-not $hasDefaultAzureCredential) {
                 Write-Host "    - Missing DefaultAzureCredential usage" -ForegroundColor Red
             }
