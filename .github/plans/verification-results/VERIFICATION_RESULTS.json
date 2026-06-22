@@ -1,221 +1,221 @@
 {
-  "timestamp": "2026-06-22T03:03:39.4586534Z",
+  "plan_file": "C:\\project-dina-data-ai\\repos\\public-azuresamples-cosmos-db-vector-samples\\.github\\plans\\create-index-architecture.md",
   "languages": {
-    "go": {
-      "G2-2": {
-        "status": "NOT_TESTED"
-      },
-      "G2-4": {
-        "status": "NOT_TESTED"
-      },
-      "G2-3": {
-        "status": "NOT_TESTED"
-      },
-      "build_test": {
-        "output": "",
-        "status": "PENDING"
-      },
-      "G2-5": {
-        "status": "NOT_TESTED"
-      },
-      "G1-3": {
-        "status": "NOT_TESTED"
-      },
-      "G2-1": {
-        "status": "NOT_TESTED"
-      },
-      "goal_2": {},
-      "G1-1": {
-        "status": "NOT_TESTED"
-      },
-      "G1-2": {
-        "status": "NOT_TESTED"
-      },
-      "embedding_field_check": {
-        "reads_create_index_var": true,
-        "has_embedding_fallback": true,
-        "status": "PASS"
-      },
-      "goal_1": {},
-      "G1-4": {
-        "status": "NOT_TESTED"
-      }
-    },
     "dotnet": {
+      "G1-1": {
+        "status": "PASS"
+      },
+      "goal_2": {},
+      "G1-2": {
+        "status": "PASS"
+      },
+      "G1-4": {
+        "status": "PASS"
+      },
       "G2-2": {
         "status": "NOT_TESTED"
       },
-      "G2-4": {
-        "status": "NOT_TESTED"
-      },
-      "G2-3": {
-        "status": "NOT_TESTED"
-      },
-      "build_test": {
-        "output": "  Determining projects to restore...\r\n  All projects are up-to-date for restore.\r\n",
-        "status": "PASS"
-      },
-      "G2-5": {
-        "status": "NOT_TESTED"
+      "embedding_field_check": {
+        "status": "PASS",
+        "has_embedding_fallback": true,
+        "reads_create_index_var": true
       },
       "G1-3": {
         "status": "PASS"
       },
-      "auth_check": {
-        "uses_default_azure_credential": true,
-        "has_forbidden_patterns": [],
-        "status": "PASS"
+      "build_test": {
+        "status": "PASS",
+        "output": "  Determining projects to restore...\r\n  All projects are up-to-date for restore.\r\n"
       },
       "G2-1": {
         "status": "NOT_TESTED"
       },
-      "goal_2": {},
-      "G1-1": {
-        "status": "PASS"
-      },
-      "G1-2": {
-        "status": "PASS"
-      },
-      "embedding_field_check": {
-        "reads_create_index_var": true,
-        "has_embedding_fallback": true,
-        "status": "PASS"
-      },
       "goal_1": {},
-      "G1-4": {
-        "status": "PASS"
-      }
-    },
-    "typescript": {
-      "G2-2": {
-        "status": "NOT_TESTED"
-      },
-      "G2-4": {
-        "status": "NOT_TESTED"
-      },
-      "G2-3": {
-        "status": "NOT_TESTED"
-      },
-      "build_test": {
-        "output": "\r\n> nosql-create-index-typescript@1.0.0 test\r\n> vitest run\r\n\r\n\r\n\u001b[1m\u001b[46m RUN \u001b[49m\u001b[22m \u001b[36mv4.1.0 \u001b[39m\u001b[90mC:/project-dina-data-ai/repos/public-azuresamples-cosmos-db-vector-samples/nosql-create-index-typescript\u001b[39m\r\n\r\n\u001b[90mstdout\u001b[2m | test/live.integration.test.ts\u001b[2m > \u001b[22m\u001b[2mnosql-create-index-typescript live integration tests\u001b[2m > \u001b[22m\u001b[2mcreates a container with a vector index (live)\r\n\u001b[22m\u001b[39m\r\n=== Step 1: Create Container with Vector Index ===\r\n  Container:      hotels_diskann\r\n  Index type:     diskANN\r\n  Dimensions:     1536\r\n  Distance func:  cosine (queried with all 3 metrics)\r\n  Deleting existing container if present...\r\n\r\n\u001b[90mstdout\u001b[2m | test/live.integration.test.ts\u001b[2m > \u001b[22m\u001b[2mnosql-create-index-typescript live integration tests\u001b[2m > \u001b[22m\u001b[2mcreates a container with a vector index (live)\r\n\u001b[22m\u001b[39m  Deleted existing container\r\n\r\n\u001b[90mstdout\u001b[2m | test/live.integration.test.ts\u001b[2m > \u001b[22m\u001b[2mnosql-create-index-typescript live integration tests\u001b[2m > \u001b[22m\u001b[2mcreates a container with a vector index (live)\r\n\u001b[22m\u001b[39m  Created in 8.2s\r\n  Vector index is IMMUTABLE — cannot be changed after creation\r\n\r\n=== Step 1: Create Container with Vector Index ===\r\n  Container:      hotels_quantizedflat\r\n  Index type:     quantizedFlat\r\n  Dimensions:     1536\r\n  Distance func:  cosine (queried with all 3 metrics)\r\n  Deleting existing container if present...\r\n\r\n\u001b[90mstdout\u001b[2m | test/live.integration.test.ts\u001b[2m > \u001b[22m\u001b[2mnosql-create-index-typescript live integration tests\u001b[2m > \u001b[22m\u001b[2mcreates a container with a vector index (live)\r\n\u001b[22m\u001b[39m  Deleted existing container\r\n\r\n\u001b[90mstdout\u001b[2m | test/live.integration.test.ts\u001b[2m > \u001b[22m\u001b[2mnosql-create-index-typescript live integration tests\u001b[2m > \u001b[22m\u001b[2mcreates a container with a vector index (live)\r\n\u001b[22m\u001b[39m  Created in 7.8s\r\n  Vector index is IMMUTABLE — cannot be changed after creation\r\n\r\n\u001b[90mstdout\u001b[2m | test/live.integration.test.ts\u001b[2m > \u001b[22m\u001b[2mnosql-create-index-typescript live integration tests\u001b[2m > \u001b[22m\u001b[2minserts documents (live, hits Cosmos DB)\r\n\u001b[22m\u001b[39m\r\nReading JSON file from C:\\project-dina-data-ai\\repos\\public-azuresamples-cosmos-db-vector-samples\\data\\HotelsData_toCosmosDB_Vector.json\r\nLoaded 50 documents\r\n\r\n \u001b[31m❯\u001b[39m test/live.integration.test.ts \u001b[2m(\u001b[22m\u001b[2m6 tests\u001b[22m\u001b[2m | \u001b[22m\u001b[31m3 failed\u001b[39m\u001b[2m)\u001b[22m\u001b[33m 53335\u001b[2mms\u001b[22m\u001b[39m\r\n     \u001b[32m✓\u001b[39m loads config from env vars\u001b[32m 2\u001b[2mms\u001b[22m\u001b[39m\r\n     \u001b[32m✓\u001b[39m creates an ARM client\u001b[32m 0\u001b[2mms\u001b[22m\u001b[39m\r\n\u001b[31m     \u001b[31m×\u001b[31m creates a container with a vector index (live)\u001b[39m\u001b[33m 33768\u001b[2mms\u001b[22m\u001b[39m\r\n     \u001b[33m\u001b[2m✓\u001b[22m\u001b[39m verifies embedding dimensions (live, hits OpenAI) \u001b[33m 4369\u001b[2mms\u001b[22m\u001b[39m\r\n\u001b[31m     \u001b[31m×\u001b[31m inserts documents (live, hits Cosmos DB)\u001b[39m\u001b[33m 2887\u001b[2mms\u001b[22m\u001b[39m\r\n\u001b[31m     \u001b[31m×\u001b[31m runs a vector similarity query (live, hits OpenAI and Cosmos DB)\u001b[39m\u001b[32m 4\u001b[2mms\u001b[22m\u001b[39m\r\n\r\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯\r\n\r\n FAIL  test/live.integration.test.ts > nosql-create-index-typescript live integration tests > creates a container with a vector index (live)\r\nRestError: {\"code\":\"NotFound\",\"message\":\"Message: {\\\"code\\\":\\\"NotFound\\\",\\\"message\\\":\\\"Message: {\\\\\\\"Errors\\\\\\\":[\\\\\\\"Resource Not Found. Learn more: https://aka.ms/cosmosdb-tsg-not-found\\\\\\\"]}\\\\r\\\\nActivityId: 9ceabc10-1a78-41fa-9935-d8dc713ae82e, Request URI: /apps/c151a91b-28da-41c4-b204-243eb6914443/services/e15e2505-8488-4c50-a09a-7486a9e3c8db/partitions/f4a1ca56-9256-4f1b-9796-3c6ea851fd70/replicas/134261607293280905s, RequestStats: , SDK: Microsoft.Azure.Documents.Common/2.14.0\\\"}, Request URI: /dbs/HotelsCreateIndex/colls/hotels_diskann-vitest-mqomslbt-h2jzec, RequestStats: , SDK: Microsoft.Azure.Documents.Common/2.14.0\"}\r\n ❯ handleErrorResponse node_modules/@azure/core-client/src/deserializationPolicy.ts:255:16\r\n ❯ deserializeResponseBody node_modules/@azure/core-client/src/deserializationPolicy.ts:159:42\r\n\r\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯\r\n\r\n FAIL  test/live.integration.test.ts > nosql-create-index-typescript live integration tests > inserts documents (live, hits Cosmos DB)\r\nError: {\"code\":\"NotFound\",\"message\":\"Message: {\\\"Errors\\\":[\\\"Resource Not Found. Learn more: https://aka.ms/cosmosdb-tsg-not-found\\\"]}\\r\\nActivityId: c2e71a54-b0fa-4290-913c-18bfd71c5272, Request URI: /apps/c151a91b-28da-41c4-b204-243eb6914443/services/e15e2505-8488-4c50-a09a-7486a9e3c8db/partitions/f4a1ca56-9256-4f1b-9796-3c6ea851fd70/replicas/134261607338906834s, RequestStats: , SDK: Microsoft.Azure.Documents.Common/2.14.0\"}\r\nRequestUri: https://db-dib-cos-4bpmnkpp4662v4-eastus2.sql.cosmos.azure.com/dbs/HotelsCreateIndex/colls/hotels_diskann-vitest-mqomslbt-h2jzec;\r\nRequestMethod: GET;\r\nHeader: Authorization Length: 80;\r\nHeader: x-ms-date Length: 29;\r\nHeader: x-ms-activity-id Length: 36;\r\nHeader: Cache-Control Length: 8;\r\nHeader: User-Agent Length: 144;\r\nHeader: x-ms-cosmos-apitype Length: 3;\r\nHeader: x-ms-version Length: 10;\r\nHeader: x-ms-cosmos-sdk-supportedcapabilities Length: 1;\r\nHeader: Accept Length: 16;\r\nHeader: x-ms-gateway-signature Length: 82;\r\nHeader: x-ms-cosmos-compute-hop-count Length: 1;\r\nHeader: x-ms-gateway-use-mtls Length: 1;\r\n, Request URI: /dbs/HotelsCreateIndex/colls/hotels_diskann-vitest-mqomslbt-h2jzec, RequestStats: Microsoft.Azure.Cosmos.Tracing.TraceData.ClientSideRequestStatisticsTraceDatum, SDK: Windows/10.0.20348 cosmos-netstandard-sdk/3.18.0\r\n ❯ httpRequest node_modules/@azure/cosmos/src/request/RequestHandler.ts:151:41\r\n ❯ node_modules/@azure/cosmos/src/retry/retryUtility.ts:128:25\r\n ❯ addDiagnosticChild node_modules/@azure/cosmos/src/utils/diagnostics.ts:68:21\r\n ❯ addDiagnosticChild node_modules/@azure/cosmos/src/utils/diagnostics.ts:68:21\r\n ❯ ClientContext.queryFeed node_modules/@azure/cosmos/src/ClientContext.ts:287:21\r\n ❯ Array.fetchFunction node_modules/@azure/cosmos/src/client/Item/Items.ts:171:23\r\n ❯ addDiagnosticChild.queryMethodIdentifier node_modules/@azure/cosmos/src/queryExecutionContext/defaultQueryExecutionContext.ts:169:27\r\n ❯ addDiagnosticChild node_modules/@azure/cosmos/src/utils/diagnostics.ts:68:21\r\n ❯ QueryIterator.toArrayImplementation node_modules/@azure/cosmos/src/queryIterator.ts:330:19\r\n\r\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯\r\n\r\n FAIL  test/live.integration.test.ts > nosql-create-index-typescript live integration tests > runs a vector similarity query (live, hits OpenAI and Cosmos DB)\r\nTypeError: Cannot read properties of undefined (reading 'embeddingField')\r\n ❯ vectorQuery src/data-plane.ts:264:33\r\n    262|   config: SampleConfig\r\n    263| ) {\r\n    264|   const embeddingField = config.embeddingField;\r\n       |                                 ^\r\n    265|\r\n    266|   // Cosmos DB SQL does not support parameter placeholders for field n…\r\n ❯ test/live.integration.test.ts:172:26\r\n\r\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯\r\n\r\n\r\n\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[31m1 failed\u001b[39m\u001b[22m\u001b[90m (1)\u001b[39m\r\n\u001b[2m      Tests \u001b[22m \u001b[1m\u001b[31m3 failed\u001b[39m\u001b[22m\u001b[2m | \u001b[22m\u001b[1m\u001b[32m3 passed\u001b[39m\u001b[22m\u001b[90m (6)\u001b[39m\r\n\u001b[2m   Start at \u001b[22m 20:03:42\r\n\u001b[2m   Duration \u001b[22m 55.25s\u001b[2m (transform 88ms, setup 0ms, import 1.62s, tests 53.33s, environment 0ms)\u001b[22m\r\n\r\n",
-        "status": "FAIL"
-      },
       "G2-5": {
         "status": "NOT_TESTED"
       },
-      "G1-3": {
-        "status": "PASS"
-      },
       "auth_check": {
-        "uses_default_azure_credential": true,
+        "status": "PASS",
         "has_forbidden_patterns": [],
-        "status": "PASS"
+        "uses_default_azure_credential": true
       },
-      "G2-1": {
-        "status": "NOT_TESTED"
-      },
-      "goal_2": {},
-      "G1-1": {
-        "status": "PASS"
-      },
-      "G1-2": {
-        "status": "PASS"
-      },
-      "embedding_field_check": {
-        "reads_create_index_var": true,
-        "has_embedding_fallback": true,
-        "status": "PASS"
-      },
-      "goal_1": {},
-      "G1-4": {
-        "status": "PASS"
-      }
-    },
-    "java": {
-      "G2-2": {
+      "G2-3": {
         "status": "NOT_TESTED"
       },
       "G2-4": {
         "status": "NOT_TESTED"
+      }
+    },
+    "go": {
+      "G1-1": {
+        "status": "NOT_TESTED"
       },
-      "G2-3": {
+      "goal_2": {},
+      "G1-2": {
+        "status": "NOT_TESTED"
+      },
+      "G1-4": {
+        "status": "NOT_TESTED"
+      },
+      "G2-2": {
+        "status": "NOT_TESTED"
+      },
+      "embedding_field_check": {
+        "status": "PASS",
+        "has_embedding_fallback": true,
+        "reads_create_index_var": true
+      },
+      "G1-3": {
         "status": "NOT_TESTED"
       },
       "build_test": {
         "output": "",
         "status": "PENDING"
       },
-      "G2-5": {
-        "status": "NOT_TESTED"
-      },
-      "G1-3": {
-        "status": "NOT_TESTED"
-      },
       "G2-1": {
         "status": "NOT_TESTED"
       },
-      "goal_2": {},
-      "G1-1": {
-        "status": "NOT_TESTED"
-      },
-      "G1-2": {
-        "status": "NOT_TESTED"
-      },
-      "embedding_field_check": {
-        "reads_create_index_var": true,
-        "has_embedding_fallback": true,
-        "status": "PASS"
-      },
       "goal_1": {},
-      "G1-4": {
+      "G2-5": {
+        "status": "NOT_TESTED"
+      },
+      "G2-3": {
+        "status": "NOT_TESTED"
+      },
+      "G2-4": {
         "status": "NOT_TESTED"
       }
     },
     "python": {
+      "G1-1": {
+        "status": "PASS"
+      },
+      "goal_2": {},
+      "G1-2": {
+        "status": "PASS"
+      },
+      "G1-4": {
+        "status": "PASS"
+      },
       "G2-2": {
         "status": "FAIL"
       },
-      "G2-4": {
-        "status": "FAIL"
-      },
-      "G2-3": {
-        "status": "FAIL"
-      },
-      "build_test": {
-        "output": "============================= test session starts =============================\r\nplatform win32 -- Python 3.13.14, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\diberry\\AppData\\Local\\Programs\\Python\\Python313\\python.exe\r\ncachedir: .pytest_cache\r\nrootdir: C:\\project-dina-data-ai\\repos\\public-azuresamples-cosmos-db-vector-samples\r\nplugins: anyio-4.13.0, cov-7.1.0\r\ncollecting ... collected 5 items\r\n\r\nnosql-create-index-python/tests/test_config.py::ConfigTests::test_load_config_defaults_to_both_containers PASSED [ 20%]\r\nnosql-create-index-python/tests/test_config.py::ConfigTests::test_load_config_resolves_shared_data_file PASSED [ 40%]\r\nnosql-create-index-python/tests/test_config.py::ConfigTests::test_validate_config_accepts_single_algorithm PASSED [ 60%]\r\nnosql-create-index-python/tests/test_config.py::ConfigTests::test_validate_config_rejects_inconsistent_container_and_algorithm PASSED [ 80%]\r\nnosql-create-index-python/tests/test_config.py::ConfigTests::test_validate_config_rejects_missing_required_values PASSED [100%]\r\n\r\n============================== 5 passed in 0.07s ==============================\r\n",
-        "status": "PASS"
-      },
-      "G2-5": {
-        "status": "NOT_TESTED"
+      "embedding_field_check": {
+        "status": "PASS",
+        "has_embedding_fallback": true,
+        "reads_create_index_var": true
       },
       "G1-3": {
         "status": "PASS"
       },
-      "auth_check": {
-        "uses_default_azure_credential": true,
-        "has_forbidden_patterns": [],
-        "status": "PASS"
+      "build_test": {
+        "status": "PASS",
+        "output": "============================= test session starts =============================\r\nplatform win32 -- Python 3.13.14, pytest-9.0.3, pluggy-1.6.0 -- C:\\Users\\diberry\\AppData\\Local\\Programs\\Python\\Python313\\python.exe\r\ncachedir: .pytest_cache\r\nrootdir: C:\\project-dina-data-ai\\repos\\public-azuresamples-cosmos-db-vector-samples\r\nplugins: anyio-4.13.0, cov-7.1.0\r\ncollecting ... collected 5 items\r\n\r\nnosql-create-index-python/tests/test_config.py::ConfigTests::test_load_config_defaults_to_both_containers PASSED [ 20%]\r\nnosql-create-index-python/tests/test_config.py::ConfigTests::test_load_config_resolves_shared_data_file PASSED [ 40%]\r\nnosql-create-index-python/tests/test_config.py::ConfigTests::test_validate_config_accepts_single_algorithm PASSED [ 60%]\r\nnosql-create-index-python/tests/test_config.py::ConfigTests::test_validate_config_rejects_inconsistent_container_and_algorithm PASSED [ 80%]\r\nnosql-create-index-python/tests/test_config.py::ConfigTests::test_validate_config_rejects_missing_required_values PASSED [100%]\r\n\r\n============================== 5 passed in 0.20s ==============================\r\n"
       },
       "G2-1": {
         "status": "NOT_TESTED"
       },
+      "goal_1": {},
+      "G2-5": {
+        "status": "NOT_TESTED"
+      },
+      "auth_check": {
+        "status": "PASS",
+        "has_forbidden_patterns": [],
+        "uses_default_azure_credential": true
+      },
+      "G2-3": {
+        "status": "FAIL"
+      },
+      "G2-4": {
+        "status": "FAIL"
+      }
+    },
+    "java": {
+      "G1-1": {
+        "status": "NOT_TESTED"
+      },
       "goal_2": {},
+      "G1-2": {
+        "status": "NOT_TESTED"
+      },
+      "G1-4": {
+        "status": "NOT_TESTED"
+      },
+      "G2-2": {
+        "status": "NOT_TESTED"
+      },
+      "embedding_field_check": {
+        "status": "PASS",
+        "has_embedding_fallback": true,
+        "reads_create_index_var": true
+      },
+      "G1-3": {
+        "status": "NOT_TESTED"
+      },
+      "build_test": {
+        "output": "",
+        "status": "PENDING"
+      },
+      "G2-1": {
+        "status": "NOT_TESTED"
+      },
+      "goal_1": {},
+      "G2-5": {
+        "status": "NOT_TESTED"
+      },
+      "G2-3": {
+        "status": "NOT_TESTED"
+      },
+      "G2-4": {
+        "status": "NOT_TESTED"
+      }
+    },
+    "typescript": {
       "G1-1": {
         "status": "PASS"
       },
+      "goal_2": {},
       "G1-2": {
         "status": "PASS"
       },
-      "embedding_field_check": {
-        "reads_create_index_var": true,
-        "has_embedding_fallback": true,
-        "status": "PASS"
-      },
-      "goal_1": {},
       "G1-4": {
         "status": "PASS"
+      },
+      "G2-2": {
+        "status": "NOT_TESTED"
+      },
+      "embedding_field_check": {
+        "status": "PASS",
+        "has_embedding_fallback": true,
+        "reads_create_index_var": true
+      },
+      "G1-3": {
+        "status": "PASS"
+      },
+      "build_test": {
+        "status": "FAIL",
+        "output": "\r\n> nosql-create-index-typescript@1.0.0 test\r\n> vitest run\r\n\r\n\r\n\u001b[1m\u001b[46m RUN \u001b[49m\u001b[22m \u001b[36mv4.1.0 \u001b[39m\u001b[90mC:/project-dina-data-ai/repos/public-azuresamples-cosmos-db-vector-samples/nosql-create-index-typescript\u001b[39m\r\n\r\n\u001b[90mstdout\u001b[2m | test/live.integration.test.ts\u001b[2m > \u001b[22m\u001b[2mnosql-create-index-typescript live integration tests\u001b[2m > \u001b[22m\u001b[2mcreates a container with a vector index (live)\r\n\u001b[22m\u001b[39m\r\n=== Step 1: Create Container with Vector Index ===\r\n  Container:      hotels_diskann\r\n  Index type:     diskANN\r\n  Dimensions:     1536\r\n  Distance func:  cosine (queried with all 3 metrics)\r\n  Deleting existing container if present...\r\n\r\n\u001b[90mstdout\u001b[2m | test/live.integration.test.ts\u001b[2m > \u001b[22m\u001b[2mnosql-create-index-typescript live integration tests\u001b[2m > \u001b[22m\u001b[2mcreates a container with a vector index (live)\r\n\u001b[22m\u001b[39m  Deleted existing container\r\n\r\n\u001b[90mstdout\u001b[2m | test/live.integration.test.ts\u001b[2m > \u001b[22m\u001b[2mnosql-create-index-typescript live integration tests\u001b[2m > \u001b[22m\u001b[2mcreates a container with a vector index (live)\r\n\u001b[22m\u001b[39m  Created in 8.0s\r\n  Vector index is IMMUTABLE — cannot be changed after creation\r\n\r\n=== Step 1: Create Container with Vector Index ===\r\n  Container:      hotels_quantizedflat\r\n  Index type:     quantizedFlat\r\n  Dimensions:     1536\r\n  Distance func:  cosine (queried with all 3 metrics)\r\n  Deleting existing container if present...\r\n\r\n\u001b[90mstdout\u001b[2m | test/live.integration.test.ts\u001b[2m > \u001b[22m\u001b[2mnosql-create-index-typescript live integration tests\u001b[2m > \u001b[22m\u001b[2mcreates a container with a vector index (live)\r\n\u001b[22m\u001b[39m  Deleted existing container\r\n\r\n\u001b[90mstdout\u001b[2m | test/live.integration.test.ts\u001b[2m > \u001b[22m\u001b[2mnosql-create-index-typescript live integration tests\u001b[2m > \u001b[22m\u001b[2mcreates a container with a vector index (live)\r\n\u001b[22m\u001b[39m  Created in 8.4s\r\n  Vector index is IMMUTABLE — cannot be changed after creation\r\n\r\n\u001b[90mstdout\u001b[2m | test/live.integration.test.ts\u001b[2m > \u001b[22m\u001b[2mnosql-create-index-typescript live integration tests\u001b[2m > \u001b[22m\u001b[2minserts documents (live, hits Cosmos DB)\r\n\u001b[22m\u001b[39m\r\nReading JSON file from C:\\project-dina-data-ai\\repos\\public-azuresamples-cosmos-db-vector-samples\\data\\HotelsData_toCosmosDB_Vector.json\r\nLoaded 50 documents\r\n\r\n \u001b[31m❯\u001b[39m test/live.integration.test.ts \u001b[2m(\u001b[22m\u001b[2m6 tests\u001b[22m\u001b[2m | \u001b[22m\u001b[31m3 failed\u001b[39m\u001b[2m)\u001b[22m\u001b[33m 59248\u001b[2mms\u001b[22m\u001b[39m\r\n     \u001b[32m✓\u001b[39m loads config from env vars\u001b[32m 2\u001b[2mms\u001b[22m\u001b[39m\r\n     \u001b[32m✓\u001b[39m creates an ARM client\u001b[32m 0\u001b[2mms\u001b[22m\u001b[39m\r\n\u001b[31m     \u001b[31m×\u001b[31m creates a container with a vector index (live)\u001b[39m\u001b[33m 37279\u001b[2mms\u001b[22m\u001b[39m\r\n     \u001b[33m\u001b[2m✓\u001b[22m\u001b[39m verifies embedding dimensions (live, hits OpenAI) \u001b[33m 5126\u001b[2mms\u001b[22m\u001b[39m\r\n\u001b[31m     \u001b[31m×\u001b[31m inserts documents (live, hits Cosmos DB)\u001b[39m\u001b[33m 4572\u001b[2mms\u001b[22m\u001b[39m\r\n\u001b[31m     \u001b[31m×\u001b[31m runs a vector similarity query (live, hits OpenAI and Cosmos DB)\u001b[39m\u001b[32m 4\u001b[2mms\u001b[22m\u001b[39m\r\n\r\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯\r\n\r\n FAIL  test/live.integration.test.ts > nosql-create-index-typescript live integration tests > creates a container with a vector index (live)\r\nRestError: {\"code\":\"NotFound\",\"message\":\"Message: {\\\"code\\\":\\\"NotFound\\\",\\\"message\\\":\\\"Message: {\\\\\\\"Errors\\\\\\\":[\\\\\\\"Resource Not Found. Learn more: https://aka.ms/cosmosdb-tsg-not-found\\\\\\\"]}\\\\r\\\\nActivityId: 98be8ada-66c7-497b-b3d9-cdd23c22b498, Request URI: /apps/c151a91b-28da-41c4-b204-243eb6914443/services/e15e2505-8488-4c50-a09a-7486a9e3c8db/partitions/f4a1ca56-9256-4f1b-9796-3c6ea851fd70/replicas/134261607338906834s, RequestStats: , SDK: Microsoft.Azure.Documents.Common/2.14.0\\\"}, Request URI: /dbs/HotelsCreateIndex/colls/hotels_diskann-vitest-mqpg62k5-htljun, RequestStats: , SDK: Microsoft.Azure.Documents.Common/2.14.0\"}\r\n ❯ handleErrorResponse node_modules/@azure/core-client/src/deserializationPolicy.ts:255:16\r\n ❯ deserializeResponseBody node_modules/@azure/core-client/src/deserializationPolicy.ts:159:42\r\n\r\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯\r\n\r\n FAIL  test/live.integration.test.ts > nosql-create-index-typescript live integration tests > inserts documents (live, hits Cosmos DB)\r\nError: {\"code\":\"NotFound\",\"message\":\"Message: {\\\"Errors\\\":[\\\"Resource Not Found. Learn more: https://aka.ms/cosmosdb-tsg-not-found\\\"]}\\r\\nActivityId: dbd6c863-df0a-451b-8485-609bafd3de51, Request URI: /apps/c151a91b-28da-41c4-b204-243eb6914443/services/e15e2505-8488-4c50-a09a-7486a9e3c8db/partitions/f4a1ca56-9256-4f1b-9796-3c6ea851fd70/replicas/134261607338906832s, RequestStats: , SDK: Microsoft.Azure.Documents.Common/2.14.0\"}\r\nRequestUri: https://db-dib-cos-4bpmnkpp4662v4-eastus2.sql.cosmos.azure.com/dbs/HotelsCreateIndex/colls/hotels_diskann-vitest-mqpg62k5-htljun;\r\nRequestMethod: GET;\r\nHeader: Authorization Length: 80;\r\nHeader: x-ms-date Length: 29;\r\nHeader: x-ms-activity-id Length: 36;\r\nHeader: Cache-Control Length: 8;\r\nHeader: User-Agent Length: 144;\r\nHeader: x-ms-cosmos-apitype Length: 3;\r\nHeader: x-ms-version Length: 10;\r\nHeader: x-ms-cosmos-sdk-supportedcapabilities Length: 1;\r\nHeader: Accept Length: 16;\r\nHeader: x-ms-gateway-signature Length: 86;\r\nHeader: x-ms-cosmos-compute-hop-count Length: 1;\r\nHeader: x-ms-gateway-use-mtls Length: 1;\r\n, Request URI: /dbs/HotelsCreateIndex/colls/hotels_diskann-vitest-mqpg62k5-htljun, RequestStats: Microsoft.Azure.Cosmos.Tracing.TraceData.ClientSideRequestStatisticsTraceDatum, SDK: Windows/10.0.20348 cosmos-netstandard-sdk/3.18.0\r\n ❯ httpRequest node_modules/@azure/cosmos/src/request/RequestHandler.ts:151:41\r\n ❯ node_modules/@azure/cosmos/src/retry/retryUtility.ts:128:25\r\n ❯ addDiagnosticChild node_modules/@azure/cosmos/src/utils/diagnostics.ts:68:21\r\n ❯ addDiagnosticChild node_modules/@azure/cosmos/src/utils/diagnostics.ts:68:21\r\n ❯ ClientContext.queryFeed node_modules/@azure/cosmos/src/ClientContext.ts:287:21\r\n ❯ Array.fetchFunction node_modules/@azure/cosmos/src/client/Item/Items.ts:171:23\r\n ❯ addDiagnosticChild.queryMethodIdentifier node_modules/@azure/cosmos/src/queryExecutionContext/defaultQueryExecutionContext.ts:169:27\r\n ❯ addDiagnosticChild node_modules/@azure/cosmos/src/utils/diagnostics.ts:68:21\r\n ❯ QueryIterator.toArrayImplementation node_modules/@azure/cosmos/src/queryIterator.ts:330:19\r\n\r\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯\r\n\r\n FAIL  test/live.integration.test.ts > nosql-create-index-typescript live integration tests > runs a vector similarity query (live, hits OpenAI and Cosmos DB)\r\nTypeError: Cannot read properties of undefined (reading 'embeddingField')\r\n ❯ vectorQuery src/data-plane.ts:264:33\r\n    262|   config: SampleConfig\r\n    263| ) {\r\n    264|   const embeddingField = config.embeddingField;\r\n       |                                 ^\r\n    265|\r\n    266|   // Cosmos DB SQL does not support parameter placeholders for field n…\r\n ❯ test/live.integration.test.ts:172:26\r\n\r\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯\r\n\r\n\r\n\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[31m1 failed\u001b[39m\u001b[22m\u001b[90m (1)\u001b[39m\r\n\u001b[2m      Tests \u001b[22m \u001b[1m\u001b[31m3 failed\u001b[39m\u001b[22m\u001b[2m | \u001b[22m\u001b[1m\u001b[32m3 passed\u001b[39m\u001b[22m\u001b[90m (6)\u001b[39m\r\n\u001b[2m   Start at \u001b[22m 09:45:58\r\n\u001b[2m   Duration \u001b[22m 62.66s\u001b[2m (transform 198ms, setup 0ms, import 3.00s, tests 59.25s, environment 0ms)\u001b[22m\r\n\r\n"
+      },
+      "G2-1": {
+        "status": "NOT_TESTED"
+      },
+      "goal_1": {},
+      "G2-5": {
+        "status": "NOT_TESTED"
+      },
+      "auth_check": {
+        "status": "PASS",
+        "has_forbidden_patterns": [],
+        "uses_default_azure_credential": true
+      },
+      "G2-3": {
+        "status": "NOT_TESTED"
+      },
+      "G2-4": {
+        "status": "NOT_TESTED"
       }
     }
   },
-  "plan_file": "C:\\project-dina-data-ai\\repos\\public-azuresamples-cosmos-db-vector-samples\\.github\\plans\\create-index-architecture.md"
+  "timestamp": "2026-06-22T16:45:52.3096747Z"
 }

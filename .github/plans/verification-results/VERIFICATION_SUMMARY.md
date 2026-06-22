@@ -1,15 +1,15 @@
 # CREATE-INDEX VERIFICATION REPORT
-Generated: 06/21/2026 20:04:40
+Generated: 06/22/2026 09:47:04
 
 ## AUTHENTICATION
 Verify: All samples use DefaultAzureCredential, no hardcoded keys
 ### dotnet
 [OK] Auth check - PASS
 
-### typescript
+### python
 [OK] Auth check - PASS
 
-### python
+### typescript
 [OK] Auth check - PASS
 
 ## GOAL 1: ARM SDK Control Plane
