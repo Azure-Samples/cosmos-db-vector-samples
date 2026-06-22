@@ -668,17 +668,21 @@ diff <(python output.txt) <(go output.txt)
 |----------|---------|---------|-------------------|----------------------|--------|
 | **Python** | `azure-mgmt-cosmosdb` | (latest) | ✅ Complete | ✅ Complete | **VERIFIED** |
 | **TypeScript** | `@azure/arm-cosmosdb` | (latest) | ✅ Complete | ✅ Complete | **VERIFIED** |
-| **Go** | `armcosmos` | **v3.4.0** (typed SDK) | ✅ In Progress | ✅ In Progress | **IN PROGRESS** — Using typed SDK with fluent API |
-| **Java** | `azure-resourcemanager-cosmos` | (latest) | ❌ TODO | ❌ TODO | **TODO** — Implement using typed SDK pattern |
+| **Go** | `armcosmos` | **v3.4.0** (typed SDK) | ✅ Complete | ✅ Complete | **VERIFIED** |
+| **Java** | `azure-resourcemanager-cosmos` | **2.48.0+** (typed SDK) | ❌ Blocked | ❌ Blocked | **BLOCKED** — SDK API incompatibility; `sqlResources()` method not available |
 | **.NET** | `Azure.ResourceManager.CosmosDB` | (latest) | ✅ Complete | ✅ Complete | **VERIFIED** |
 
 **Critical Architecture Decision (2026-06-22):** 
 - All implementations MUST use **typed fluent SDKs**, NOT raw REST API
-- **Go:** Upgrading from `armcosmos v1.0.0` (no vector support) → `armcosmos v3.4.0` (full typed support)
+- **Go:** Upgraded from `armcosmos v1.0.0` (no vector support) → `armcosmos v3.4.0` (full typed support)
   - Uses `BeginCreateUpdateSQLContainer()` with `VectorEmbeddingPolicy`, `VectorIndexType` enums
   - Uses `.PollUntilDone()` for async container creation
-  - Matches Abhishek's recommended pattern (see example in research/go-arm-sdk-comparison.md)
-- **Java:** Will follow same typed SDK pattern as Go (not REST API)
+  - Matches Abhishek's recommended pattern
+  - **Status:** ✅ COMPLETE & VERIFIED (2026-06-22)
+- **Java:** Attempted typed SDK pattern using `azure-resourcemanager-cosmos:2.48.0`
+  - API surface incompatibility: `sqlResources()` method not found on `CosmosManager`
+  - Requires research into alternative Java SDK versions or REST-based approach
+  - **Status:** ❌ BLOCKED pending SDK investigation
 
 **Goal 2: Data Plane Implementation (Distance Functions Across All 5 SDKs)**
 

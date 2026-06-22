@@ -12,6 +12,7 @@ public final class Config {
     private static final List<String> TARGET_CONTAINERS = List.of("hotels_diskann", "hotels_quantizedflat");
 
     private static final String DEFAULT_DATABASE_NAME = "HotelsCreateIndex";
+    private static final String DEFAULT_LOCATION = "West US 3";
     private static final String DEFAULT_API_VERSION = "2024-08-01-preview";
     private static final String DEFAULT_QUERY_TEXT = "hotel near the ocean";
     private static final String DEFAULT_DATA_FILE = "./data/HotelsData_toCosmosDB_Vector_byRegion.json";
@@ -25,6 +26,7 @@ public final class Config {
     public static SampleConfig load() {
         String databaseName = read("AZURE_COSMOSDB_CREATE_INDEX_DATABASENAME", DEFAULT_DATABASE_NAME);
         String containerName = read("AZURE_COSMOSDB_CONTAINER_NAME", null);
+        String location = read("AZURE_LOCATION", DEFAULT_LOCATION);
         String vectorAlgorithm = read("VECTOR_ALGORITHM", null);
         if (vectorAlgorithm != null) {
             vectorAlgorithm = vectorAlgorithm.toLowerCase();
@@ -40,6 +42,7 @@ public final class Config {
                 read("AZURE_COSMOSDB_ENDPOINT", null),
                 databaseName,
                 containerName,
+                location,
                 read("AZURE_OPENAI_EMBEDDING_ENDPOINT", null),
                 read("AZURE_OPENAI_EMBEDDING_DEPLOYMENT", null),
                 read("AZURE_OPENAI_EMBEDDING_API_VERSION", DEFAULT_API_VERSION),
@@ -56,6 +59,7 @@ public final class Config {
         StringBuilder missing = new StringBuilder();
         appendMissing(missing, "AZURE_COSMOSDB_ENDPOINT", config.cosmosEndpoint());
         appendMissing(missing, "AZURE_COSMOSDB_DATABASENAME", config.databaseName());
+        appendMissing(missing, "AZURE_LOCATION", config.location());
         appendMissing(missing, "AZURE_OPENAI_EMBEDDING_ENDPOINT", config.openAiEmbeddingEndpoint());
         appendMissing(missing, "AZURE_OPENAI_EMBEDDING_DEPLOYMENT", config.openAiEmbeddingDeployment());
 
@@ -127,6 +131,7 @@ record SampleConfig(
         String cosmosEndpoint,
         String databaseName,
         String containerName,
+        String location,
         String openAiEmbeddingEndpoint,
         String openAiEmbeddingDeployment,
         String openAiEmbeddingApiVersion,

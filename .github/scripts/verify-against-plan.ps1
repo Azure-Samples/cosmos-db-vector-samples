@@ -131,6 +131,18 @@ function Test-AuthenticationPatterns {
             shouldHave = @("DefaultAzureCredential", "from @azure/identity")
             shouldNotHave = @("COSMOS_KEY", "OPENAI_KEY", "password", "apiKey", "secretKey")
         }
+        go = @{
+            path = "nosql-create-index-go"
+            filePattern = "*.go"
+            shouldHave = @("DefaultAzureCredential", "azidentity")
+            shouldNotHave = @("cosmosKey", "openAiKey", "password", "apiKey", "secretKey")
+        }
+        java = @{
+            path = "nosql-create-index-java/src"
+            filePattern = "*.java"
+            shouldHave = @("DefaultAzureCredential", "azure.identity")
+            shouldNotHave = @("COSMOS_KEY", "OPENAI_KEY", "password", "apiKey", "secretKey")
+        }
         dotnet = @{
             path = "nosql-create-index-dotnet/src"
             filePattern = "*.cs"
@@ -351,6 +363,76 @@ function Test-TypeScript {
     }
 }
 
+function Test-Go {
+    param([hashtable]$Results)
+    
+    Write-Host "Testing Go implementation..." -ForegroundColor Cyan
+    $goDir = Join-Path $RepoRoot "nosql-create-index-go"
+    
+    # Check if go exists
+    $hasGo = go version 2>&1 | Select-String "go version"
+    
+    if ($hasGo) {
+        Write-Host "  Running: go build" -ForegroundColor Gray
+        Push-Location $goDir
+        $buildOutput = go build 2>&1
+        $buildResult = $LASTEXITCODE -eq 0
+        Pop-Location
+        
+        $Results["go"]["build_test"]["status"] = if ($buildResult) { "PASS" } else { "FAIL" }
+        $Results["go"]["build_test"]["output"] = $buildOutput | Out-String
+    } else {
+        Write-Host "  go not found, skipping tests" -ForegroundColor Yellow
+        $Results["go"]["build_test"]["status"] = "SKIPPED"
+    }
+    
+    # Code inspection for Goal 1
+    $controlPlaneFile = Join-Path $goDir "controlplane.go"
+    if (Test-Path $controlPlaneFile) {
+        $content = Get-Content $controlPlaneFile -Raw
+        
+        $Results["go"]["G1-1"]["status"] = if ($content -match "/Region") { "PASS" } else { "FAIL" }
+        $Results["go"]["G1-2"]["status"] = if ($content -match "VectorIndexTypeDiskANN|DiskANN") { "PASS" } else { "FAIL" }
+        $Results["go"]["G1-3"]["status"] = if ($content -match "VectorIndexTypeQuantizedFlat|QuantizedFlat") { "PASS" } else { "FAIL" }
+        $Results["go"]["G1-4"]["status"] = if ($content -match 'int32\(1536\)|1536') { "PASS" } else { "FAIL" }
+    }
+}
+
+function Test-Java {
+    param([hashtable]$Results)
+    
+    Write-Host "Testing Java implementation..." -ForegroundColor Cyan
+    $javaDir = Join-Path $RepoRoot "nosql-create-index-java"
+    
+    # Check if mvn exists
+    $hasMvn = mvn --version 2>&1 | Select-String "Apache Maven"
+    
+    if ($hasMvn) {
+        Write-Host "  Running: mvn clean compile" -ForegroundColor Gray
+        Push-Location $javaDir
+        $buildOutput = mvn clean compile 2>&1
+        $buildResult = $LASTEXITCODE -eq 0
+        Pop-Location
+        
+        $Results["java"]["build_test"]["status"] = if ($buildResult) { "PASS" } else { "FAIL" }
+        $Results["java"]["build_test"]["output"] = $buildOutput | Out-String
+    } else {
+        Write-Host "  mvn not found, skipping tests" -ForegroundColor Yellow
+        $Results["java"]["build_test"]["status"] = "SKIPPED"
+    }
+    
+    # Code inspection for Goal 1
+    $controlPlaneFile = Join-Path $javaDir "src/main/java/com/azure/cosmos/createindex/ControlPlane.java"
+    if (Test-Path $controlPlaneFile) {
+        $content = Get-Content $controlPlaneFile -Raw
+        
+        $Results["java"]["G1-1"]["status"] = if ($content -match '"/Region"') { "PASS" } else { "FAIL" }
+        $Results["java"]["G1-2"]["status"] = if ($content -match "VectorIndexType\.DISK_ANN|DISK_ANN") { "PASS" } else { "FAIL" }
+        $Results["java"]["G1-3"]["status"] = if ($content -match "VectorIndexType\.QUANTIZED_FLAT|QUANTIZED_FLAT") { "PASS" } else { "FAIL" }
+        $Results["java"]["G1-4"]["status"] = if ($content -match '1536') { "PASS" } else { "FAIL" }
+    }
+}
+
 function Test-DotNet {
     param([hashtable]$Results)
     
@@ -429,6 +511,12 @@ if ($LanguagesToTest -match "python") {
 }
 if ($LanguagesToTest -match "typescript") {
     Test-TypeScript -Results $results.languages
+}
+if ($LanguagesToTest -match "go") {
+    Test-Go -Results $results.languages
+}
+if ($LanguagesToTest -match "java") {
+    Test-Java -Results $results.languages
 }
 if ($LanguagesToTest -match "dotnet") {
     Test-DotNet -Results $results.languages
