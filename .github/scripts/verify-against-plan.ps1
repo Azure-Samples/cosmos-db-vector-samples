@@ -196,6 +196,60 @@ function Test-AuthenticationPatterns {
 }
 
 # ==============================================================================
+# EMBEDDING FIELD ENVIRONMENT VARIABLE VALIDATION
+# ==============================================================================
+
+function Test-EmbeddingFieldEnvVars {
+    param([hashtable]$Results)
+    
+    Write-Host "`nValidating embedding field environment variable usage..." -ForegroundColor Cyan
+    
+    $configFiles = @{
+        python = "nosql-create-index-python/src/config.py"
+        typescript = "nosql-create-index-typescript/src/config.ts"
+        go = "nosql-create-index-go/config.go"
+        java = "nosql-create-index-java/src/main/java/com/azure/cosmos/createindex/Config.java"
+        dotnet = "nosql-create-index-dotnet/src/Config.cs"
+    }
+    
+    foreach ($lang in $configFiles.Keys) {
+        $configPath = Join-Path $RepoRoot $configFiles[$lang]
+        
+        if (-not (Test-Path $configPath)) {
+            Write-Host "  ⚠ Skipping $lang — config file not found at $configPath" -ForegroundColor Yellow
+            $Results.languages[$lang]["embedding_field_check"] = @{ status = "SKIPPED" }
+            continue
+        }
+        
+        $content = Get-Content $configPath -Raw
+        $readsCreateIndexEmbeddedField = $content -match "AZURE_COSMOSDB_CREATE_INDEX_EMBEDDED_FIELD"
+        $hasEmbeddingDefault = $content -match '"embedding"' -or $content -match "'embedding'"
+        
+        if ($readsCreateIndexEmbeddedField -and $hasEmbeddingDefault) {
+            $Results.languages[$lang]["embedding_field_check"] = @{
+                status = "PASS"
+                reads_create_index_var = $true
+                has_embedding_fallback = $true
+            }
+            Write-Host "  ✓ $($lang): Reads AZURE_COSMOSDB_CREATE_INDEX_EMBEDDED_FIELD with 'embedding' fallback" -ForegroundColor Green
+        } elseif ($readsCreateIndexEmbeddedField) {
+            $Results.languages[$lang]["embedding_field_check"] = @{
+                status = "PASS"
+                reads_create_index_var = $true
+                has_embedding_fallback = $false
+            }
+            Write-Host "  ✓ $($lang): Reads AZURE_COSMOSDB_CREATE_INDEX_EMBEDDED_FIELD (no hardcoding)" -ForegroundColor Green
+        } else {
+            $Results.languages[$lang]["embedding_field_check"] = @{
+                status = "FAIL"
+                reads_create_index_var = $false
+            }
+            Write-Host "  ✗ $($lang): Does NOT read AZURE_COSMOSDB_CREATE_INDEX_EMBEDDED_FIELD" -ForegroundColor Red
+        }
+    }
+}
+
+# ==============================================================================
 # LANGUAGE-SPECIFIC TEST RUNNERS
 # ==============================================================================
 
@@ -382,6 +436,9 @@ if ($LanguagesToTest -match "dotnet") {
 
 # Validate authentication patterns
 Test-AuthenticationPatterns -Results $results
+
+# Validate embedding field environment variable usage
+Test-EmbeddingFieldEnvVars -Results $results
 
 # ==============================================================================
 # GENERATE RESULTS
