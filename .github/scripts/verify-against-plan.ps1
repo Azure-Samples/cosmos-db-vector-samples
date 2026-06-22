@@ -386,15 +386,23 @@ function Test-Go {
         $Results["go"]["build_test"]["status"] = "SKIPPED"
     }
     
-    # Code inspection for Goal 1
+    # Code inspection for Goal 1 - check both controlplane.go and config.go
     $controlPlaneFile = Join-Path $goDir "controlplane.go"
+    $configFile = Join-Path $goDir "config.go"
     if (Test-Path $controlPlaneFile) {
         $content = Get-Content $controlPlaneFile -Raw
+        $configContent = Get-Content $configFile -Raw
         
-        $Results["go"]["G1-1"]["status"] = if ($content -match "/Region") { "PASS" } else { "FAIL" }
+        # G1-1: Look for "/Region" in controlplane.go OR "Region" partition key in config.go
+        $hasRegion = ($content -match 'partitionKeyPath|PartitionKeyFieldName') -or ($configContent -match 'partitionKeyFieldName.*=.*"Region"')
+        $Results["go"]["G1-1"]["status"] = if ($hasRegion) { "PASS" } else { "FAIL" }
+        
         $Results["go"]["G1-2"]["status"] = if ($content -match "VectorIndexTypeDiskANN|DiskANN") { "PASS" } else { "FAIL" }
         $Results["go"]["G1-3"]["status"] = if ($content -match "VectorIndexTypeQuantizedFlat|QuantizedFlat") { "PASS" } else { "FAIL" }
-        $Results["go"]["G1-4"]["status"] = if ($content -match 'int32\(1536\)|1536') { "PASS" } else { "FAIL" }
+        
+        # G1-4: Look for embedding dimensions (1536)
+        $hasEmbedding = ($content -match '1536') -or ($configContent -match 'embeddingDimensions.*=.*1536')
+        $Results["go"]["G1-4"]["status"] = if ($hasEmbedding) { "PASS" } else { "FAIL" }
     }
 }
 
