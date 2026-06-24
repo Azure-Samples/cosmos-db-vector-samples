@@ -1,0 +1,1201 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "_generator": {
+      "name": "bicep",
+      "version": "0.42.1.51946",
+      "templateHash": "13451566095277367724"
+    },
+    "description": "Create database accounts."
+  },
+  "parameters": {
+    "accountName": {
+      "type": "string"
+    },
+    "location": {
+      "type": "string",
+      "defaultValue": "[resourceGroup().location]"
+    },
+    "tags": {
+      "type": "object",
+      "defaultValue": {}
+    },
+    "managedIdentityPrincipalId": {
+      "type": "string"
+    },
+    "deploymentUserPrincipalId": {
+      "type": "string",
+      "defaultValue": ""
+    },
+    "databaseName": {
+      "type": "string"
+    },
+    "createIndexDatabaseName": {
+      "type": "string",
+      "defaultValue": ""
+    }
+  },
+  "variables": {
+    "database": {
+      "name": "[parameters('databaseName')]"
+    },
+    "vectorSearchContainerDefinitions": [
+      {
+        "name": "hotels_diskann",
+        "partitionKeyPaths": [
+          "/HotelId"
+        ],
+        "indexingPolicy": {
+          "indexingMode": "consistent",
+          "automatic": true,
+          "includedPaths": [
+            {
+              "path": "/*"
+            }
+          ],
+          "excludedPaths": [
+            {
+              "path": "/_etag/?"
+            }
+          ],
+          "vectorIndexes": [
+            {
+              "path": "/DescriptionVector",
+              "type": "diskANN"
+            }
+          ]
+        },
+        "vectorEmbeddingPolicy": {
+          "vectorEmbeddings": [
+            {
+              "path": "/DescriptionVector",
+              "dataType": "float32",
+              "dimensions": 1536,
+              "distanceFunction": "cosine"
+            }
+          ]
+        }
+      },
+      {
+        "name": "hotels_quantizedflat",
+        "partitionKeyPaths": [
+          "/HotelId"
+        ],
+        "indexingPolicy": {
+          "indexingMode": "consistent",
+          "automatic": true,
+          "includedPaths": [
+            {
+              "path": "/*"
+            }
+          ],
+          "excludedPaths": [
+            {
+              "path": "/_etag/?"
+            },
+            {
+              "path": "/DescriptionVector/*"
+            }
+          ],
+          "vectorIndexes": [
+            {
+              "path": "/DescriptionVector",
+              "type": "quantizedFlat"
+            }
+          ]
+        },
+        "vectorEmbeddingPolicy": {
+          "vectorEmbeddings": [
+            {
+              "path": "/DescriptionVector",
+              "dataType": "float32",
+              "dimensions": 1536,
+              "distanceFunction": "cosine"
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "cosmos-db-account",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "name": {
+            "value": "[parameters('accountName')]"
+          },
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "tags": {
+            "value": "[parameters('tags')]"
+          },
+          "enableServerless": {
+            "value": true
+          },
+          "enableVectorSearch": {
+            "value": true
+          },
+          "enableNoSQLFullTextSearch": {
+            "value": true
+          },
+          "disableKeyBasedAuth": {
+            "value": true
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.42.1.51946",
+              "templateHash": "11154776759976966058"
+            },
+            "description": "Create an Azure Cosmos DB for NoSQL account."
+          },
+          "parameters": {
+            "name": {
+              "type": "string"
+            },
+            "location": {
+              "type": "string",
+              "defaultValue": "[resourceGroup().location]"
+            },
+            "tags": {
+              "type": "object",
+              "defaultValue": {}
+            },
+            "enableServerless": {
+              "type": "bool",
+              "defaultValue": false,
+              "metadata": {
+                "description": "Enables serverless for this account. Defaults to false."
+              }
+            },
+            "disableKeyBasedAuth": {
+              "type": "bool",
+              "defaultValue": false,
+              "metadata": {
+                "description": "Disables key-based authentication. Defaults to false."
+              }
+            },
+            "enableVectorSearch": {
+              "type": "bool",
+              "defaultValue": false,
+              "metadata": {
+                "description": "Enables vector search for this account. Defaults to false."
+              }
+            },
+            "enableNoSQLFullTextSearch": {
+              "type": "bool",
+              "defaultValue": false,
+              "metadata": {
+                "description": "Enables NoSQL full text search for this account. Defaults to false."
+              }
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.Resources/deployments",
+              "apiVersion": "2025-04-01",
+              "name": "cosmos-db-nosql-account",
+              "properties": {
+                "expressionEvaluationOptions": {
+                  "scope": "inner"
+                },
+                "mode": "Incremental",
+                "parameters": {
+                  "name": {
+                    "value": "[parameters('name')]"
+                  },
+                  "location": {
+                    "value": "[parameters('location')]"
+                  },
+                  "tags": {
+                    "value": "[parameters('tags')]"
+                  },
+                  "kind": {
+                    "value": "GlobalDocumentDB"
+                  },
+                  "enableServerless": {
+                    "value": "[parameters('enableServerless')]"
+                  },
+                  "enableNoSQLVectorSearch": {
+                    "value": "[parameters('enableVectorSearch')]"
+                  },
+                  "enableNoSQLFullTextSearch": {
+                    "value": "[parameters('enableNoSQLFullTextSearch')]"
+                  },
+                  "disableKeyBasedAuth": {
+                    "value": "[parameters('disableKeyBasedAuth')]"
+                  }
+                },
+                "template": {
+                  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+                  "contentVersion": "1.0.0.0",
+                  "metadata": {
+                    "_generator": {
+                      "name": "bicep",
+                      "version": "0.42.1.51946",
+                      "templateHash": "13685438203317507561"
+                    },
+                    "description": "Create an Azure Cosmos DB account."
+                  },
+                  "parameters": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "location": {
+                      "type": "string",
+                      "defaultValue": "[resourceGroup().location]"
+                    },
+                    "tags": {
+                      "type": "object",
+                      "defaultValue": {}
+                    },
+                    "kind": {
+                      "type": "string",
+                      "defaultValue": "GlobalDocumentDB",
+                      "allowedValues": [
+                        "GlobalDocumentDB"
+                      ],
+                      "metadata": {
+                        "description": "Sets the kind of account."
+                      }
+                    },
+                    "enableServerless": {
+                      "type": "bool",
+                      "defaultValue": true,
+                      "metadata": {
+                        "description": "Enables serverless for this account. Defaults to false."
+                      }
+                    },
+                    "enableNoSQLVectorSearch": {
+                      "type": "bool",
+                      "defaultValue": false,
+                      "metadata": {
+                        "description": "Enables NoSQL vector search for this account. Defaults to false."
+                      }
+                    },
+                    "enableNoSQLFullTextSearch": {
+                      "type": "bool",
+                      "defaultValue": false,
+                      "metadata": {
+                        "description": "Enables NoSQL full text search for this account. Defaults to false."
+                      }
+                    },
+                    "disableKeyBasedAuth": {
+                      "type": "bool",
+                      "defaultValue": false,
+                      "metadata": {
+                        "description": "Disables key-based authentication. Defaults to false."
+                      }
+                    }
+                  },
+                  "resources": [
+                    {
+                      "type": "Microsoft.DocumentDB/databaseAccounts",
+                      "apiVersion": "2024-05-15",
+                      "name": "[parameters('name')]",
+                      "location": "[parameters('location')]",
+                      "tags": "[parameters('tags')]",
+                      "kind": "[parameters('kind')]",
+                      "properties": {
+                        "consistencyPolicy": {
+                          "defaultConsistencyLevel": "Session"
+                        },
+                        "databaseAccountOfferType": "Standard",
+                        "locations": [
+                          {
+                            "locationName": "[parameters('location')]",
+                            "failoverPriority": 0,
+                            "isZoneRedundant": false
+                          }
+                        ],
+                        "enableAutomaticFailover": false,
+                        "enableMultipleWriteLocations": false,
+                        "disableLocalAuth": "[parameters('disableKeyBasedAuth')]",
+                        "capabilities": "[union(if(parameters('enableServerless'), createArray(createObject('name', 'EnableServerless')), createArray()), if(parameters('enableNoSQLVectorSearch'), createArray(createObject('name', 'EnableNoSQLVectorSearch')), createArray()), if(parameters('enableNoSQLFullTextSearch'), createArray(createObject('name', 'EnableNoSQLFullTextSearch')), createArray()))]"
+                      }
+                    }
+                  ],
+                  "outputs": {
+                    "endpoint": {
+                      "type": "string",
+                      "value": "[reference(resourceId('Microsoft.DocumentDB/databaseAccounts', parameters('name')), '2024-05-15').documentEndpoint]"
+                    },
+                    "name": {
+                      "type": "string",
+                      "value": "[parameters('name')]"
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "outputs": {
+            "endpoint": {
+              "type": "string",
+              "value": "[reference(resourceId('Microsoft.Resources/deployments', 'cosmos-db-nosql-account'), '2025-04-01').outputs.endpoint.value]"
+            },
+            "name": {
+              "type": "string",
+              "value": "[reference(resourceId('Microsoft.Resources/deployments', 'cosmos-db-nosql-account'), '2025-04-01').outputs.name.value]"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "cosmos-db-database",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "name": {
+            "value": "[variables('database').name]"
+          },
+          "parentAccountName": {
+            "value": "[reference(resourceId('Microsoft.Resources/deployments', 'cosmos-db-account'), '2025-04-01').outputs.name.value]"
+          },
+          "tags": {
+            "value": "[parameters('tags')]"
+          },
+          "setThroughput": {
+            "value": false
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.42.1.51946",
+              "templateHash": "7345110926520108746"
+            },
+            "description": "Create an Azure Cosmos DB for NoSQL database."
+          },
+          "parameters": {
+            "name": {
+              "type": "string"
+            },
+            "tags": {
+              "type": "object",
+              "defaultValue": {}
+            },
+            "parentAccountName": {
+              "type": "string",
+              "metadata": {
+                "description": "Name of the parent Azure Cosmos DB account."
+              }
+            },
+            "setThroughput": {
+              "type": "bool",
+              "defaultValue": false,
+              "metadata": {
+                "description": "Enables throughput setting at this resource level. Defaults to false."
+              }
+            },
+            "autoscale": {
+              "type": "bool",
+              "defaultValue": false,
+              "metadata": {
+                "description": "Enables autoscale. If setThroughput is enabled, defaults to false."
+              }
+            },
+            "throughput": {
+              "type": "int",
+              "defaultValue": 400,
+              "metadata": {
+                "description": "The amount of throughput set. If setThroughput is enabled, defaults to 400."
+              }
+            }
+          },
+          "variables": {
+            "options": "[if(parameters('setThroughput'), if(parameters('autoscale'), createObject('autoscaleSettings', createObject('maxThroughput', parameters('throughput'))), createObject('throughput', parameters('throughput'))), createObject())]"
+          },
+          "resources": [
+            {
+              "type": "Microsoft.DocumentDB/databaseAccounts/sqlDatabases",
+              "apiVersion": "2024-05-15",
+              "name": "[format('{0}/{1}', parameters('parentAccountName'), parameters('name'))]",
+              "tags": "[parameters('tags')]",
+              "properties": {
+                "options": "[variables('options')]",
+                "resource": {
+                  "id": "[parameters('name')]"
+                }
+              }
+            }
+          ],
+          "outputs": {
+            "name": {
+              "type": "string",
+              "value": "[parameters('name')]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Resources/deployments', 'cosmos-db-account')]"
+      ]
+    },
+    {
+      "copy": {
+        "name": "vectorSearchContainers",
+        "count": "[length(variables('vectorSearchContainerDefinitions'))]"
+      },
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "[format('cosmos-db-vector-search-container-{0}', copyIndex())]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "name": {
+            "value": "[variables('vectorSearchContainerDefinitions')[copyIndex()].name]"
+          },
+          "parentAccountName": {
+            "value": "[reference(resourceId('Microsoft.Resources/deployments', 'cosmos-db-account'), '2025-04-01').outputs.name.value]"
+          },
+          "parentDatabaseName": {
+            "value": "[reference(resourceId('Microsoft.Resources/deployments', 'cosmos-db-database'), '2025-04-01').outputs.name.value]"
+          },
+          "tags": {
+            "value": "[parameters('tags')]"
+          },
+          "setThroughput": {
+            "value": false
+          },
+          "partitionKeyPaths": {
+            "value": "[variables('vectorSearchContainerDefinitions')[copyIndex()].partitionKeyPaths]"
+          },
+          "indexingPolicy": {
+            "value": "[variables('vectorSearchContainerDefinitions')[copyIndex()].indexingPolicy]"
+          },
+          "vectorEmbeddingPolicy": {
+            "value": "[variables('vectorSearchContainerDefinitions')[copyIndex()].vectorEmbeddingPolicy]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "languageVersion": "2.0",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.42.1.51946",
+              "templateHash": "14294366414666751429"
+            },
+            "description": "Create an Azure Cosmos DB for NoSQL container."
+          },
+          "parameters": {
+            "name": {
+              "type": "string"
+            },
+            "tags": {
+              "type": "object",
+              "defaultValue": {}
+            },
+            "parentAccountName": {
+              "type": "string",
+              "metadata": {
+                "description": "Name of the parent Azure Cosmos DB account."
+              }
+            },
+            "parentDatabaseName": {
+              "type": "string",
+              "metadata": {
+                "description": "Name of the parent Azure Cosmos DB database."
+              }
+            },
+            "setThroughput": {
+              "type": "bool",
+              "defaultValue": false,
+              "metadata": {
+                "description": "Enables throughput setting at this resource level. Defaults to true."
+              }
+            },
+            "autoscale": {
+              "type": "bool",
+              "defaultValue": false,
+              "metadata": {
+                "description": "Enables autoscale. If setThroughput is enabled, defaults to false."
+              }
+            },
+            "throughput": {
+              "type": "int",
+              "defaultValue": 400,
+              "metadata": {
+                "description": "The amount of throughput set. If setThroughput is enabled, defaults to 400."
+              }
+            },
+            "partitionKeyPaths": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "defaultValue": [
+                "/id"
+              ],
+              "metadata": {
+                "description": "List of hierarhical partition key paths. Defaults to an array that only contains /id."
+              }
+            },
+            "indexingPolicy": {
+              "type": "object",
+              "defaultValue": {},
+              "metadata": {
+                "description": "Optional custom indexing policy for the container."
+              }
+            },
+            "vectorEmbeddingPolicy": {
+              "type": "object",
+              "defaultValue": {},
+              "metadata": {
+                "description": "Optional vector embedding policy for the container."
+              }
+            }
+          },
+          "variables": {
+            "options": "[if(parameters('setThroughput'), if(parameters('autoscale'), createObject('autoscaleSettings', createObject('maxThroughput', parameters('throughput'))), createObject('throughput', parameters('throughput'))), createObject())]"
+          },
+          "resources": {
+            "account": {
+              "existing": true,
+              "type": "Microsoft.DocumentDB/databaseAccounts",
+              "apiVersion": "2024-05-15",
+              "name": "[parameters('parentAccountName')]"
+            },
+            "database": {
+              "existing": true,
+              "type": "Microsoft.DocumentDB/databaseAccounts/sqlDatabases",
+              "apiVersion": "2024-05-15",
+              "name": "[format('{0}/{1}', parameters('parentAccountName'), parameters('parentDatabaseName'))]"
+            },
+            "container": {
+              "type": "Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers",
+              "apiVersion": "2024-05-15",
+              "name": "[format('{0}/{1}/{2}', parameters('parentAccountName'), parameters('parentDatabaseName'), parameters('name'))]",
+              "tags": "[parameters('tags')]",
+              "properties": {
+                "options": "[variables('options')]",
+                "resource": "[union(createObject('id', parameters('name'), 'partitionKey', createObject('paths', parameters('partitionKeyPaths'), 'kind', 'MultiHash', 'version', 2)), if(not(empty(parameters('indexingPolicy'))), createObject('indexingPolicy', parameters('indexingPolicy')), createObject()), if(not(empty(parameters('vectorEmbeddingPolicy'))), createObject('vectorEmbeddingPolicy', parameters('vectorEmbeddingPolicy')), createObject()))]"
+              }
+            }
+          },
+          "outputs": {
+            "name": {
+              "type": "string",
+              "value": "[parameters('name')]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Resources/deployments', 'cosmos-db-account')]",
+        "[resourceId('Microsoft.Resources/deployments', 'cosmos-db-database')]"
+      ]
+    },
+    {
+      "condition": "[not(empty(parameters('createIndexDatabaseName')))]",
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "cosmos-db-create-index-database",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "name": {
+            "value": "[parameters('createIndexDatabaseName')]"
+          },
+          "parentAccountName": {
+            "value": "[reference(resourceId('Microsoft.Resources/deployments', 'cosmos-db-account'), '2025-04-01').outputs.name.value]"
+          },
+          "tags": {
+            "value": "[parameters('tags')]"
+          },
+          "setThroughput": {
+            "value": false
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.42.1.51946",
+              "templateHash": "7345110926520108746"
+            },
+            "description": "Create an Azure Cosmos DB for NoSQL database."
+          },
+          "parameters": {
+            "name": {
+              "type": "string"
+            },
+            "tags": {
+              "type": "object",
+              "defaultValue": {}
+            },
+            "parentAccountName": {
+              "type": "string",
+              "metadata": {
+                "description": "Name of the parent Azure Cosmos DB account."
+              }
+            },
+            "setThroughput": {
+              "type": "bool",
+              "defaultValue": false,
+              "metadata": {
+                "description": "Enables throughput setting at this resource level. Defaults to false."
+              }
+            },
+            "autoscale": {
+              "type": "bool",
+              "defaultValue": false,
+              "metadata": {
+                "description": "Enables autoscale. If setThroughput is enabled, defaults to false."
+              }
+            },
+            "throughput": {
+              "type": "int",
+              "defaultValue": 400,
+              "metadata": {
+                "description": "The amount of throughput set. If setThroughput is enabled, defaults to 400."
+              }
+            }
+          },
+          "variables": {
+            "options": "[if(parameters('setThroughput'), if(parameters('autoscale'), createObject('autoscaleSettings', createObject('maxThroughput', parameters('throughput'))), createObject('throughput', parameters('throughput'))), createObject())]"
+          },
+          "resources": [
+            {
+              "type": "Microsoft.DocumentDB/databaseAccounts/sqlDatabases",
+              "apiVersion": "2024-05-15",
+              "name": "[format('{0}/{1}', parameters('parentAccountName'), parameters('name'))]",
+              "tags": "[parameters('tags')]",
+              "properties": {
+                "options": "[variables('options')]",
+                "resource": {
+                  "id": "[parameters('name')]"
+                }
+              }
+            }
+          ],
+          "outputs": {
+            "name": {
+              "type": "string",
+              "value": "[parameters('name')]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Resources/deployments', 'cosmos-db-account')]"
+      ]
+    },
+    {
+      "copy": {
+        "name": "createIndexContainers",
+        "count": "[length(range(0, if(not(empty(parameters('createIndexDatabaseName'))), 2, 0)))]"
+      },
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "[format('cosmos-db-create-index-container-{0}', copyIndex())]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "name": "[if(equals(range(0, if(not(empty(parameters('createIndexDatabaseName'))), 2, 0))[copyIndex()], 0), createObject('value', 'hotels_diskann'), createObject('value', 'hotels_quantizedflat'))]",
+          "parentAccountName": {
+            "value": "[reference(resourceId('Microsoft.Resources/deployments', 'cosmos-db-account'), '2025-04-01').outputs.name.value]"
+          },
+          "parentDatabaseName": {
+            "value": "[reference(resourceId('Microsoft.Resources/deployments', 'cosmos-db-create-index-database'), '2025-04-01').outputs.name.value]"
+          },
+          "tags": {
+            "value": "[parameters('tags')]"
+          },
+          "setThroughput": {
+            "value": false
+          },
+          "partitionKeyPaths": {
+            "value": [
+              "/PartitionKey"
+            ]
+          },
+          "indexingPolicy": {
+            "value": {
+              "indexingMode": "consistent",
+              "automatic": true,
+              "includedPaths": [
+                {
+                  "path": "/*"
+                }
+              ],
+              "excludedPaths": [
+                {
+                  "path": "/_etag/?"
+                }
+              ],
+              "vectorIndexes": [
+                {
+                  "path": "/DescriptionVector",
+                  "type": "[if(equals(range(0, if(not(empty(parameters('createIndexDatabaseName'))), 2, 0))[copyIndex()], 0), 'diskANN', 'quantizedFlat')]"
+                }
+              ]
+            }
+          },
+          "vectorEmbeddingPolicy": {
+            "value": {
+              "vectorEmbeddings": [
+                {
+                  "path": "/DescriptionVector",
+                  "dataType": "float32",
+                  "dimensions": 1536,
+                  "distanceFunction": "cosine"
+                }
+              ]
+            }
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "languageVersion": "2.0",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.42.1.51946",
+              "templateHash": "14294366414666751429"
+            },
+            "description": "Create an Azure Cosmos DB for NoSQL container."
+          },
+          "parameters": {
+            "name": {
+              "type": "string"
+            },
+            "tags": {
+              "type": "object",
+              "defaultValue": {}
+            },
+            "parentAccountName": {
+              "type": "string",
+              "metadata": {
+                "description": "Name of the parent Azure Cosmos DB account."
+              }
+            },
+            "parentDatabaseName": {
+              "type": "string",
+              "metadata": {
+                "description": "Name of the parent Azure Cosmos DB database."
+              }
+            },
+            "setThroughput": {
+              "type": "bool",
+              "defaultValue": false,
+              "metadata": {
+                "description": "Enables throughput setting at this resource level. Defaults to true."
+              }
+            },
+            "autoscale": {
+              "type": "bool",
+              "defaultValue": false,
+              "metadata": {
+                "description": "Enables autoscale. If setThroughput is enabled, defaults to false."
+              }
+            },
+            "throughput": {
+              "type": "int",
+              "defaultValue": 400,
+              "metadata": {
+                "description": "The amount of throughput set. If setThroughput is enabled, defaults to 400."
+              }
+            },
+            "partitionKeyPaths": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "defaultValue": [
+                "/id"
+              ],
+              "metadata": {
+                "description": "List of hierarhical partition key paths. Defaults to an array that only contains /id."
+              }
+            },
+            "indexingPolicy": {
+              "type": "object",
+              "defaultValue": {},
+              "metadata": {
+                "description": "Optional custom indexing policy for the container."
+              }
+            },
+            "vectorEmbeddingPolicy": {
+              "type": "object",
+              "defaultValue": {},
+              "metadata": {
+                "description": "Optional vector embedding policy for the container."
+              }
+            }
+          },
+          "variables": {
+            "options": "[if(parameters('setThroughput'), if(parameters('autoscale'), createObject('autoscaleSettings', createObject('maxThroughput', parameters('throughput'))), createObject('throughput', parameters('throughput'))), createObject())]"
+          },
+          "resources": {
+            "account": {
+              "existing": true,
+              "type": "Microsoft.DocumentDB/databaseAccounts",
+              "apiVersion": "2024-05-15",
+              "name": "[parameters('parentAccountName')]"
+            },
+            "database": {
+              "existing": true,
+              "type": "Microsoft.DocumentDB/databaseAccounts/sqlDatabases",
+              "apiVersion": "2024-05-15",
+              "name": "[format('{0}/{1}', parameters('parentAccountName'), parameters('parentDatabaseName'))]"
+            },
+            "container": {
+              "type": "Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers",
+              "apiVersion": "2024-05-15",
+              "name": "[format('{0}/{1}/{2}', parameters('parentAccountName'), parameters('parentDatabaseName'), parameters('name'))]",
+              "tags": "[parameters('tags')]",
+              "properties": {
+                "options": "[variables('options')]",
+                "resource": "[union(createObject('id', parameters('name'), 'partitionKey', createObject('paths', parameters('partitionKeyPaths'), 'kind', 'MultiHash', 'version', 2)), if(not(empty(parameters('indexingPolicy'))), createObject('indexingPolicy', parameters('indexingPolicy')), createObject()), if(not(empty(parameters('vectorEmbeddingPolicy'))), createObject('vectorEmbeddingPolicy', parameters('vectorEmbeddingPolicy')), createObject()))]"
+              }
+            }
+          },
+          "outputs": {
+            "name": {
+              "type": "string",
+              "value": "[parameters('name')]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Resources/deployments', 'cosmos-db-account')]",
+        "[resourceId('Microsoft.Resources/deployments', 'cosmos-db-create-index-database')]"
+      ]
+    },
+    {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "nosql-role-definition",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "targetAccountName": {
+            "value": "[reference(resourceId('Microsoft.Resources/deployments', 'cosmos-db-account'), '2025-04-01').outputs.name.value]"
+          },
+          "definitionName": {
+            "value": "Write to Azure Cosmos DB for NoSQL data plane"
+          },
+          "permissionsDataActions": {
+            "value": [
+              "Microsoft.DocumentDB/databaseAccounts/readMetadata",
+              "Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers/items/*",
+              "Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers/*"
+            ]
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "languageVersion": "2.0",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.42.1.51946",
+              "templateHash": "16326657319800322056"
+            },
+            "description": "Create an Azure Cosmos DB for NoSQL role definition."
+          },
+          "parameters": {
+            "targetAccountName": {
+              "type": "string",
+              "metadata": {
+                "description": "Name of the target Azure Cosmos DB account."
+              }
+            },
+            "definitionName": {
+              "type": "string",
+              "metadata": {
+                "description": "Name of the role definiton."
+              }
+            },
+            "permissionsDataActions": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "defaultValue": [],
+              "metadata": {
+                "description": "An array of data actions that are allowed. Defaults to an empty array."
+              }
+            },
+            "permissionsNonDataActions": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "defaultValue": [],
+              "metadata": {
+                "description": "An array of data actions that are denied. Defaults to an empty array."
+              }
+            }
+          },
+          "resources": {
+            "account": {
+              "existing": true,
+              "type": "Microsoft.DocumentDB/databaseAccounts",
+              "apiVersion": "2023-04-15",
+              "name": "[parameters('targetAccountName')]"
+            },
+            "definition": {
+              "type": "Microsoft.DocumentDB/databaseAccounts/sqlRoleDefinitions",
+              "apiVersion": "2023-04-15",
+              "name": "[format('{0}/{1}', parameters('targetAccountName'), guid('nosql-role-definition', resourceId('Microsoft.DocumentDB/databaseAccounts', parameters('targetAccountName'))))]",
+              "properties": {
+                "assignableScopes": [
+                  "[resourceId('Microsoft.DocumentDB/databaseAccounts', parameters('targetAccountName'))]"
+                ],
+                "permissions": [
+                  {
+                    "dataActions": "[parameters('permissionsDataActions')]",
+                    "notDataActions": "[parameters('permissionsNonDataActions')]"
+                  }
+                ],
+                "roleName": "[parameters('definitionName')]",
+                "type": "CustomRole"
+              }
+            }
+          },
+          "outputs": {
+            "id": {
+              "type": "string",
+              "value": "[resourceId('Microsoft.DocumentDB/databaseAccounts/sqlRoleDefinitions', parameters('targetAccountName'), guid('nosql-role-definition', resourceId('Microsoft.DocumentDB/databaseAccounts', parameters('targetAccountName'))))]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Resources/deployments', 'cosmos-db-account')]"
+      ]
+    },
+    {
+      "condition": "[not(empty(parameters('deploymentUserPrincipalId')))]",
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "nosql-role-assignment-user",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "targetAccountName": {
+            "value": "[reference(resourceId('Microsoft.Resources/deployments', 'cosmos-db-account'), '2025-04-01').outputs.name.value]"
+          },
+          "roleDefinitionId": {
+            "value": "[reference(resourceId('Microsoft.Resources/deployments', 'nosql-role-definition'), '2025-04-01').outputs.id.value]"
+          },
+          "principalId": {
+            "value": "[coalesce(parameters('deploymentUserPrincipalId'), '')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.42.1.51946",
+              "templateHash": "7126412619056446199"
+            },
+            "description": "Create an Azure Cosmos DB for NoSQL role assignment."
+          },
+          "parameters": {
+            "targetAccountName": {
+              "type": "string",
+              "metadata": {
+                "description": "Name of the target Azure Cosmos DB account."
+              }
+            },
+            "roleDefinitionId": {
+              "type": "string",
+              "metadata": {
+                "description": "Id of the role definition to assign to the targeted principal and account."
+              }
+            },
+            "principalId": {
+              "type": "string",
+              "metadata": {
+                "description": "Id of the principal to assign the role definition for the account."
+              }
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.DocumentDB/databaseAccounts/sqlRoleAssignments",
+              "apiVersion": "2023-04-15",
+              "name": "[format('{0}/{1}', parameters('targetAccountName'), guid(parameters('roleDefinitionId'), parameters('principalId'), resourceId('Microsoft.DocumentDB/databaseAccounts', parameters('targetAccountName'))))]",
+              "properties": {
+                "principalId": "[parameters('principalId')]",
+                "roleDefinitionId": "[parameters('roleDefinitionId')]",
+                "scope": "[resourceId('Microsoft.DocumentDB/databaseAccounts', parameters('targetAccountName'))]"
+              }
+            }
+          ],
+          "outputs": {
+            "id": {
+              "type": "string",
+              "value": "[resourceId('Microsoft.DocumentDB/databaseAccounts/sqlRoleAssignments', parameters('targetAccountName'), guid(parameters('roleDefinitionId'), parameters('principalId'), resourceId('Microsoft.DocumentDB/databaseAccounts', parameters('targetAccountName'))))]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Resources/deployments', 'cosmos-db-account')]",
+        "[resourceId('Microsoft.Resources/deployments', 'nosql-role-definition')]"
+      ]
+    },
+    {
+      "condition": "[not(empty(parameters('managedIdentityPrincipalId')))]",
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "nosql-role-assignment-managed-identity",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "targetAccountName": {
+            "value": "[reference(resourceId('Microsoft.Resources/deployments', 'cosmos-db-account'), '2025-04-01').outputs.name.value]"
+          },
+          "roleDefinitionId": {
+            "value": "[reference(resourceId('Microsoft.Resources/deployments', 'nosql-role-definition'), '2025-04-01').outputs.id.value]"
+          },
+          "principalId": {
+            "value": "[coalesce(parameters('managedIdentityPrincipalId'), '')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.42.1.51946",
+              "templateHash": "7126412619056446199"
+            },
+            "description": "Create an Azure Cosmos DB for NoSQL role assignment."
+          },
+          "parameters": {
+            "targetAccountName": {
+              "type": "string",
+              "metadata": {
+                "description": "Name of the target Azure Cosmos DB account."
+              }
+            },
+            "roleDefinitionId": {
+              "type": "string",
+              "metadata": {
+                "description": "Id of the role definition to assign to the targeted principal and account."
+              }
+            },
+            "principalId": {
+              "type": "string",
+              "metadata": {
+                "description": "Id of the principal to assign the role definition for the account."
+              }
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.DocumentDB/databaseAccounts/sqlRoleAssignments",
+              "apiVersion": "2023-04-15",
+              "name": "[format('{0}/{1}', parameters('targetAccountName'), guid(parameters('roleDefinitionId'), parameters('principalId'), resourceId('Microsoft.DocumentDB/databaseAccounts', parameters('targetAccountName'))))]",
+              "properties": {
+                "principalId": "[parameters('principalId')]",
+                "roleDefinitionId": "[parameters('roleDefinitionId')]",
+                "scope": "[resourceId('Microsoft.DocumentDB/databaseAccounts', parameters('targetAccountName'))]"
+              }
+            }
+          ],
+          "outputs": {
+            "id": {
+              "type": "string",
+              "value": "[resourceId('Microsoft.DocumentDB/databaseAccounts/sqlRoleAssignments', parameters('targetAccountName'), guid(parameters('roleDefinitionId'), parameters('principalId'), resourceId('Microsoft.DocumentDB/databaseAccounts', parameters('targetAccountName'))))]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Resources/deployments', 'cosmos-db-account')]",
+        "[resourceId('Microsoft.Resources/deployments', 'nosql-role-definition')]"
+      ]
+    }
+  ],
+  "outputs": {
+    "endpoint": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.Resources/deployments', 'cosmos-db-account'), '2025-04-01').outputs.endpoint.value]"
+    },
+    "accountName": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.Resources/deployments', 'cosmos-db-account'), '2025-04-01').outputs.name.value]"
+    },
+    "database": {
+      "type": "object",
+      "value": {
+        "name": "[reference(resourceId('Microsoft.Resources/deployments', 'cosmos-db-database'), '2025-04-01').outputs.name.value]"
+      }
+    },
+    "containers": {
+      "type": "array",
+      "value": [
+        {
+          "name": "[reference(resourceId('Microsoft.Resources/deployments', format('cosmos-db-vector-search-container-{0}', 0)), '2025-04-01').outputs.name.value]"
+        },
+        {
+          "name": "[reference(resourceId('Microsoft.Resources/deployments', format('cosmos-db-vector-search-container-{0}', 1)), '2025-04-01').outputs.name.value]"
+        }
+      ]
+    },
+    "createIndexDatabase": {
+      "type": "object",
+      "value": "[if(not(empty(parameters('createIndexDatabaseName'))), createObject('name', reference(resourceId('Microsoft.Resources/deployments', 'cosmos-db-create-index-database'), '2025-04-01').outputs.name.value), createObject())]"
+    },
+    "createIndexContainers": {
+      "type": "array",
+      "value": "[if(not(empty(parameters('createIndexDatabaseName'))), createArray(createObject('name', reference(resourceId('Microsoft.Resources/deployments', format('cosmos-db-create-index-container-{0}', 0)), '2025-04-01').outputs.name.value), createObject('name', reference(resourceId('Microsoft.Resources/deployments', format('cosmos-db-create-index-container-{0}', 1)), '2025-04-01').outputs.name.value)), createArray())]"
+    }
+  }
+}
