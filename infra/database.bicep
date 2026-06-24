@@ -6,12 +6,13 @@ param tags object = {}
 param managedIdentityPrincipalId string
 param deploymentUserPrincipalId string = ''
 param databaseName string
+param createIndexDatabaseName string = ''
 
 var database = {
-  name: databaseName // Database for application
+  name: databaseName // Database for existing vector-search samples
 }
 
-var containers = [
+var vectorSearchContainerDefinitions = [
   {
     name: 'hotels_diskann'
     partitionKeyPaths: [
@@ -106,18 +107,19 @@ module cosmosDbAccount './cosmos-db/nosql/account.bicep' = {
 }
 
 module cosmosDbDatabase './cosmos-db/nosql/database.bicep' = {
-  name: 'cosmos-db-database'  
+  name: 'cosmos-db-database'
   params: {
-    name: database.name       
+    name: database.name
     parentAccountName: cosmosDbAccount.outputs.name
     tags: tags
     setThroughput: false
   }
 }
 
-module cosmosDbContainers './cosmos-db/nosql/container.bicep' = [
-  for (container, index) in containers: {
-    name: 'cosmos-db-container-${index}'  
+// Vector-search containers (always created)
+module vectorSearchContainers './cosmos-db/nosql/container.bicep' = [
+  for (container, index) in vectorSearchContainerDefinitions: {
+    name: 'cosmos-db-vector-search-container-${index}'
     params: {
       name: container.name
       parentAccountName: cosmosDbAccount.outputs.name
@@ -127,6 +129,63 @@ module cosmosDbContainers './cosmos-db/nosql/container.bicep' = [
       partitionKeyPaths: container.partitionKeyPaths
       indexingPolicy: container.indexingPolicy
       vectorEmbeddingPolicy: container.vectorEmbeddingPolicy
+    }
+  }
+]
+
+// Create-index database and containers (only if createIndexDatabaseName parameter is provided)
+module createIndexDatabase './cosmos-db/nosql/database.bicep' = if (!empty(createIndexDatabaseName)) {
+  name: 'cosmos-db-create-index-database'
+  params: {
+    name: createIndexDatabaseName
+    parentAccountName: cosmosDbAccount.outputs.name
+    tags: tags
+    setThroughput: false
+  }
+}
+
+module createIndexContainers './cosmos-db/nosql/container.bicep' = [
+  for i in range(0, !empty(createIndexDatabaseName) ? 2 : 0): {
+    name: 'cosmos-db-create-index-container-${i}'
+    params: {
+      name: i == 0 ? 'hotels_diskann' : 'hotels_quantizedflat'
+      parentAccountName: cosmosDbAccount.outputs.name
+      parentDatabaseName: createIndexDatabase!.outputs.name
+      tags: tags
+      setThroughput: false
+      partitionKeyPaths: [
+        '/PartitionKey'
+      ]
+      indexingPolicy: {
+        indexingMode: 'consistent'
+        automatic: true
+        includedPaths: [
+          {
+            path: '/*'
+          }
+        ]
+        excludedPaths: [
+          {
+            path: '/_etag/?'
+          }
+        ]
+        vectorIndexes: [
+          {
+            path: '/DescriptionVector'
+            type: i == 0 ? 'diskANN' : 'quantizedFlat'
+          }
+        ]
+      }
+      vectorEmbeddingPolicy: {
+        vectorEmbeddings: [
+          {
+            path: '/DescriptionVector'
+            dataType: 'float32'
+            dimensions: 1536
+            distanceFunction: 'cosine'
+          }
+        ]
+      }
     }
   }
 ]
@@ -150,10 +209,9 @@ module nosqlDefinition './cosmos-db/nosql/role/definition.bicep' = {
 module nosqlUserAssignment './cosmos-db/nosql/role/assignment.bicep' = if (!empty(deploymentUserPrincipalId)) {
   name: 'nosql-role-assignment-user'
   params: {
-    targetAccountName: cosmosDbAccount.outputs.name // Existing account
-    roleDefinitionId: nosqlDefinition.outputs.id // New role definition
-    principalId: deploymentUserPrincipalId ?? '' // Principal to assign role
-    principalType: 'User' // Principal type for assigning role
+    targetAccountName: cosmosDbAccount.outputs.name
+    roleDefinitionId: nosqlDefinition.outputs.id
+    principalId: deploymentUserPrincipalId ?? ''
   }
 }
 
@@ -161,10 +219,9 @@ module nosqlUserAssignment './cosmos-db/nosql/role/assignment.bicep' = if (!empt
 module nosqlManagedIdentityAssignment './cosmos-db/nosql/role/assignment.bicep' = if (!empty(managedIdentityPrincipalId)) {
   name: 'nosql-role-assignment-managed-identity'
   params: {
-    targetAccountName: cosmosDbAccount.outputs.name // Existing account
-    roleDefinitionId: nosqlDefinition.outputs.id // New role definition
-    principalId: managedIdentityPrincipalId ?? '' // Principal to assign role
-    principalType: 'ServicePrincipal' // Principal type for assigning role
+    targetAccountName: cosmosDbAccount.outputs.name
+    roleDefinitionId: nosqlDefinition.outputs.id
+    principalId: managedIdentityPrincipalId ?? ''
   }
 }
 
@@ -174,9 +231,33 @@ output accountName string = cosmosDbAccount.outputs.name
 output database object = {
   name: cosmosDbDatabase.outputs.name
 }
+
 output containers array = [
-  for (_, index) in containers: {
-    name: cosmosDbContainers[index].outputs.name
+  {
+    name: vectorSearchContainers[0].outputs.name
+  }
+  {
+    name: vectorSearchContainers[1].outputs.name
   }
 ]
+
+output createIndexDatabase object = !empty(createIndexDatabaseName)
+  ? {
+      name: createIndexDatabase!.outputs.name
+    }
+  : {}
+
+output createIndexContainers array = !empty(createIndexDatabaseName)
+  ? [
+      {
+        name: createIndexContainers[0].outputs.name
+      }
+      {
+        name: createIndexContainers[1].outputs.name
+      }
+    ]
+  : []
+
+output embeddedFieldNameForVectorSearch string = 'DescriptionVector'
+output embeddedFieldNameForCreateIndex string = 'embedding'
 
