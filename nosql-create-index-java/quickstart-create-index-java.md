@@ -12,7 +12,7 @@ ms.date: 2026-06-22
 
 In this quickstart, you run the Java create-index sample for Azure Cosmos DB for NoSQL to demonstrate two key goals:
 
-- **Goal 1 (Control Plane):** Use the ARM SDK to create the `HotelsCreateIndex` database and two vector-indexed containers: `hotels_diskann` (approximate search) and `hotels_quantizedflat` (exact search).
+- **Goal 1 (Control Plane):** Use the ARM SDK to create the `HotelsCreateIndex` database and two vector-indexed containers: `hotels_diskann_java` (approximate search) and `hotels_quantizedflat_java` (exact search).
 - **Goal 2 (Distance Functions):** Compare how the same query embedding produces different scores and rankings when using different vector distance functions: Cosine, DotProduct, and Euclidean.
 
 ## Prerequisites
@@ -32,7 +32,7 @@ In this quickstart, you run the Java create-index sample for Azure Cosmos DB for
 >
 > 1. **Control Plane (Goal 1):** The sample uses the ARM SDK (azure-resourcemanager-cosmos 2.54.3) with `DefaultAzureCredential` to create:
 >    - Database: `HotelsCreateIndex`
->    - Containers: `hotels_diskann` (DiskANN index) and `hotels_quantizedflat` (QuantizedFlat index)
+>    - Containers: `hotels_diskann_java` (DiskANN index) and `hotels_quantizedflat_java` (QuantizedFlat index)
 >    - Partition key path: `/Region` (valid values: `Northeast`, `Midwest`, `South`, `West`)
 >    - Vector field path: `/embedding` (1536 dimensions, float32)
 >
@@ -133,8 +133,8 @@ The sample demonstrates both goals in sequence:
 2. Authenticates with `DefaultAzureCredential`
 3. Creates an Azure Resource Manager client
 4. Creates the `HotelsCreateIndex` database (if needed)
-5. Creates the `hotels_diskann` container with DiskANN vector index on `/embedding`
-6. Creates the `hotels_quantizedflat` container with QuantizedFlat vector index on `/embedding`
+5. Creates the `hotels_diskann_java` container with DiskANN vector index on `/embedding`
+6. Creates the `hotels_quantizedflat_java` container with QuantizedFlat vector index on `/embedding`
 
 **Goal 2 - Data Plane (load and query with distance functions):**
 1. Creates a Cosmos DB data plane client using `DefaultAzureCredential`
@@ -145,7 +145,8 @@ The sample demonstrates both goals in sequence:
    - **Cosine:** Measures angle between vectors (values: 0 to 2)
    - **DotProduct:** Inner product of vectors (values: any real number)
    - **Euclidean:** Straight-line distance between vectors (values: 0 to √6144)
-6. Prints the top 5 matching hotels for each distance function, showing how rankings differ
+6. Scopes each vector query to one region by passing the partition key through `CosmosQueryRequestOptions.setPartitionKey`
+7. Prints the top 5 matching hotels for each distance function, showing how rankings differ
 
 ## Review the Java project structure
 
@@ -278,22 +279,29 @@ List<Float> queryEmbedding = embeddingUsage.getData().get(0).getEmbedding();
 String[] distanceFunctions = {"Cosine", "DotProduct", "Euclidean"};
 for (String distanceFunc : distanceFunctions) {
     String query = String.format(
-        "SELECT TOP 5 c.HotelId, c.HotelName, c.Description, " +
-        "VectorDistance(c.embedding, @embedding, false, {'distanceFunction': '%s'}) AS similarityScore " +
-        "FROM c WHERE c.Region = @partitionKey",
+        "SELECT TOP @topK c.HotelId, c.HotelName, c.Description, " +
+        "VectorDistance(c.embedding, @embedding, false, {'distanceFunction': '%s'}) AS SimilarityScore " +
+        "FROM c " +
+        "ORDER BY VectorDistance(c.embedding, @embedding, false, {'distanceFunction': '%s'})",
+        distanceFunc,
         distanceFunc);
 
     SqlQuerySpec querySpec = new SqlQuerySpec(query)
         .withParameters(Arrays.asList(
-            new SqlParameter("@embedding", queryEmbedding),
-            new SqlParameter("@partitionKey", "Northeast")));
+            new SqlParameter("@topK", 5),
+            new SqlParameter("@embedding", queryEmbedding)));
 
-    container.queryItems(querySpec, new CosmosQueryRequestOptions().setPartitionKey(new PartitionKey("Northeast")), HotelDocument.class)
+    CosmosQueryRequestOptions options = new CosmosQueryRequestOptions()
+        .setPartitionKey(new PartitionKey("Northeast"));
+
+    container.queryItems(querySpec, options, HotelDocument.class)
         .stream()
         .limit(5)
         .forEach(doc -> System.out.printf("  %s (score: %.4f)%n", doc.getHotelName(), doc.getSimilarityScore()));
 }
 ```
+
+Scope the vector query to a single partition by passing the partition key through the SDK's query options. Cosmos DB routes the request to the one physical partition that owns that region, so a `WHERE c.Region = ...` filter is unnecessary. This keeps the SQL focused on `ORDER BY VectorDistance(...)` for ranking and is the recommended, most efficient pattern for single-partition vector search.
 
 ## Expected output
 

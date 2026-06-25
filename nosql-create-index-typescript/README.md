@@ -204,21 +204,21 @@ Set the following in your `.env` file:
 
 ```dotenv
 VECTOR_INDEX_TYPE="diskANN"
-AZURE_COSMOSDB_CONTAINER_NAME="hotels_diskann"
+AZURE_COSMOSDB_CONTAINER_NAME="hotels_diskann_ts"
 ```
 
 ```typescript
 async function createContainer() {
-  const embeddingPath = "/DescriptionVector";
+  const embeddingPath = "/embedding";
 
   await armClient.sqlResources.beginCreateUpdateSqlContainerAndWait(
     resourceGroup,
     accountName,
     "Hotels",
-    "hotels_diskann",
+    "hotels_diskann_ts",
     {
       resource: {
-        id: "hotels_diskann",
+        id: "hotels_diskann_ts",
         partitionKey: {
           paths: ["/HotelId"],
           kind: "MultiHash",
@@ -261,7 +261,7 @@ Configuration decisions:
 | `dimensions` | `1536` | Must match the output of `text-embedding-3-small` |
 | `distanceFunction` | `cosine` | Standard for text similarity |
 | `dataType` | `float32` | Full-precision embeddings |
-| `path` | `/DescriptionVector` | Field in each document that stores the embedding vector |
+| `path` | `/embedding` | Field in each document that stores the embedding vector |
 
 ### [Quantized flat](#tab/tab-quantizedflat)
 
@@ -269,21 +269,21 @@ Set the following in your `.env` file:
 
 ```dotenv
 VECTOR_INDEX_TYPE="quantizedFlat"
-AZURE_COSMOSDB_CONTAINER_NAME="hotels_quantizedflat"
+AZURE_COSMOSDB_CONTAINER_NAME="hotels_quantizedflat_ts"
 ```
 
 ```typescript
 async function createContainer() {
-  const embeddingPath = "/DescriptionVector";
+  const embeddingPath = "/embedding";
 
   await armClient.sqlResources.beginCreateUpdateSqlContainerAndWait(
     resourceGroup,
     accountName,
     "Hotels",
-    "hotels_quantizedflat",
+    "hotels_quantizedflat_ts",
     {
       resource: {
-        id: "hotels_quantizedflat",
+        id: "hotels_quantizedflat_ts",
         partitionKey: {
           paths: ["/HotelId"],
           kind: "MultiHash",
@@ -326,7 +326,7 @@ Configuration decisions:
 | `dimensions` | `1536` | Must match the output of `text-embedding-3-small` |
 | `distanceFunction` | `cosine` | Standard for text similarity |
 | `dataType` | `float32` | Full-precision embeddings |
-| `path` | `/DescriptionVector` | Field in each document that stores the embedding vector |
+| `path` | `/embedding` | Field in each document that stores the embedding vector |
 
 ---
 
@@ -445,7 +445,7 @@ async function insertDocuments(container, config) {
 
 Key points about this approach:
 
-- **Pre-vectorized data** — the JSON file already contains `DescriptionVector` embeddings, so no Azure OpenAI calls are needed during insert.
+- **Pre-vectorized data** — the JSON file already contains `embedding` embeddings, so no Azure OpenAI calls are needed during insert.
 - **Bulk execution** — `executeBulkOperations()` handles batching, parallelization across partitions, and automatic retry/throttling internally.
 - **Idempotent** — if the container already has documents, the insert is skipped.
 - **409 conflicts** — individual document conflicts (already exists) are treated as success.
@@ -487,7 +487,7 @@ async function vectorQuery(container, openaiClient, config) {
 }
 ```
 
-> **Note:** The embedding field name (`DescriptionVector`) is injected via string interpolation because Cosmos DB SQL query syntax does not support parameter placeholders for field names. The `@embedding` value is safely parameterized. Always validate field names against a strict pattern when the value comes from configuration.
+> **Note:** The embedding field name (`embedding`) is injected via string interpolation because Cosmos DB SQL query syntax does not support parameter placeholders for field names. The `@embedding` value is safely parameterized. Always validate field names against a strict pattern when the value comes from configuration.
 
 ## Expected output
 
@@ -503,7 +503,7 @@ Azure Cosmos DB — Create Container with Vector Index via ARM SDK
 ======================================================================
 
 === Step 1: Create Container with Vector Index ===
-  Container:         hotels_diskann
+  Container:         hotels_diskann_ts
   Dimensions:        1536
   Distance function: cosine
   Created in 4.7s
@@ -550,7 +550,7 @@ Azure Cosmos DB — Create Container with Vector Index via ARM SDK
 ======================================================================
 
 === Step 1: Create Container with Vector Index ===
-  Container:         hotels_quantizedflat
+  Container:         hotels_quantizedflat_ts
   Dimensions:        1536
   Distance function: cosine
   Created in 4.7s
@@ -604,7 +604,7 @@ az cosmosdb sql container show \
   --account-name $AZURE_COSMOSDB_ACCOUNT_NAME \
   --resource-group $AZURE_RESOURCE_GROUP \
   --database-name Hotels \
-  --name hotels_diskann \
+  --name hotels_diskann_ts \
   --query "{vectorIndexes: resource.indexingPolicy.vectorIndexes, vectorEmbeddingPolicy: resource.vectorEmbeddingPolicy}" \
   --output json
 ```
@@ -638,7 +638,7 @@ SELECT TOP 3 c.id, c.Description FROM c
 
 The regular query returns documents in arbitrary order with no relevance to "hotel near the ocean." The vector query returns documents ranked by meaning — the top result describes ocean views and a beach, even though the query text doesn't appear verbatim in the document.
 
-> **Important:** If all similarity scores are `0` or `null`, the documents likely don't have the embedding field (`DescriptionVector`) populated. If the scores are all identical, the embeddings may be constant or corrupted. Both indicate a problem with the data, not the index.
+> **Important:** If all similarity scores are `0` or `null`, the documents likely don't have the embedding field (`embedding`) populated. If the scores are all identical, the embeddings may be constant or corrupted. Both indicate a problem with the data, not the index.
 
 ## Index type comparison
 
@@ -709,13 +709,13 @@ The container name depends on the index type:
 
 | Variable | Value |
 |---|---|
-| `AZURE_COSMOSDB_CONTAINER_NAME` | `hotels_diskann` |
+| `AZURE_COSMOSDB_CONTAINER_NAME` | `hotels_diskann_ts` |
 
 ### [Quantized flat](#tab/tab-quantizedflat)
 
 | Variable | Value |
 |---|---|
-| `AZURE_COSMOSDB_CONTAINER_NAME` | `hotels_quantizedflat` |
+| `AZURE_COSMOSDB_CONTAINER_NAME` | `hotels_quantizedflat_ts` |
 
 ---
 

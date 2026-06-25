@@ -3,7 +3,7 @@ SELECT TOP 5
                 c.id,
                 c.HotelName,
                 c.Description,
-               VectorDistance(c.DescriptionVector, @embedding, false, {'distanceFunction': 'DotProduct'}) AS similarity
+               VectorDistance(c.embedding, @embedding, false, {'distanceFunction': 'DotProduct'}) AS similarity
               FROM c
               WHERE c.Region = @partitionKey
 
@@ -17,7 +17,7 @@ SELECT TOP 5
                 c.id,
                 c.HotelName,
                 c.Description,
-               VectorDistance(c.DescriptionVector, @embedding, false, {'distanceFunction': 'DotProduct'}) AS similarity
+               VectorDistance(c.embedding, @embedding, false, {'distanceFunction': 'DotProduct'}) AS similarity
               FROM c
               WHERE c.Region = @partitionKey
 
@@ -31,7 +31,7 @@ SELECT TOP 5
                 c.id,
                 c.HotelName,
                 c.Description,
-               VectorDistance(c.DescriptionVector, @embedding, false, {'distanceFunction': 'DotProduct'}) AS similarity
+               VectorDistance(c.embedding, @embedding, false, {'distanceFunction': 'DotProduct'}) AS similarity
               FROM c
               WHERE c.Region = @partitionKey
 
@@ -45,7 +45,7 @@ SELECT TOP 5
                 c.id,
                 c.HotelName,
                 c.Description,
-               VectorDistance(c.DescriptionVector, @embedding, false, {'distanceFunction': 'DotProduct'}) AS similarity
+               VectorDistance(c.embedding, @embedding, false, {'distanceFunction': 'DotProduct'}) AS similarity
               FROM c
               WHERE c.Region = @partitionKey
 
@@ -59,7 +59,7 @@ SELECT TOP 5
                 c.id,
                 c.HotelName,
                 c.Description,
-               VectorDistance(c.DescriptionVector, @embedding, false, {'distanceFunction': 'DotProduct'}) AS similarity
+               VectorDistance(c.embedding, @embedding, false, {'distanceFunction': 'DotProduct'}) AS similarity
               FROM c
               WHERE c.Region = @partitionKey
 
@@ -73,7 +73,7 @@ SELECT TOP 5
                 c.id,
                 c.HotelName,
                 c.Description,
-               VectorDistance(c.DescriptionVector, @embedding, false, {'distanceFunction': 'DotProduct'}) AS similarity
+               VectorDistance(c.embedding, @embedding, false, {'distanceFunction': 'DotProduct'}) AS similarity
               FROM c
               WHERE c.Region = @partitionKey
 
@@ -87,7 +87,7 @@ SELECT TOP 5
                 c.id,
                 c.HotelName,
                 c.Description,
-               VectorDistance(c.DescriptionVector, @embedding, false, {'distanceFunction': 'DotProduct'}) AS similarity
+               VectorDistance(c.embedding, @embedding, false, {'distanceFunction': 'DotProduct'}) AS similarity
               FROM c
               WHERE c.Region = @partitionKey
 
@@ -101,7 +101,7 @@ SELECT TOP 5
                 c.id,
                 c.HotelName,
                 c.Description,
-               VectorDistance(c.DescriptionVector, @embedding, false, {'distanceFunction': 'DotProduct'}) AS similarity
+               VectorDistance(c.embedding, @embedding, false, {'distanceFunction': 'DotProduct'}) AS similarity
               FROM c
               WHERE c.Region = @partitionKey
 

@@ -8,7 +8,7 @@ The sample:
 - authenticates with `DefaultAzureCredential`
 - loads the shared hotel dataset from the repo root
 - adds `PartitionKey="hotels"` during ingestion
-- upserts data into `hotels_diskann` and `hotels_quantizedflat`
+- upserts data into `hotels_diskann_py` and `hotels_quantizedflat_py`
 - generates a query embedding with the Azure OpenAI client
 - runs `VectorDistance()` queries and prints the top 5 matches
 
@@ -18,8 +18,8 @@ The sample:
 - Azure CLI installed and signed in with `az login`
 - An Azure Cosmos DB for NoSQL account and database already provisioned
 - The following existing containers created by shared Bicep:
-  - `hotels_diskann`
-  - `hotels_quantizedflat`
+  - `hotels_diskann_py`
+  - `hotels_quantizedflat_py`
 - Azure RBAC roles for your identity:
   - **Cosmos DB Built-in Data Contributor**
   - **Cognitive Services OpenAI User**

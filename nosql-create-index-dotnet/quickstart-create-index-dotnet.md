@@ -27,7 +27,7 @@ In this quickstart, you run the .NET create-index sample for Azure Cosmos DB for
 > This sample is **data-plane only**. It does not create databases or containers.
 > Before running the sample, ensure these existing resources are already provisioned:
 > - Database: `HotelsCreateIndex`
-> - Containers: `hotels_diskann` and `hotels_quantizedflat`
+> - Containers: `hotels_diskann_dotnet` and `hotels_quantizedflat_dotnet`
 > - Partition key path: `/Region` with valid values `Northeast`, `Midwest`, `South`, `West`
 
 ## Clone the repository
@@ -110,7 +110,7 @@ The sample:
 2. Reads `./data/HotelsData_toCosmosDB_Vector_byRegion.json` using `System.Text.Json`
 3. Groups documents by `Region` and upserts one transactional batch per region
 4. Generates a query embedding with the Azure OpenAI client
-5. Runs **three separate** `VectorDistance()` SQL queries with different distance functions:
+5. Runs **three separate** `VectorDistance()` SQL queries with different distance functions and scopes each query to one partition by using `QueryRequestOptions.PartitionKey`:
    - **Cosine:** Measures angle between vectors (values: 0 to 2)
    - **DotProduct:** Inner product of vectors (values: any real number)
    - **Euclidean:** Straight-line distance between vectors (values: 0 to √6144)
@@ -196,11 +196,18 @@ foreach (var distanceFunc in distanceFunctions)
     var query = new QueryDefinition(
         $"SELECT TOP 5 c.HotelId, c.HotelName, c.Description, " +
         $"VectorDistance(c.embedding, @embedding, false, {{'distanceFunction': '{distanceFunc}'}}) AS SimilarityScore " +
-        "FROM c WHERE c.Region = @partitionKey")
-        .WithParameter("@embedding", queryEmbedding)
-        .WithParameter("@partitionKey", "Northeast");
+        "FROM c " +
+        $"ORDER BY VectorDistance(c.embedding, @embedding, false, {{'distanceFunction': '{distanceFunc}'}})")
+        .WithParameter("@embedding", queryEmbedding);
 
-    var iterator = container.GetItemQueryIterator<HotelDocument>(query, requestOptions: new QueryRequestOptions { PartitionKey = new PartitionKey("Northeast") });
+    var queryRequestOptions = new QueryRequestOptions
+    {
+        PartitionKey = new PartitionKey("Northeast")
+    };
+
+    using var iterator = container.GetItemQueryIterator<HotelDocument>(
+        query,
+        requestOptions: queryRequestOptions);
 
     while (iterator.HasMoreResults)
     {
@@ -214,18 +221,11 @@ foreach (var distanceFunc in distanceFunctions)
 
 ### Understanding the single-partition query pattern
 
-The query above demonstrates efficient single-partition vector search. The query targets only the "Northeast" partition using a **belt-and-suspenders** pattern:
+The query above demonstrates efficient single-partition vector search. Scope the vector query to a single partition by passing the partition key through the SDK's query options. Azure Cosmos DB routes the request to the one physical partition that owns that region, so a `WHERE c.Region = ...` filter is unnecessary. This keeps the SQL focused on `ORDER BY VectorDistance(...)` for ranking and is the recommended, most efficient pattern for single-partition vector search.
 
 | Mechanism | Purpose | Code |
 |-----------|---------|------|
-| **SQL WHERE clause** | Explicit filter in query text | `WHERE c.Region = @partitionKey` |
-| **SDK partition key** | Routing hint for efficiency | `PartitionKey = new PartitionKey("Northeast")` |
-
-**Why use both?**
-
-- The **WHERE clause** makes the partition filter visible in the query text (self-documenting)
-- The **SDK partition key** ensures the query routes directly to the correct partition (optimal performance)
-- If either mechanism is misconfigured, the other still provides correct filtering
+| **SDK partition key** | Routes the query to the target region partition | `PartitionKey = new PartitionKey("Northeast")` |
 
 **Benefits of single-partition queries:**
 
@@ -246,7 +246,7 @@ $env:PARTITION_KEY_VALUE = "Midwest"
 This queries hotels in a different region while maintaining the same efficient single-partition pattern.
 
 > [!NOTE]
-> The `VectorDistance()` function automatically sorts results by similarity score. **Do not add an ORDER BY clause** — it's redundant and can cause errors with some index types.
+> An `ORDER BY VectorDistance(...)` clause is **required** for nearest-neighbor ranking. Without it, `SELECT TOP N` returns N arbitrary documents, not the N nearest neighbors. The `ORDER BY` expression must repeat the same `VectorDistance(...)` call used in the `SELECT` clause.
 
 ## Example output
 
@@ -256,17 +256,17 @@ Azure Cosmos DB for NoSQL - create and query vector indexes with .NET
 ========================================================================
 Database: Hotels
 Data file: C:\project-dina-data-ai\repos\public-azuresamples-cosmos-db-vector-samples\nosql-create-index-dotnet\data\HotelsData_toCosmosDB_Vector_byRegion.json
-Target containers: hotels_diskann, hotels_quantizedflat
+Target containers: hotels_diskann_dotnet, hotels_quantizedflat_dotnet
 
 === Verify embedding dimensions ===
 Deployment: text-embedding-3-small
 Actual:     1536
 Expected:   1536
 
-=== Ingest documents: hotels_diskann ===
+=== Ingest documents: hotels_diskann_dotnet ===
 Upserted 50/50 documents using 4 Region transactional batches. RU: 6812.47
 
-=== Query results: hotels_diskann (DiskANN) ===
+=== Query results: hotels_diskann_dotnet (DiskANN) ===
 Request charge: 5.33 RUs
 1. HotelId=11 | HotelName=Royal Cottage Resort | score=0.4991 | Description=Your home away from home. Brand new fully equipped premium rooms, fast WiFi, full kitchen, washer & dryer...
 ```

@@ -206,12 +206,11 @@ public static partial class DataPlane
     {
         var queryDefinition = new QueryDefinition(BuildVectorDistanceQueryText(config.EmbeddingFieldName, distanceFunction))
             .WithParameter("@topK", config.TopCount)
-            .WithParameter("@embedding", queryEmbedding)
-            .WithParameter("@partitionKey", config.PartitionKeyValue);
+            .WithParameter("@embedding", queryEmbedding);
 
         var queryRequestOptions = new QueryRequestOptions
         {
-        PartitionKey = BuildRegionPartitionKey(config.PartitionKeyValue)
+            PartitionKey = BuildRegionPartitionKey(config.PartitionKeyValue)
         };
         using var iterator = container.GetItemQueryIterator<VectorSearchRow>(
             queryDefinition,
@@ -282,7 +281,8 @@ public static partial class DataPlane
         return
             $"SELECT TOP @topK c.HotelId, c.HotelName, c.Description, " +
             $"VectorDistance(c.{validatedFieldName}, @embedding, false, {{'distanceFunction': '{distanceFunction}'}}) AS SimilarityScore " +
-            "FROM c WHERE c.Region = @partitionKey";
+            $"FROM c " +
+            $"ORDER BY VectorDistance(c.{validatedFieldName}, @embedding, false, {{'distanceFunction': '{distanceFunction}'}})";
     }
 
     private static AzureOpenAIClientOptions CreateAzureOpenAIClientOptions(string apiVersion)

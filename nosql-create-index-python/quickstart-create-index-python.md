@@ -12,7 +12,7 @@ ms.date: 2026-06-22
 
 In this quickstart, you run the Python create-index sample for Azure Cosmos DB for NoSQL to demonstrate two key goals:
 
-- **Goal 1 (Control Plane):** Use the ARM SDK to create the `HotelsCreateIndex` database and two vector-indexed containers: `hotels_diskann` (approximate search) and `hotels_quantizedflat` (exact search).
+- **Goal 1 (Control Plane):** Use the ARM SDK to create the `HotelsCreateIndex` database and two vector-indexed containers: `hotels_diskann_py` (approximate search) and `hotels_quantizedflat_py` (exact search).
 - **Goal 2 (Distance Functions):** Compare how the same query embedding produces different scores and rankings when using different vector distance functions: Cosine, DotProduct, and Euclidean.
 
 Find the sample code on GitHub in [`nosql-create-index-python`](https://github.com/Azure-Samples/cosmos-db-vector-samples/tree/main/nosql-create-index-python).
@@ -33,7 +33,7 @@ Find the sample code on GitHub in [`nosql-create-index-python`](https://github.c
 >
 > 1. **Control Plane (Goal 1):** The sample uses the ARM SDK with `DefaultAzureCredential` to create:
 >    - Database: `HotelsCreateIndex`
->    - Containers: `hotels_diskann` (DiskANN index) and `hotels_quantizedflat` (QuantizedFlat index)
+>    - Containers: `hotels_diskann_py` (DiskANN index) and `hotels_quantizedflat_py` (QuantizedFlat index)
 >    - Partition key path: `/Region` (valid values: `Northeast`, `Midwest`, `South`, `West`)
 >    - Vector field path: `/embedding` (1536 dimensions, float32)
 >
@@ -94,7 +94,7 @@ The sample expects the data file at: `./data/HotelsData_toCosmosDB_Vector_byRegi
    DATA_FILE_WITH_VECTORS_AND_REGIONS="./data/HotelsData_toCosmosDB_Vector_byRegion.json"
    ```
 
-Leave `AZURE_COSMOSDB_CONTAINER_NAME` and `VECTOR_ALGORITHM` empty to run both containers automatically. The sample iterates over the known container names (`hotels_diskann` and `hotels_quantizedflat`) when no specific container is configured. If you set `VECTOR_ALGORITHM`, use one of these values:
+Leave `AZURE_COSMOSDB_CONTAINER_NAME` and `VECTOR_ALGORITHM` empty to run both containers automatically. The sample iterates over the known container names (`hotels_diskann_py` and `hotels_quantizedflat_py`) when no specific container is configured. If you set `VECTOR_ALGORITHM`, use one of these values:
 
 - `diskann`
 - `quantizedflat`
@@ -130,8 +130,8 @@ The sample demonstrates both goals in sequence:
 **Goal 1 - Control Plane (create containers with vector indexes):**
 1. Authenticates with `DefaultAzureCredential`
 2. Creates the `HotelsCreateIndex` database (if needed)
-3. Creates the `hotels_diskann` container with DiskANN vector index on `/embedding`
-4. Creates the `hotels_quantizedflat` container with QuantizedFlat vector index on `/embedding`
+3. Creates the `hotels_diskann_py` container with DiskANN vector index on `/embedding`
+4. Creates the `hotels_quantizedflat_py` container with QuantizedFlat vector index on `/embedding`
 
 **Goal 2 - Data Plane (load and query with distance functions):**
 1. Loads pre-vectorized hotel documents from `./data/HotelsData_toCosmosDB_Vector_byRegion.json`
@@ -245,14 +245,17 @@ for batch in _chunked(documents, BATCH_SIZE):
 
 ### Run vector similarity queries with different distance functions
 
-After inserting documents, the sample generates a query embedding and runs **three separate queries** — one for each distance function. The embedding field name is validated before being interpolated. `VectorDistance()` automatically ranks results by similarity:
+After inserting documents, the sample generates a query embedding and runs **three separate queries** — one for each distance function. The embedding field name is validated before being interpolated. `ORDER BY VectorDistance(...)` is required to rank results by similarity; without it, `SELECT TOP N` returns N arbitrary documents, not the nearest neighbors.
+
+Scope the vector query to a single partition by passing the partition key through the Python SDK query option. Cosmos DB routes the request to the one physical partition that owns that region, so a `WHERE c.Region = ...` filter is unnecessary. This keeps the SQL focused on `ORDER BY VectorDistance(...)` for ranking and is the recommended, most efficient pattern for single-partition vector search:
 
 ```python
 # Query with Cosine distance
 query_text = (
     "SELECT TOP @topK c.HotelId, c.HotelName, c.Region, "
     "VectorDistance(c.{0}, @embedding, false, {{'distanceFunction': 'Cosine'}}) AS similarityScore "
-    "FROM c WHERE c.Region = @partitionKey"
+    "FROM c "
+    "ORDER BY VectorDistance(c.{0}, @embedding, false, {{'distanceFunction': 'Cosine'}})"
 ).format(embedding_field)
 
 results_cosine = list(container.query_items(
@@ -260,7 +263,6 @@ results_cosine = list(container.query_items(
     parameters=[
         {"name": "@topK", "value": 5},
         {"name": "@embedding", "value": list(query_embedding)},
-        {"name": "@partitionKey", "value": "Northeast"},
     ],
     partition_key="Northeast",
 ))
@@ -276,7 +278,7 @@ Azure Cosmos DB for NoSQL - create and query vector indexes with Python
 ========================================================================
 Database: Hotels
 Data file: .../data/HotelsData_toCosmosDB_Vector_byRegion.json
-Target containers: hotels_diskann, hotels_quantizedflat
+Target containers: hotels_diskann_py, hotels_quantizedflat_py
 
 === Verify embedding dimensions ===
 Deployment: text-embedding-3-small
@@ -284,19 +286,19 @@ Model:      text-embedding-3-small
 Actual:     1536
 Expected:   1536
 
-=== Ingest documents: hotels_diskann ===
+=== Ingest documents: hotels_diskann_py ===
 Inserted 50/50 documents using transactional batches. RU: 6812.47
 
-=== Ingest documents: hotels_quantizedflat ===
+=== Ingest documents: hotels_quantizedflat_py ===
 Inserted 50/50 documents using transactional batches. RU: 6810.92
 
 Query text: hotel near the ocean
 
-=== Query results: hotels_diskann (DiskANN) ===
+=== Query results: hotels_diskann_py (DiskANN) ===
 Request charge: 5.33 RUs
 1. HotelId=11 | HotelName=Royal Cottage Resort | score=0.4991 | Description=Your home away from home...
 
-=== Query results: hotels_quantizedflat (QuantizedFlat) ===
+=== Query results: hotels_quantizedflat_py (QuantizedFlat) ===
 Request charge: 5.35 RUs
 1. HotelId=11 | HotelName=Royal Cottage Resort | score=0.4991 | Description=Your home away from home...
 

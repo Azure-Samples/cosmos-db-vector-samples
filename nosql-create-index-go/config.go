@@ -10,8 +10,8 @@ import (
 )
 
 const (
-	diskANNContainer                = "hotels_diskann"
-	quantizedFlatContainer          = "hotels_quantizedflat"
+	diskANNContainer                = "hotels_diskann_go"
+	quantizedFlatContainer          = "hotels_quantizedflat_go"
 	embeddingFieldName              = "embedding"
 	embeddingDimensions             = 1536
 	partitionKeyFieldName           = "Region"

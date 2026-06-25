@@ -28,7 +28,7 @@ def _build_container_payload(
     Args:
         container_name: Name of the container
         partition_key_path: Path to partition key field (e.g., "/HotelId")
-        embedding_field: Path to embedding field (e.g., "/DescriptionVector")
+        embedding_field: Path to embedding field (e.g., "/embedding")
         dimensions: Vector embedding dimensions
         index_type: Vector index type ("diskANN" or "quantizedflat")
     
@@ -80,8 +80,8 @@ def create_containers(credential: DefaultAzureCredential, config: SampleConfig) 
 
     embedding_path = f"/{config.embedding_field_name}"
     containers_config = [
-        {"type": "diskANN", "container_name": "hotels_diskann"},
-        {"type": "QuantizedFlat", "container_name": "hotels_quantizedflat"},
+        {"type": "diskANN", "container_name": "hotels_diskann_py"},
+        {"type": "QuantizedFlat", "container_name": "hotels_quantizedflat_py"},
     ]
 
     for container_config in containers_config:
@@ -146,7 +146,7 @@ def delete_containers(credential: DefaultAzureCredential, config: SampleConfig) 
     )
 
     # Always try to delete both containers, regardless of which one is active
-    container_names = ["hotels_diskann", "hotels_quantizedflat"]
+    container_names = ["hotels_diskann_py", "hotels_quantizedflat_py"]
 
     for container_name in container_names:
         try:

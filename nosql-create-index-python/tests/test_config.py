@@ -22,7 +22,7 @@ class ConfigTests(unittest.TestCase):
         config = load_config(self.valid_env)
         self.assertEqual(
             tuple(target_containers(config)),
-            ("hotels_diskann", "hotels_quantizedflat"),
+            ("hotels_diskann_py", "hotels_quantizedflat_py"),
         )
 
     def test_load_config_resolves_shared_data_file(self) -> None:
@@ -50,7 +50,7 @@ class ConfigTests(unittest.TestCase):
 
     def test_validate_config_rejects_inconsistent_container_and_algorithm(self) -> None:
         invalid_env = dict(self.valid_env)
-        invalid_env["AZURE_COSMOSDB_CONTAINER_NAME"] = "hotels_quantizedflat"
+        invalid_env["AZURE_COSMOSDB_CONTAINER_NAME"] = "hotels_quantizedflat_py"
         invalid_env["VECTOR_ALGORITHM"] = "diskann"
         config = load_config(invalid_env)
 
@@ -62,7 +62,7 @@ class ConfigTests(unittest.TestCase):
         env["VECTOR_ALGORITHM"] = "diskann"
         config = load_config(env)
         validate_config(config)
-        self.assertEqual(tuple(target_containers(config)), ("hotels_diskann",))
+        self.assertEqual(tuple(target_containers(config)), ("hotels_diskann_py",))
 
 
 if __name__ == "__main__":

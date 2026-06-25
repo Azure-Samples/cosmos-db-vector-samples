@@ -24,8 +24,8 @@ public sealed record SampleConfig(
     public static readonly IReadOnlyDictionary<string, string> KnownContainers =
         new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
-            ["diskann"] = "hotels_diskann",
-            ["quantizedflat"] = "hotels_quantizedflat"
+            ["diskann"] = "hotels_diskann_dotnet",
+            ["quantizedflat"] = "hotels_quantizedflat_dotnet"
         };
 }
 
@@ -102,7 +102,7 @@ public static class Config
 
         if (config.ContainerName is not null && !SampleConfig.KnownContainers.Values.Contains(config.ContainerName, StringComparer.OrdinalIgnoreCase))
         {
-            throw new InvalidOperationException("AZURE_COSMOSDB_CONTAINER_NAME must be one of: hotels_diskann, hotels_quantizedflat.");
+            throw new InvalidOperationException("AZURE_COSMOSDB_CONTAINER_NAME must be one of: hotels_diskann_dotnet, hotels_quantizedflat_dotnet.");
         }
 
         if (config.ContainerName is not null && config.VectorAlgorithm is not null)
@@ -144,8 +144,8 @@ public static class Config
     {
         return containerName switch
         {
-            "hotels_diskann" => "DiskANN",
-            "hotels_quantizedflat" => "QuantizedFlat",
+            "hotels_diskann_dotnet" => "DiskANN",
+            "hotels_quantizedflat_dotnet" => "QuantizedFlat",
             _ => containerName
         };
     }

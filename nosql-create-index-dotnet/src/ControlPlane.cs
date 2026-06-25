@@ -10,7 +10,7 @@ namespace NosqlCreateIndexDotnet;
 /// <summary>
 /// Control-plane operations using Azure.ResourceManager.CosmosDB (ARM SDK).
 /// 
-///   1. Create containers with vector indexes (hotels_diskann, hotels_quantizedflat)
+///   1. Create containers with vector indexes (hotels_diskann_dotnet, hotels_quantizedflat_dotnet)
 ///   2. Clean up sample-created containers
 /// 
 /// RBAC Setup:
@@ -46,8 +46,8 @@ public static class ControlPlane
         // Create separate containers for each index type
         var indexConfigs = new[]
         {
-            (Name: "hotels_diskann", IndexType: CosmosDBVectorIndexType.DiskAnn),
-            (Name: "hotels_quantizedflat", IndexType: CosmosDBVectorIndexType.QuantizedFlat)
+            (Name: "hotels_diskann_dotnet", IndexType: CosmosDBVectorIndexType.DiskAnn),
+            (Name: "hotels_quantizedflat_dotnet", IndexType: CosmosDBVectorIndexType.QuantizedFlat)
         };
 
         foreach (var indexConfig in indexConfigs)
@@ -95,7 +95,7 @@ public static class ControlPlane
         var database = await account.Value.GetCosmosDBSqlDatabaseAsync(config.DatabaseName, cancellationToken);
         var containers = database.Value.GetCosmosDBSqlContainers();
 
-        var containerNames = new[] { "hotels_diskann", "hotels_quantizedflat" };
+        var containerNames = new[] { "hotels_diskann_dotnet", "hotels_quantizedflat_dotnet" };
 
         Console.WriteLine("\n=== Cleanup: Remove Sample Containers ===");
         foreach (var containerName in containerNames)

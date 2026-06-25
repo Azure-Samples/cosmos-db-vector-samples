@@ -31,8 +31,8 @@ static async Task<int> RunAsync()
         Console.WriteLine("  4. Documents group correctly by Region for batching");
         Console.WriteLine("  5. Field name validation and distance function support are correct");
         Console.WriteLine("  6. VectorDistance query structure is correct:");
-        Console.WriteLine("     - No ORDER BY clause");
-        Console.WriteLine("     - Uses Region partition key in WHERE clause");
+        Console.WriteLine("     - Includes ORDER BY VectorDistance clause for nearest-neighbor ranking");
+        Console.WriteLine("     - Does not filter by Region in the SQL WHERE clause");
         Console.WriteLine("     - Passes distance function in options parameter");
         Console.WriteLine("     - Applies QueryRequestOptions.PartitionKey");
         return 0;
@@ -152,8 +152,9 @@ static void TestFieldNameValidation()
 static async Task TestQueryStructureAsync()
 {
     var query = DataPlane.BuildVectorDistanceQueryText("embedding", "Cosine");
-    Assert(!query.Contains("ORDER BY", StringComparison.OrdinalIgnoreCase), "Query must not contain ORDER BY.");
-    Assert(query.Contains("WHERE c.Region = @partitionKey", StringComparison.Ordinal), "Query must filter on Region partition key.");
+    Assert(query.Contains("ORDER BY", StringComparison.OrdinalIgnoreCase), "Query must contain ORDER BY for nearest-neighbor ranking.");
+    Assert(query.Contains("VectorDistance(c.embedding, @embedding, false", StringComparison.Ordinal), "ORDER BY must repeat the VectorDistance expression.");
+    Assert(!query.Contains("WHERE c.Region = @partitionKey", StringComparison.Ordinal), "Query must not filter on Region in SQL.");
     Assert(query.Contains("{'distanceFunction': 'Cosine'}", StringComparison.Ordinal), "Query must include distanceFunction options.");
 
     var sampleRoot = Config.Load().SampleRoot;
@@ -166,12 +167,16 @@ static async Task TestQueryStructureAsync()
     Assert(
         !source.Contains("WHERE c.HotelId = @partitionKey", StringComparison.Ordinal),
         "Query should not use HotelId as the partition key filter.");
+    Assert(
+        !source.Contains(".WithParameter(\"@partitionKey\", config.PartitionKeyValue)", StringComparison.Ordinal),
+        "Query should not pass the partition key as a SQL parameter.");
 
     Console.WriteLine("[PASS] VectorDistance query structure is correct");
-    Console.WriteLine("        - Uses Region partition key in WHERE clause");
+    Console.WriteLine("        - Does not filter by Region in the SQL WHERE clause");
     Console.WriteLine("        - Passes distance function in options");
     Console.WriteLine("        - Does NOT use HotelId as partition key");
     Console.WriteLine("        - Applies QueryRequestOptions.PartitionKey");
+    Console.WriteLine("        - Includes ORDER BY VectorDistance for nearest-neighbor ranking");
 }
 
 static void Assert(bool condition, string message)

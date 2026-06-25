@@ -8,8 +8,8 @@ from pathlib import Path
 from typing import Mapping, Optional, Sequence
 
 KNOWN_CONTAINERS = {
-    "diskann": "hotels_diskann",
-    "quantizedflat": "hotels_quantizedflat",
+    "diskann": "hotels_diskann_py",
+    "quantizedflat": "hotels_quantizedflat_py",
 }
 
 REQUIRED_ENV_VARS = (

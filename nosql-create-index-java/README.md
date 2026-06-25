@@ -6,7 +6,7 @@ It uses:
 - `DefaultAzureCredential` for Azure Cosmos DB and the Azure OpenAI client
 - existing `Hotels` database resources created by `azd up`
 - the shared `..\data\HotelsData_toCosmosDB_Vector_byRegion.json` dataset
-- bulk upsert operations for `hotels_diskann` and `hotels_quantizedflat`
+- bulk upsert operations for `hotels_diskann_java` and `hotels_quantizedflat_java`
 - `VectorDistance()` SQL queries for similarity search
 
 > [!IMPORTANT]
@@ -23,8 +23,8 @@ It uses:
   - **Cognitive Services OpenAI User**
 
 The sample expects these existing containers in the `Hotels` database:
-- `hotels_diskann`
-- `hotels_quantizedflat`
+- `hotels_diskann_java`
+- `hotels_quantizedflat_java`
 
 ## Set up the sample
 

@@ -35,7 +35,7 @@ export function loadConfigFromEnv(
       accountName: env.AZURE_COSMOSDB_ACCOUNT_NAME,
       endpoint: env.AZURE_COSMOSDB_ENDPOINT,
       databaseName: env.AZURE_COSMOSDB_CREATE_INDEX_DATABASENAME || "HotelsCreateIndex",
-      containerName: env.AZURE_COSMOSDB_CONTAINER_NAME || "hotels_diskann",
+      containerName: env.AZURE_COSMOSDB_CONTAINER_NAME || "hotels_diskann_ts",
     },
     openai: {
       endpoint: env.AZURE_OPENAI_ENDPOINT,

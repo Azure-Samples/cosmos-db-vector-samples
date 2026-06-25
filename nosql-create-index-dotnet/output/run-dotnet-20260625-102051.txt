@@ -1,0 +1,66 @@
+Using Azure OpenAI Embedding Deployment/Model: text-embedding-3-small
+Reading JSON file from C:\project-dina-data-ai\repos\cosmos-db-vector-samples-2\nosql-create-index-dotnet\data\HotelsData_toCosmosDB_Vector_byRegion.json
+✓ Region validation passed. Found regions: Midwest, Northeast, South, West
+  Region 'Northeast': 10 documents
+  Region 'Midwest': 10 documents
+  Region 'South': 14 documents
+  Region 'West': 16 documents
+Loaded 50 documents
+
+=== Step 1: Create Container with Vector Index ===
+  Container:      hotels_diskann_dotnet
+  Index type:     diskANN
+  Dimensions:     1536
+  Distance func:  cosine (queried with all 3 metrics)
+  Deleting existing container if present...
+  Container does not exist (OK)
+  Created in 7.5s
+  Vector index is IMMUTABLE — cannot be changed after creation
+
+=== Step 1: Create Container with Vector Index ===
+  Container:      hotels_quantizedflat_dotnet
+  Index type:     quantizedFlat
+  Dimensions:     1536
+  Distance func:  cosine (queried with all 3 metrics)
+  Deleting existing container if present...
+  Container does not exist (OK)
+  Created in 6.9s
+  Vector index is IMMUTABLE — cannot be changed after creation
+
+Processing in batches of 50...
+  Region 'Midwest': 10 documents
+  Region 'Northeast': 10 documents
+  Region 'South': 14 documents
+  Region 'West': 16 documents
+  ✓ hotels_diskann_dotnet: 50 inserted (3779.15 RUs)
+  Region 'Midwest': 10 documents
+  Region 'Northeast': 10 documents
+  Region 'South': 14 documents
+  Region 'West': 16 documents
+  ✓ hotels_quantizedflat_dotnet: 50 inserted (1889.58 RUs)
+
+Query: "hotel near the ocean"
+Embedding generated (1536 dimensions)
+
+Running searches (top 5 results for each distance function)...
+  ✓ hotels_diskann_dotnet queried (3.54 RUs)
+  ✓ hotels_diskann_dotnet queried (3.54 RUs)
+  ✓ hotels_diskann_dotnet queried (3.54 RUs)
+  ✓ hotels_quantizedflat_dotnet queried (3.54 RUs)
+  ✓ hotels_quantizedflat_dotnet queried (3.54 RUs)
+  ✓ hotels_quantizedflat_dotnet queried (3.54 RUs)
+
+| Index Type     | Distance Function | Top 1 Result               | Score  | Top 2 Result               | Score  | Diff   |
+|----------------|-------------------|----------------------------|--------|----------------------------|--------|--------|
+| DiskANN        | Cosine            | City Center Summer Wind... | 0.4025 | Red Tide Hotel             | 0.4000 | 0.0025 |
+| DiskANN        | DotProduct        | City Center Summer Wind... | 0.4027 | Red Tide Hotel             | 0.4001 | 0.0025 |
+| DiskANN        | Euclidean         | City Center Summer Wind... | 1.0934 | Red Tide Hotel             | 1.0957 | -0.0023 |
+| QuantizedFlat  | Cosine            | City Center Summer Wind... | 0.4025 | Red Tide Hotel             | 0.4000 | 0.0025 |
+| QuantizedFlat  | DotProduct        | City Center Summer Wind... | 0.4027 | Red Tide Hotel             | 0.4001 | 0.0025 |
+| QuantizedFlat  | Euclidean         | City Center Summer Wind... | 1.0934 | Red Tide Hotel             | 1.0957 | -0.0023 |
+
+=== Cleanup: Remove Sample Containers ===
+  ✓ Deleted container: hotels_diskann_dotnet
+  ✓ Deleted container: hotels_quantizedflat_dotnet
+
+Complete

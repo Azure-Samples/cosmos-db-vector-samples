@@ -6,10 +6,10 @@ import java.util.Map;
 
 public final class Config {
     private static final Map<String, String> KNOWN_CONTAINERS = Map.of(
-            "diskann", "hotels_diskann",
-            "quantizedflat", "hotels_quantizedflat"
+            "diskann", "hotels_diskann_java",
+            "quantizedflat", "hotels_quantizedflat_java"
     );
-    private static final List<String> TARGET_CONTAINERS = List.of("hotels_diskann", "hotels_quantizedflat");
+    private static final List<String> TARGET_CONTAINERS = List.of("hotels_diskann_java", "hotels_quantizedflat_java");
 
     private static final String DEFAULT_DATABASE_NAME = "HotelsCreateIndex";
     private static final String DEFAULT_LOCATION = "West US 3";
@@ -63,8 +63,11 @@ public final class Config {
 
     public static void validate(SampleConfig config) {
         StringBuilder missing = new StringBuilder();
+        appendMissing(missing, "AZURE_SUBSCRIPTION_ID", config.subscriptionId());
+        appendMissing(missing, "AZURE_RESOURCE_GROUP", config.resourceGroup());
+        appendMissing(missing, "AZURE_COSMOSDB_ACCOUNT_NAME", config.accountName());
         appendMissing(missing, "AZURE_COSMOSDB_ENDPOINT", config.cosmosEndpoint());
-        appendMissing(missing, "AZURE_COSMOSDB_DATABASENAME", config.databaseName());
+        appendMissing(missing, "AZURE_COSMOSDB_CREATE_INDEX_DATABASENAME", config.databaseName());
         appendMissing(missing, "AZURE_LOCATION", config.location());
         appendMissing(missing, "AZURE_OPENAI_EMBEDDING_ENDPOINT", config.openAiEmbeddingEndpoint());
         appendMissing(missing, "AZURE_OPENAI_EMBEDDING_DEPLOYMENT", config.openAiEmbeddingDeployment());
@@ -78,7 +81,7 @@ public final class Config {
         }
 
         if (config.containerName() != null && !TARGET_CONTAINERS.contains(config.containerName())) {
-            throw new IllegalArgumentException("AZURE_COSMOSDB_CONTAINER_NAME must be one of: hotels_diskann, hotels_quantizedflat.");
+            throw new IllegalArgumentException("AZURE_COSMOSDB_CONTAINER_NAME must be one of: hotels_diskann_java, hotels_quantizedflat_java.");
         }
 
         if (config.containerName() != null && config.vectorAlgorithm() != null) {
@@ -106,8 +109,8 @@ public final class Config {
 
     public static String algorithmLabel(String containerName) {
         return switch (containerName) {
-            case "hotels_diskann" -> "DiskANN";
-            case "hotels_quantizedflat" -> "QuantizedFlat";
+            case "hotels_diskann_java" -> "DiskANN";
+            case "hotels_quantizedflat_java" -> "QuantizedFlat";
             default -> containerName;
         };
     }

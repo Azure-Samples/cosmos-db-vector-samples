@@ -130,6 +130,16 @@ public final class DataPlane {
             String containerName,
             List<Map<String, Object>> documents) {
 
+        // Group by region and print per-region counts as batch progress (matches .NET output)
+        Map<String, List<Map<String, Object>>> byRegion = new java.util.TreeMap<>();
+        for (Map<String, Object> doc : documents) {
+            String region = String.valueOf(doc.get("Region"));
+            byRegion.computeIfAbsent(region, k -> new ArrayList<>()).add(doc);
+        }
+        for (Map.Entry<String, List<Map<String, Object>>> entry : byRegion.entrySet()) {
+            System.out.printf("  Region '%s': %d documents%n", entry.getKey(), entry.getValue().size());
+        }
+
         List<CosmosItemOperation> operations = new ArrayList<>(documents.size());
         for (Map<String, Object> document : documents) {
             // Extract Region from document for partition key
@@ -172,11 +182,11 @@ public final class DataPlane {
             List<Float> queryEmbedding,
             String distanceFunction) {
         String embeddingField = validateFieldName(config.embeddingFieldName());
-        // Query pattern matches plan section 4.4: WHERE c.Region = @partitionKey for single-partition efficiency
-        // Belt-and-suspenders: both WHERE clause AND SDK partition key routing for guaranteed single-partition execution
+        // Scope the vector query to one partition through SDK request options so the SQL focuses on ranking.
         String queryText = "SELECT TOP @topK c.HotelId, c.HotelName, c.Description, "
                 + "VectorDistance(c." + embeddingField + ", @embedding, false, {'distanceFunction': '" + distanceFunction + "'}) AS SimilarityScore "
-                + "FROM c WHERE c.Region = @partitionKey";
+                + "FROM c "
+                + "ORDER BY VectorDistance(c." + embeddingField + ", @embedding, false, {'distanceFunction': '" + distanceFunction + "'})";
 
         List<QueryResult> results = new ArrayList<>();
         double requestCharge = 0.0;
@@ -187,8 +197,7 @@ public final class DataPlane {
                 queryText,
                 List.of(
                         new SqlParameter("@topK", config.topCount()),
-                        new SqlParameter("@embedding", toDoubleList(queryEmbedding)),
-                        new SqlParameter("@partitionKey", partitionKeyValue)));
+                        new SqlParameter("@embedding", toDoubleList(queryEmbedding))));
 
         CosmosQueryRequestOptions options = new CosmosQueryRequestOptions();
         options.setPartitionKey(new PartitionKeyBuilder().add(partitionKeyValue).build());
