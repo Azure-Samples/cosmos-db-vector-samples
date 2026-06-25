@@ -1,0 +1,73 @@
+Using Azure OpenAI Embedding Deployment/Model: text-embedding-3-small
+
+=== Step 1: Create Container with Vector Index ===
+  Container:      hotels_diskann
+  Index type:     diskANN
+  Dimensions:     1536
+  Distance func:  cosine (queried with all 3 metrics)
+  Deleting existing container if present...
+  Deleted existing container
+  Created in 7.9s
+  Vector index is IMMUTABLE — cannot be changed after creation
+
+=== Step 1: Create Container with Vector Index ===
+  Container:      hotels_quantizedflat
+  Index type:     quantizedFlat
+  Dimensions:     1536
+  Distance func:  cosine (queried with all 3 metrics)
+  Deleting existing container if present...
+  Deleted existing container
+  Created in 10.3s
+  Vector index is IMMUTABLE — cannot be changed after creation
+
+==================================================
+Index type: diskANN
+Container: hotels_diskann
+==================================================
+
+Reading JSON file from C:\project-dina-data-ai\repos\public-azuresamples-cosmos-db-vector-samples\data\HotelsData_toCosmosDB_Vector.json
+Loaded 50 documents
+Processing in batches of 50...
+  ✓ hotels_diskann: 50 inserted (6805.25 RUs)
+
+Query: "hotel near the ocean"
+Embedding generated (1536 dimensions)
+
+Running search (top 3 results for each metric)...
+  ✓ hotels_diskann queried with 3 metrics (15.66 RUs)
+
+==================================================
+Index type: quantizedFlat
+Container: hotels_quantizedflat
+==================================================
+
+Reading JSON file from C:\project-dina-data-ai\repos\public-azuresamples-cosmos-db-vector-samples\data\HotelsData_toCosmosDB_Vector.json
+Loaded 50 documents
+Processing in batches of 50...
+  ✓ hotels_quantizedflat: 50 inserted (3402.63 RUs)
+
+Query: "hotel near the ocean"
+Embedding generated (1536 dimensions)
+
+Running search (top 3 results for each metric)...
+  ✓ hotels_quantizedflat queried with 3 metrics (15.66 RUs)
+
+================================================================================
+CONSOLIDATED RESULTS — Vector Query with All Metrics & Index Types
+================================================================================
+
+| Container          | Metric     | Top 1 Result               | Score  | Top 2 Result               | Score  | Diff   |
+|--------------------|------------|----------------------------|--------|----------------------------|--------|--------|
+| hotels_diskann     | cosine     | Windy Ocean Motel          | 0.5268 | Ocean Water Resort & Spa   | 0.5177 | 0.0091 |
+| hotels_diskann     | euclidean  | Windy Ocean Motel          | 0.5268 | Ocean Water Resort & Spa   | 0.5177 | 0.0091 |
+| hotels_diskann     | dotproduct | Windy Ocean Motel          | 0.5268 | Ocean Water Resort & Spa   | 0.5177 | 0.0091 |
+| hotels_quantizedflat | cosine     | Windy Ocean Motel          | 0.5268 | Ocean Water Resort & Spa   | 0.5176 | 0.0092 |
+| hotels_quantizedflat | euclidean  | Windy Ocean Motel          | 0.5268 | Ocean Water Resort & Spa   | 0.5176 | 0.0092 |
+| hotels_quantizedflat | dotproduct | Windy Ocean Motel          | 0.5268 | Ocean Water Resort & Spa   | 0.5176 | 0.0092 |
+
+
+=== Cleanup: Remove Sample Containers ===
+  ✓ Deleted container: hotels_diskann
+  ✓ Deleted container: hotels_quantizedflat
+
+Complete

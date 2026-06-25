@@ -209,7 +209,7 @@ EMBEDDED_FIELD="DescriptionVector"
 EMBEDDING_DIMENSIONS="1536"
 
 # Data file with pre-computed vectors (relative to dist/)
-DATA_FILE_WITH_VECTORS="../data/HotelsData_toCosmosDB_Vector.json"
+DATA_FILE_WITH_VECTORS_AND_REGIONS="../data/HotelsData_toCosmosDB_Vector_byRegion.json"
 EOF
 
 echo ""

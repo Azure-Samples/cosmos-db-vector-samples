@@ -1,26 +1,18 @@
 /**
  * Control-plane operations using @azure/arm-cosmosdb (ARM SDK).
  *
- *   1. Create container with vector index
- *   2. Create data-plane RBAC role definition and assignment
+ *   1. Create containers with vector indexes
+ *   2. Clean up sample-created containers
+ *
+ * RBAC Setup:
+ * - Role definitions and assignments are created by `azd up` via Bicep (infra/database.bicep lines 195-226)
+ * - Sample code uses DefaultAzureCredential() for authentication
+ * - No RBAC creation code is needed in the sample
  */
 
 import { CosmosDBManagementClient } from "@azure/arm-cosmosdb";
 import type { TokenCredential } from "@azure/identity";
 import type { SampleConfig } from "./config.js";
-
-// Deterministic GUIDs for idempotent role definition / assignment
-export const ROLE_DEFINITION_GUID = "e4e1a8b7-0a7e-4c6c-8f1d-000000000001";
-export const ROLE_ASSIGNMENT_GUID = "e4e1a8b7-0a7e-4c6c-8f1d-000000000002";
-
-/** Build the full ARM resource ID for the Cosmos DB account. */
-function accountResourceId(config: SampleConfig) {
-  return (
-    `/subscriptions/${config.azure.subscriptionId}` +
-    `/resourceGroups/${config.azure.resourceGroup}` +
-    `/providers/Microsoft.DocumentDB/databaseAccounts/${config.cosmos.accountName}`
-  );
-}
 
 /** Create an ARM management client for Cosmos DB. */
 export function createArmClient(
@@ -31,122 +23,137 @@ export function createArmClient(
 }
 
 // ---------------------------------------------------------------------------
+// Delete container (if it exists) to ensure clean state
+// ---------------------------------------------------------------------------
+async function deleteContainerIfExists(
+  armClient: CosmosDBManagementClient,
+  config: SampleConfig,
+  containerName?: string
+) {
+  const actualContainerName = containerName || config.cosmos.containerName;
+  try {
+    console.log(`  Deleting existing container if present...`);
+    await armClient.sqlResources.beginDeleteSqlContainerAndWait(
+      config.azure.resourceGroup!,
+      config.cosmos.accountName!,
+      config.cosmos.databaseName,
+      actualContainerName
+    );
+    console.log(`  Deleted existing container`);
+  } catch (error) {
+    // 404 means container doesn't exist — that's fine
+    if ((error as any).code === 404 || (error as any).message?.includes("NotFound")) {
+      console.log(`  Container does not exist (OK)`);
+    } else {
+      throw error;
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Step 1 — Create container with vector index
 // ---------------------------------------------------------------------------
 export async function createContainer(
   armClient: CosmosDBManagementClient,
   config: SampleConfig
 ) {
-  console.log("\n=== Step 1: Create Container with Vector Index ===");
-  console.log(`  Container:         ${config.cosmos.containerName}`);
-  console.log(`  Index type:        ${config.vectorIndexType}`);
-  console.log(`  Dimensions:        ${config.expectedDimensions}`);
-  console.log(`  Distance function: cosine`);
+  const indexTypes = [
+    { type: "diskANN", containerName: "hotels_diskann" },
+    { type: "quantizedFlat", containerName: "hotels_quantizedflat" },
+  ];
 
   const embeddingPath = `/${config.embeddingField}`;
 
-  const start = Date.now();
-  await armClient.sqlResources.beginCreateUpdateSqlContainerAndWait(
-    config.azure.resourceGroup!,
-    config.cosmos.accountName!,
-    config.cosmos.databaseName,
-    config.cosmos.containerName,
-    {
-      resource: {
-        id: config.cosmos.containerName,
-        partitionKey: {
-          paths: ["/HotelId"],
-          kind: "MultiHash",
-          version: 2,
-        },
-        indexingPolicy: {
-          indexingMode: "consistent",
-          automatic: true,
-          includedPaths: [{ path: "/*" }],
-          excludedPaths: [{ path: "/_etag/?" }],
-          vectorIndexes: [
-            {
-              path: embeddingPath,
-              type: config.vectorIndexType,
-            },
-          ],
-        },
-        vectorEmbeddingPolicy: {
-          vectorEmbeddings: [
-            {
-              path: embeddingPath,
-              dataType: "float32",
-              dimensions: config.expectedDimensions,
-              distanceFunction: "cosine",
-            },
-          ],
-        },
-      },
-      location: config.azure.location,
-    }
-  );
+  for (const indexConfig of indexTypes) {
+    console.log("\n=== Step 1: Create Container with Vector Index ===");
+    console.log(`  Container:      ${indexConfig.containerName}`);
+    console.log(`  Index type:     ${indexConfig.type}`);
+    console.log(`  Dimensions:     ${config.expectedDimensions}`);
+    console.log(`  Distance func:  cosine (queried with all 3 metrics)`);
 
-  const elapsed = ((Date.now() - start) / 1000).toFixed(1);
-  console.log(`  Created in ${elapsed}s`);
-  console.log(
-    "  Vector index is IMMUTABLE — cannot be changed after creation"
-  );
+    // Delete existing container to ensure clean state (idempotent)
+    await deleteContainerIfExists(armClient, config, indexConfig.containerName);
+
+    const start = Date.now();
+    await armClient.sqlResources.beginCreateUpdateSqlContainerAndWait(
+      config.azure.resourceGroup!,
+      config.cosmos.accountName!,
+      config.cosmos.databaseName,
+      indexConfig.containerName,
+      {
+        resource: {
+          id: indexConfig.containerName,
+          partitionKey: {
+            paths: ["/Region"],
+            kind: "MultiHash",
+            version: 2,
+          },
+          indexingPolicy: {
+            indexingMode: "consistent",
+            automatic: true,
+            includedPaths: [{ path: "/*" }],
+            excludedPaths: [{ path: "/_etag/?" }],
+            vectorIndexes: [
+              {
+                path: embeddingPath,
+                type: indexConfig.type,
+              },
+            ],
+          },
+          vectorEmbeddingPolicy: {
+            vectorEmbeddings: [
+              {
+                path: embeddingPath,
+                dataType: "float32",
+                dimensions: config.expectedDimensions,
+                distanceFunction: "cosine",
+              },
+            ],
+          },
+        },
+        location: config.azure.location,
+      }
+    );
+
+    const elapsed = ((Date.now() - start) / 1000).toFixed(1);
+    console.log(`  Created in ${elapsed}s`);
+    console.log(
+      "  Vector index is IMMUTABLE — cannot be changed after creation"
+    );
+  }
 }
 
 // ---------------------------------------------------------------------------
-// Step 2 — Create data-plane RBAC role definition + assignment
+// Step 6 — Clean up sample-created containers (not azd infra)
 // ---------------------------------------------------------------------------
-export async function createRbacAccess(
+export async function cleanupSampleContainers(
   armClient: CosmosDBManagementClient,
   config: SampleConfig
 ) {
-  console.log("\n=== Step 2: Create Data-Plane RBAC Access ===");
+  const containerNames = ["hotels_diskann", "hotels_quantizedflat"];
 
-  const accountId = accountResourceId(config);
-
-  // ---- Role definition ----
-  console.log("  Creating role definition...");
-  await armClient.sqlResources.beginCreateUpdateSqlRoleDefinitionAndWait(
-    ROLE_DEFINITION_GUID,
-    config.azure.resourceGroup!,
-    config.cosmos.accountName!,
-    {
-      roleName: "Write to Azure Cosmos DB for NoSQL data plane",
-      type: "CustomRole",
-      assignableScopes: [accountId],
-      permissions: [
-        {
-          dataActions: [
-            "Microsoft.DocumentDB/databaseAccounts/readMetadata",
-            "Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers/items/*",
-            "Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers/*",
-          ],
-        },
-      ],
+  console.log("\n=== Cleanup: Remove Sample Containers ===");
+  for (const containerName of containerNames) {
+    try {
+      await armClient.sqlResources.beginDeleteSqlContainerAndWait(
+        config.azure.resourceGroup!,
+        config.cosmos.accountName!,
+        config.cosmos.databaseName,
+        containerName
+      );
+      console.log(`  ✓ Deleted container: ${containerName}`);
+    } catch (error) {
+      if ((error as any).code === 404 || (error as any).message?.includes("NotFound")) {
+        console.log(`  ✓ Container does not exist: ${containerName}`);
+      } else {
+        throw error;
+      }
     }
-  );
-  console.log("  Role definition created");
-
-  // ---- Role assignment for current user ----
-  if (!config.azure.userPrincipalId) {
-    console.log(
-      "  AZURE_USER_PRINCIPAL_ID not set — skipping role assignment"
-    );
-    return;
   }
-
-  console.log("  Assigning role to current user...");
-  const roleDefinitionId = `${accountId}/sqlRoleDefinitions/${ROLE_DEFINITION_GUID}`;
-
-  await armClient.sqlResources.beginCreateUpdateSqlRoleAssignmentAndWait(
-    ROLE_ASSIGNMENT_GUID,
-    config.azure.resourceGroup!,
-    config.cosmos.accountName!,
-    {
-      roleDefinitionId,
-      scope: accountId,
-      principalId: config.azure.userPrincipalId,
-    }
-  );
-  console.log(`  Role assigned to principal: ${config.azure.userPrincipalId}`);
 }
+
+// ---------------------------------------------------------------------------
+// Exports for testing
+// ---------------------------------------------------------------------------
+export { CosmosDBManagementClient } from "@azure/arm-cosmosdb";
+

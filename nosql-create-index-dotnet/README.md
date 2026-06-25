@@ -76,7 +76,19 @@ The sample never creates databases, containers, or vector indexes in code.
 
 ## Run
 
-Run the sample from this directory:
+**Load environment variables from `.env` first (if not using appsettings.json):**
+
+```powershell
+# PowerShell (strips quotes from values)
+Get-Content .env | Where-Object { $_ -match '^[^#].*=' } | ForEach-Object { $k,$v = $_ -split '=',2; [Environment]::SetEnvironmentVariable($k.Trim(), $v.Trim().Trim('"').Trim("'")) }
+```
+
+```bash
+# Bash/Linux/Mac
+set -a; source .env; set +a
+```
+
+**Then run the sample:**
 
 ```powershell
 dotnet run --project .\nosql-create-index-dotnet.csproj
