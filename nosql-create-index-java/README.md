@@ -76,6 +76,18 @@ set -a; source .env; set +a
 mvn exec:java
 ```
 
+### Note about SLF4J logging messages
+
+When you run `mvn exec:java`, you may see these lines:
+
+```text
+SLF4J: Failed to load class "org.slf4j.impl.StaticLoggerBinder".
+SLF4J: Defaulting to no-operation (NOP) logger implementation
+SLF4J: See http://www.slf4j.org/codes.html#StaticLoggerBinder for further details.
+```
+
+This message is informational, not an error. The Azure SDK uses SLF4J as a logging facade, but no logging backend is on the classpath, so SLF4J defaults to a no-op logger that discards SDK internal log output. The sample's `System.out` output is unaffected. These lines print to stderr, so `> output.txt` doesn't capture them. To see SDK logs, add an SLF4J binding such as `slf4j-simple` or `logback-classic` as a dependency.
+
 Examples:
 
 ```powershell

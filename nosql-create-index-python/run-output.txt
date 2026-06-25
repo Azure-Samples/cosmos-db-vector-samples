@@ -1,6 +1,0 @@
-
-Error: 'charmap' codec can't encode character '\u2717' in position 0: character maps to <undefined>
-
-=== Diagnostic Check ===
-Cosmos DB Endpoint: https://db-dib-cos-4bpmnkpp4662v4.documents.azure.com:443/
-Database name: HotelsCreateIndex
