@@ -3,7 +3,6 @@ export interface SampleConfig {
     subscriptionId?: string;
     resourceGroup?: string;
     location: string;
-    userPrincipalId?: string;
   };
   cosmos: {
     accountName?: string;
@@ -20,6 +19,7 @@ export interface SampleConfig {
   embeddingField: string;
   expectedDimensions: number;
   dataFile: string;
+  partitionKeyValue: string;  // Region to query (single-partition efficiency)
 }
 
 export function loadConfigFromEnv(
@@ -30,12 +30,11 @@ export function loadConfigFromEnv(
       subscriptionId: env.AZURE_SUBSCRIPTION_ID,
       resourceGroup: env.AZURE_RESOURCE_GROUP,
       location: env.AZURE_LOCATION || "eastus2",
-      userPrincipalId: env.AZURE_USER_PRINCIPAL_ID,
     },
     cosmos: {
       accountName: env.AZURE_COSMOSDB_ACCOUNT_NAME,
       endpoint: env.AZURE_COSMOSDB_ENDPOINT,
-      databaseName: env.AZURE_COSMOSDB_DATABASENAME || "Hotels",
+      databaseName: env.AZURE_COSMOSDB_CREATE_INDEX_DATABASENAME || "HotelsCreateIndex",
       containerName: env.AZURE_COSMOSDB_CONTAINER_NAME || "hotels_diskann",
     },
     openai: {
@@ -46,18 +45,18 @@ export function loadConfigFromEnv(
         env.AZURE_OPENAI_EMBEDDING_API_VERSION || "2024-08-01-preview",
     },
     vectorIndexType: env.VECTOR_INDEX_TYPE || "diskANN",
-    embeddingField: env.EMBEDDED_FIELD || "DescriptionVector",
+    embeddingField: env.AZURE_COSMOSDB_CREATE_INDEX_EMBEDDED_FIELD || "embedding",
     expectedDimensions: parseInt(env.EMBEDDING_DIMENSIONS || "1536", 10),
     dataFile:
-      env.DATA_FILE_WITH_VECTORS || "../data/HotelsData_toCosmosDB_Vector.json",
+      env.DATA_FILE_WITH_VECTORS_AND_REGIONS ||
+      env.DATA_FILE_WITH_VECTORS ||
+      "./data/HotelsData_toCosmosDB_Vector_byRegion.json",
+    partitionKeyValue: env.PARTITION_KEY_VALUE || "Northeast",
   };
 }
 
 export function getMissingEnvironmentVariables(config: SampleConfig): string[] {
   const required: Array<[string, string | undefined]> = [
-    ["AZURE_SUBSCRIPTION_ID", config.azure.subscriptionId],
-    ["AZURE_RESOURCE_GROUP", config.azure.resourceGroup],
-    ["AZURE_COSMOSDB_ACCOUNT_NAME", config.cosmos.accountName],
     ["AZURE_COSMOSDB_ENDPOINT", config.cosmos.endpoint],
     ["AZURE_OPENAI_ENDPOINT", config.openai.endpoint],
   ];
@@ -74,6 +73,6 @@ export function validateRequiredEnvironmentVariables(config: SampleConfig): void
 
   throw new Error(
     `Missing required environment variables: ${missing.join(", ")}. ` +
-      "Run scripts/create-resources.sh first, or populate .env manually."
+      "Run 'azd up' first, or populate .env manually with 'azd env get-values > .env'."
   );
 }
