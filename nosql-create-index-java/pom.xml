@@ -78,6 +78,7 @@
                 <version>3.5.0</version>
                 <configuration>
                     <mainClass>com.azure.cosmos.createindex.App</mainClass>
+                    <cleanupDaemonThreads>false</cleanupDaemonThreads>
                 </configuration>
             </plugin>
         </plugins>

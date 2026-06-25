@@ -1,4 +1,0 @@
-
-=== Diagnostic Check ===
-Cosmos DB Endpoint: https://db-dib-cos-4bpmnkpp4662v4.documents.azure.com:443/
-Database name: HotelsCreateIndex

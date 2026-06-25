@@ -32,7 +32,10 @@ param(
     [switch]$SkipValidation
 )
 
-# Resolve to absolute path
+# Resolve to absolute path relative to PowerShell's current location (not .NET's CurrentDirectory)
+if (-not [System.IO.Path]::IsPathRooted($OutputPath)) {
+    $OutputPath = Join-Path (Get-Location).Path $OutputPath
+}
 $OutputPath = [System.IO.Path]::GetFullPath($OutputPath)
 
 Write-Host "========================================" -ForegroundColor Cyan

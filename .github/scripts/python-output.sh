@@ -1,0 +1,1 @@
+$env:PYTHONIOENCODING="utf-8"; python -m src.index > output/sample-output.txt
