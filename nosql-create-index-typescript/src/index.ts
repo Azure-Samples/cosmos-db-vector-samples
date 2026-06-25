@@ -1,26 +1,24 @@
 /**
- * Azure Cosmos DB — Create Container with Vector Index via ARM SDK
+ * Azure Cosmos DB — Vector Search Sample
  *
  * Orchestrates control-plane and data-plane operations:
  *
  * Control plane (control-plane.ts — @azure/arm-cosmosdb):
  *   1. Create container with vector index
- *   2. Create data-plane RBAC role definition and assignment
  *
  * Data plane (data-plane.ts — @azure/cosmos + Azure OpenAI):
- *   3. Verify embedding dimensions
- *   4. Insert documents from pre-vectorized data file (bulk)
- *   5. Run a vector similarity query using VectorDistance()
+ *   2. Verify embedding dimensions
+ *   3. Insert documents from pre-vectorized data file (bulk)
+ *   4. Run a vector similarity query using VectorDistance()
  *
  * Prerequisites:
- *   - Run scripts/create-resources.sh to create the resource group,
- *     Azure OpenAI, Cosmos DB account, and database
+ *   - Run `azd up` to create resources and set up RBAC roles
  *   - Or manually populate .env with the required variables
  */
 
 import { DefaultAzureCredential } from "@azure/identity";
 import { pathToFileURL } from "node:url";
-import { createArmClient, createContainer, createRbacAccess } from "./control-plane.js";
+import { createArmClient, createContainer, cleanupSampleContainers } from "./control-plane.js";
 import {
   loadConfigFromEnv,
   validateRequiredEnvironmentVariables,
@@ -37,40 +35,62 @@ import {
 // Main
 // ---------------------------------------------------------------------------
 export async function main() {
-  console.log("=".repeat(70));
-  console.log(
-    "Azure Cosmos DB — Create Container with Vector Index via ARM SDK"
-  );
-  console.log("=".repeat(70));
-
   const config = loadConfigFromEnv();
   validateRequiredEnvironmentVariables(config);
+
+  console.log(`Using Azure OpenAI Embedding Deployment/Model: ${config.openai.embeddingDeployment}`);
 
   const credential = new DefaultAzureCredential();
 
   // ---- Control plane: ARM SDK ----
   const armClient = createArmClient(credential, config.azure.subscriptionId!);
   await createContainer(armClient, config);
-  await createRbacAccess(armClient, config);
-
-  // RBAC propagation can take a few seconds
-  console.log("\n  Waiting 15 s for RBAC propagation...");
-  await new Promise((resolve) => setTimeout(resolve, 15_000));
 
   // ---- Data plane: Cosmos SDK + Azure OpenAI ----
   const cosmosClient = createCosmosClient(credential, config.cosmos.endpoint!);
   const openaiClient = createOpenAIClient(credential, config);
 
   const database = cosmosClient.database(config.cosmos.databaseName);
-  const container = database.container(config.cosmos.containerName);
-
+  
+  // Verify dimensions once
   await verifyEmbeddingDimensions(openaiClient, config);
-  await insertDocuments(container, config);
-  await vectorQuery(container, openaiClient, config);
 
-  console.log("\n" + "=".repeat(70));
-  console.log("Complete — container, vector index, and RBAC created");
-  console.log("=".repeat(70));
+  // Query both index types with all distance metrics
+  const indexTypes = ["diskANN", "quantizedFlat"];
+  const allResults: Array<{ container: string; metric: string; top1: string; top1Score: number; top2: string; top2Score: number; diff: number; ru: number }> = [];
+
+  for (const indexType of indexTypes) {
+    const containerName = indexType === "diskANN" ? "hotels_diskann" : "hotels_quantizedflat";
+    const container = database.container(containerName);
+
+    console.log(`\n${"=".repeat(50)}`);
+    console.log(`Index type: ${indexType}`);
+    console.log(`Container: ${containerName}`);
+    console.log(`${"=".repeat(50)}`);
+
+    await insertDocuments(container, config, config.embeddingField, containerName);
+    const results = await vectorQuery(container, containerName, openaiClient, config);
+    allResults.push(...results);
+  }
+
+  // Print consolidated results table
+  console.log(`\n${"=".repeat(80)}`);
+  console.log("CONSOLIDATED RESULTS — Vector Query with All Metrics & Index Types");
+  console.log(`${"=".repeat(80)}`);
+  console.log();
+  console.log(`| ${"Container".padEnd(18)} | ${"Metric".padEnd(10)} | ${"Top 1 Result".padEnd(26)} | ${"Score".padEnd(6)} | ${"Top 2 Result".padEnd(26)} | ${"Score".padEnd(6)} | ${"Diff".padEnd(6)} |`);
+  console.log(`|${"-".repeat(20)}|${"-".repeat(12)}|${"-".repeat(28)}|${"-".repeat(8)}|${"-".repeat(28)}|${"-".repeat(8)}|${"-".repeat(8)}|`);
+
+  for (const result of allResults) {
+    console.log(`| ${result.container.padEnd(18)} | ${result.metric.padEnd(10)} | ${result.top1.padEnd(26)} | ${result.top1Score.toFixed(4)} | ${result.top2.padEnd(26)} | ${result.top2Score.toFixed(4)} | ${result.diff.toFixed(4)} |`);
+  }
+
+  console.log();
+
+  // Clean up sample-created containers
+  await cleanupSampleContainers(armClient, config);
+
+  console.log("\nComplete");
 }
 
 const isDirectExecution = process.argv[1]
@@ -83,3 +103,4 @@ if (isDirectExecution) {
     process.exit(1);
   });
 }
+

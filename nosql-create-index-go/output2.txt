@@ -1,0 +1,21 @@
+✓ Region validation passed. Found regions: Midwest, Northeast, South, West
+  Region 'Northeast': 10 documents
+  Region 'Midwest': 10 documents
+  Region 'South': 14 documents
+  Region 'West': 16 documents
+Using Azure OpenAI Embedding Deployment/Model: text-embedding-3-small
+Reading JSON file from C:\project-dina-data-ai\repos\cosmos-db-vector-samples-2\nosql-create-index-go\data\HotelsData_toCosmosDB_Vector_byRegion.json
+Loaded 50 documents
+
+=== Phase 1: Create Database ===
+  Database: HotelsCreateIndex
+  ✓ Database created or already exists
+
+=== Creating Container: hotels_diskann ===
+  Index type:     diskANN
+  Embedding path: /embedding
+  Dimensions:     1536
+  Distance func:  cosine (queried with all 3 metrics)
+  Cleaning up existing container...
+  Deleted existing container
+  Creating container with vector index...

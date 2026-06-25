@@ -62,6 +62,13 @@ Calls control-plane, then
 
 The setup script creates the Azure resource group, Azure OpenAI resource, Cosmos DB account, and database, then writes a `.env` file with all configuration values needed by `src/index.ts`.
 
+**Option A — If you deployed with `azd up`:**
+
+```powershell
+azd env get-values > .env
+```
+
+**Option B — Otherwise**, use the standalone setup script:
 
 ```bash
 chmod +x scripts/create-resources.sh
@@ -109,7 +116,19 @@ This installs:
 
 ## Run the sample
 
-Run the TypeScript code to create the container with a vector index, assign RBAC, insert documents, and run a vector query:
+**Load environment variables from `.env` first:**
+
+```powershell
+# PowerShell (strips quotes from values)
+Get-Content .env | Where-Object { $_ -match '^[^#].*=' } | ForEach-Object { $k,$v = $_ -split '=',2; [Environment]::SetEnvironmentVariable($k.Trim(), $v.Trim().Trim('"').Trim("'")) }
+```
+
+```bash
+# Bash/Linux/Mac
+set -a; source .env; set +a
+```
+
+**Then run the sample:**
 
 ```bash
 npm start
@@ -398,7 +417,7 @@ A mismatch here means the container was created with the wrong `dimensions` valu
 
 ### Step 4: Insert documents from data file (data-plane.ts)
 
-The sample loads pre-vectorized hotel data from `data/HotelsData_toCosmosDB_Vector.json` and inserts all documents using the Cosmos DB bulk execution API:
+The sample loads pre-vectorized hotel data from `data/HotelsData_toCosmosDB_Vector_byRegion.json` and inserts all documents using the Cosmos DB bulk execution API:
 
 ```typescript
 async function insertDocuments(container, config) {
@@ -505,7 +524,7 @@ Azure Cosmos DB — Create Container with Vector Index via ARM SDK
   Dimensions match
 
 === Step 4: Insert Documents ===
-  Data file: /path/to/data/HotelsData_toCosmosDB_Vector.json
+  Data file: /path/to/data/HotelsData_toCosmosDB_Vector_byRegion.json
   Loaded 50 documents (embeddings already included)
   Inserting 50 items using executeBulkOperations...
   Bulk insert completed in 3.21s
@@ -552,7 +571,7 @@ Azure Cosmos DB — Create Container with Vector Index via ARM SDK
   Dimensions match
 
 === Step 4: Insert Documents ===
-  Data file: /path/to/data/HotelsData_toCosmosDB_Vector.json
+  Data file: /path/to/data/HotelsData_toCosmosDB_Vector_byRegion.json
   Loaded 50 documents (embeddings already included)
   Inserting 50 items using executeBulkOperations...
   Bulk insert completed in 3.21s
@@ -682,7 +701,7 @@ All values are written to `.env` by `scripts/create-resources.sh`:
 | `AZURE_OPENAI_EMBEDDING_API_VERSION` | Embedding API version |
 | `EMBEDDED_FIELD` | Document field for embedding vectors |
 | `EMBEDDING_DIMENSIONS` | Expected embedding dimensions |
-| `DATA_FILE_WITH_VECTORS` | Path to pre-vectorized data file (default: `../data/HotelsData_toCosmosDB_Vector.json`) |
+| `DATA_FILE_WITH_VECTORS_AND_REGIONS` | Path to pre-vectorized data file (default: `../data/HotelsData_toCosmosDB_Vector_byRegion.json`) |
 
 The container name depends on the index type:
 

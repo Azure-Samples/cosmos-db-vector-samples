@@ -22,7 +22,8 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/data/azcosmos"
 )
 
-const maxInsertConcurrency = 5
+// Set to 1 for sequential insertion (helps with index stability)
+const maxInsertConcurrency = 1
 
 var validIdentifier = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 
@@ -269,14 +270,43 @@ func InsertDocuments(ctx context.Context, container *azcosmos.ContainerClient, d
 	return stats, nil
 }
 
+// CountDocuments counts documents in a specific partition
+func CountDocuments(ctx context.Context, container *azcosmos.ContainerClient, partitionKeyValue string) (int, error) {
+	queryText := `SELECT VALUE COUNT(1) FROM c WHERE c.Region = @partitionKey`
+	options := azcosmos.QueryOptions{
+		QueryParameters: []azcosmos.QueryParameter{
+			{Name: "@partitionKey", Value: partitionKeyValue},
+		},
+	}
+	partitionKey := azcosmos.NewPartitionKey().AppendString(partitionKeyValue)
+	pager := container.NewQueryItemsPager(queryText, partitionKey, &options)
+
+	for pager.More() {
+		page, err := pager.NextPage(ctx)
+		if err != nil {
+			return 0, fmt.Errorf("count query: %w", err)
+		}
+		for _, item := range page.Items {
+			var count int
+			if err := json.Unmarshal(item, &count); err != nil {
+				return 0, fmt.Errorf("parse count: %w", err)
+			}
+			return count, nil
+		}
+	}
+	return 0, nil
+}
+
 func QueryTopHotels(ctx context.Context, container *azcosmos.ContainerClient, embedding []float32, embeddingField, distanceFunction, partitionKeyValue string) ([]VectorSearchResult, float64, error) {
 	if !validIdentifier.MatchString(embeddingField) {
 		return nil, 0, fmt.Errorf("invalid embedding field name: %q", embeddingField)
 	}
 
-	embeddingJSON, err := json.Marshal(embedding)
-	if err != nil {
-		return nil, 0, fmt.Errorf("marshal embedding parameter: %w", err)
+	// Convert float32 to float64 for parameter binding
+	// The Cosmos DB SDK expects []float64 for numeric array parameters
+	embedding64 := make([]float64, len(embedding))
+	for i, v := range embedding {
+		embedding64[i] = float64(v)
 	}
 
 	// Query text with WHERE clause for single-partition efficiency
@@ -284,6 +314,7 @@ func QueryTopHotels(ctx context.Context, container *azcosmos.ContainerClient, em
 	// 1. Query only searches documents in the specified region
 	// 2. Lower RU consumption (single partition vs cross-partition)
 	// 3. Faster query execution
+	// NOTE: Cosmos DB VectorDistance queries automatically sort by similarity
 	queryText := fmt.Sprintf(`SELECT TOP 5
 		c.HotelId,
 		c.HotelName,
@@ -296,7 +327,7 @@ func QueryTopHotels(ctx context.Context, container *azcosmos.ContainerClient, em
 		QueryParameters: []azcosmos.QueryParameter{
 			{
 				Name:  "@embedding",
-				Value: json.RawMessage(embeddingJSON),
+				Value: embedding64,
 			},
 			{
 				Name:  "@partitionKey",
