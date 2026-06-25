@@ -38,7 +38,7 @@ type VectorSearchResult struct {
 	HotelID     string  `json:"HotelId"`
 	HotelName   string  `json:"HotelName"`
 	Description string  `json:"Description"`
-	Score       float64 `json:"score"`
+	Score       float64 `json:"SimilarityScore"`
 }
 
 type ContainerRunResult struct {
