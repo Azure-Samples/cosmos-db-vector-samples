@@ -18,8 +18,8 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
-	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/cosmos/armcosmos"
 	"github.com/Azure/azure-sdk-for-go/sdk/data/azcosmos"
+	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/cosmos/armcosmos"
 )
 
 // Set to 1 for sequential insertion (helps with index stability)
@@ -309,19 +309,17 @@ func QueryTopHotels(ctx context.Context, container *azcosmos.ContainerClient, em
 		embedding64[i] = float64(v)
 	}
 
-	// Query text with WHERE clause for single-partition efficiency
-	// The WHERE clause + SDK partition key routing (belt-and-suspenders) ensures:
-	// 1. Query only searches documents in the specified region
-	// 2. Lower RU consumption (single partition vs cross-partition)
-	// 3. Faster query execution
-	// NOTE: Cosmos DB VectorDistance queries automatically sort by similarity
+	// ORDER BY VectorDistance(...) is required to rank results nearest-first.
+	// Without it, SELECT TOP 5 returns 5 arbitrary documents from the partition,
+	// not the nearest neighbors. SDK partition-key routing scopes the search to a
+	// single partition, so the SQL stays focused on vector ranking.
 	queryText := fmt.Sprintf(`SELECT TOP 5
 		c.HotelId,
 		c.HotelName,
 		c.Description,
 		VectorDistance(c.%s, @embedding, false, {'distanceFunction': '%s'}) AS SimilarityScore
 	FROM c
-	WHERE c.Region = @partitionKey`, embeddingField, distanceFunction)
+	ORDER BY VectorDistance(c.%s, @embedding, false, {'distanceFunction': '%s'})`, embeddingField, distanceFunction, embeddingField, distanceFunction)
 
 	options := azcosmos.QueryOptions{
 		QueryParameters: []azcosmos.QueryParameter{
@@ -329,14 +327,10 @@ func QueryTopHotels(ctx context.Context, container *azcosmos.ContainerClient, em
 				Name:  "@embedding",
 				Value: embedding64,
 			},
-			{
-				Name:  "@partitionKey",
-				Value: partitionKeyValue,
-			},
 		},
 	}
 
-	// SDK-level partition key routing (belt-and-suspenders with WHERE clause)
+	// SDK-level partition key routing scopes the vector query to one partition.
 	partitionKey := azcosmos.NewPartitionKey().AppendString(partitionKeyValue)
 	pager := container.NewQueryItemsPager(queryText, partitionKey, &options)
 
@@ -418,7 +412,7 @@ func DeleteContainers(ctx context.Context, credential azcore.TokenCredential, cf
 		return fmt.Errorf("failed to create SQL resources client: %w", err)
 	}
 
-	for _, containerName := range []string{"hotels_diskann", "hotels_quantizedflat"} {
+	for _, containerName := range []string{"hotels_diskann_go", "hotels_quantizedflat_go"} {
 		// Delete container via ARM SDK
 		poller, err := sqlResourcesClient.BeginDeleteSQLContainer(ctx, cfg.ResourceGroup, cfg.AccountName, cfg.DatabaseName, containerName, nil)
 		if err != nil {
@@ -466,7 +460,7 @@ func newHTTPClient() *http.Client {
 func ClearContainerData(ctx context.Context, container *azcosmos.ContainerClient) error {
 	// Query across all regions to find all documents
 	regions := []string{"Northeast", "Midwest", "South", "West"}
-	
+
 	for _, region := range regions {
 		queryText := "SELECT c.id, c.Region FROM c WHERE c.Region = @region"
 		options := azcosmos.QueryOptions{

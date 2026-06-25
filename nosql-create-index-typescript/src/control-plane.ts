@@ -58,8 +58,8 @@ export async function createContainer(
   config: SampleConfig
 ) {
   const indexTypes = [
-    { type: "diskANN", containerName: "hotels_diskann" },
-    { type: "quantizedFlat", containerName: "hotels_quantizedflat" },
+    { type: "diskANN", containerName: "hotels_diskann_ts" },
+    { type: "quantizedFlat", containerName: "hotels_quantizedflat_ts" },
   ];
 
   const embeddingPath = `/${config.embeddingField}`;
@@ -130,7 +130,7 @@ export async function cleanupSampleContainers(
   armClient: CosmosDBManagementClient,
   config: SampleConfig
 ) {
-  const containerNames = ["hotels_diskann", "hotels_quantizedflat"];
+  const containerNames = ["hotels_diskann_ts", "hotels_quantizedflat_ts"];
 
   console.log("\n=== Cleanup: Remove Sample Containers ===");
   for (const containerName of containerNames) {

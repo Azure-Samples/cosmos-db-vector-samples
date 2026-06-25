@@ -105,7 +105,7 @@ def test_field_name_validation():
     return True
 
 def test_query_structure():
-    """Verify VectorDistance query doesn't include ORDER BY in the SQL."""
+    """Verify VectorDistance query includes ORDER BY for correct nearest-neighbor ranking."""
     # Verify the actual query text is correct
     # We check the source code for the correct structure
     
@@ -114,9 +114,12 @@ def test_query_structure():
     
     source = inspect.getsource(query_top_matches)
     
-    # Check that Region partition key is used in WHERE clause
-    assert 'WHERE c.Region = @partitionKey' in source, \
-        "Query should use Region partition key (c.Region = @partitionKey)"
+    # Check that Region partition key is passed through the SDK query option,
+    # not duplicated as a SQL WHERE filter.
+    assert 'WHERE c.Region = @partitionKey' not in source, \
+        "Query should not duplicate the SDK partition key with a SQL WHERE filter"
+    assert 'partition_key=config.partition_key_value' in source, \
+        "Query should use the SDK partition key option for single-partition routing"
     
     # Check that distance function option is passed
     assert "'distanceFunction'" in source, \
@@ -126,10 +129,18 @@ def test_query_structure():
     assert 'WHERE c.HotelId = @partitionKey' not in source, \
         "Query should NOT use HotelId as partition key"
     
+    # ORDER BY VectorDistance(...) is required — without it TOP N returns arbitrary docs
+    assert 'ORDER BY' in source, \
+        "Query MUST include ORDER BY VectorDistance(...) for nearest-neighbor ranking"
+    
+    assert 'VectorDistance' in source, \
+        "Query MUST include VectorDistance in ORDER BY clause"
+    
     print(f"[PASS] VectorDistance query structure is correct")
-    print(f"        - Uses Region partition key in WHERE clause")
+    print(f"        - Uses SDK partition key option for single-partition routing")
     print(f"        - Passes distance function in options")
     print(f"        - Does NOT use HotelId as partition key")
+    print(f"        - Includes ORDER BY VectorDistance(...) for nearest-neighbor ranking")
 
 def main():
     """Run all tests."""
@@ -158,8 +169,8 @@ def main():
         print("  4. Documents group correctly by Region for batching")
         print("  5. Field name validation works correctly")
         print("  6. VectorDistance query structure is correct:")
-        print("     - No ORDER BY clause (VectorDistance handles sorting)")
-        print("     - Uses Region partition key in WHERE clause")
+        print("     - ORDER BY VectorDistance(...) present (required for nearest-neighbor ranking)")
+        print("     - Uses SDK partition key option for single-partition routing")
         print("     - Passes distance function in options parameter")
         print()
         return 0

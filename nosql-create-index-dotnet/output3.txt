@@ -1,6 +1,6 @@
 Using Azure OpenAI Embedding Deployment/Model: text-embedding-3-small
-Reading JSON file from ../data/HotelsData_toCosmosDB_Vector_byRegion.json
-✓ Region validation passed. Found regions: Northeast, Midwest, South, West
+Reading JSON file from C:\project-dina-data-ai\repos\cosmos-db-vector-samples-2\nosql-create-index-dotnet\data\HotelsData_toCosmosDB_Vector_byRegion.json
+✓ Region validation passed. Found regions: Midwest, Northeast, South, West
   Region 'Northeast': 10 documents
   Region 'Midwest': 10 documents
   Region 'South': 14 documents
@@ -14,7 +14,7 @@ Loaded 50 documents
   Distance func:  cosine (queried with all 3 metrics)
   Deleting existing container if present...
   Container does not exist (OK)
-  Created in 31.0s
+  Created in 7.6s
   Vector index is IMMUTABLE — cannot be changed after creation
 
 === Step 1: Create Container with Vector Index ===
@@ -24,7 +24,7 @@ Loaded 50 documents
   Distance func:  cosine (queried with all 3 metrics)
   Deleting existing container if present...
   Container does not exist (OK)
-  Created in 31.0s
+  Created in 7.2s
   Vector index is IMMUTABLE — cannot be changed after creation
 
 Processing in batches of 50...
@@ -32,23 +32,23 @@ Processing in batches of 50...
   Region 'Northeast': 10 documents
   Region 'South': 14 documents
   Region 'West': 16 documents
-  ✓ hotels_diskann: 50 inserted (5243.73 RUs)
+  ✓ hotels_diskann: 50 inserted (3779.15 RUs)
   Region 'Midwest': 10 documents
   Region 'Northeast': 10 documents
   Region 'South': 14 documents
   Region 'West': 16 documents
-  ✓ hotels_quantizedflat: 50 inserted (2621.86 RUs)
+  ✓ hotels_quantizedflat: 50 inserted (1889.58 RUs)
 
 Query: "hotel near the ocean"
 Embedding generated (1536 dimensions)
 
 Running searches (top 5 results for each distance function)...
-  ✓ hotels_diskann queried (3.20 RUs)
-  ✓ hotels_diskann queried (3.20 RUs)
-  ✓ hotels_diskann queried (3.20 RUs)
-  ✓ hotels_quantizedflat queried (3.20 RUs)
-  ✓ hotels_quantizedflat queried (3.20 RUs)
-  ✓ hotels_quantizedflat queried (3.20 RUs)
+  ✓ hotels_diskann queried (3.15 RUs)
+  ✓ hotels_diskann queried (3.15 RUs)
+  ✓ hotels_diskann queried (3.15 RUs)
+  ✓ hotels_quantizedflat queried (3.15 RUs)
+  ✓ hotels_quantizedflat queried (3.15 RUs)
+  ✓ hotels_quantizedflat queried (3.15 RUs)
 
 | Index Type     | Distance Function | Top 1 Result               | Score  | Top 2 Result               | Score  | Diff   |
 |----------------|-------------------|----------------------------|--------|----------------------------|--------|--------|

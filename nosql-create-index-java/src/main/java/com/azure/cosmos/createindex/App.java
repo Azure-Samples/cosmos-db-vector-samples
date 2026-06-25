@@ -28,15 +28,7 @@ public final class App {
         Config.validate(config);
 
         var credential = new DefaultAzureCredentialBuilder().build();
-        
-        // --- Control Plane: Create containers with vector indexes (ARM SDK) ---
-        System.out.println("\n=== Control Plane: Creating containers with vector indexes ===");
-        ControlPlane.createContainersWithVectorIndexes(
-                config.subscriptionId(),
-                config.resourceGroup(),
-                config.accountName(),
-                config.location());
-        
+
         try (var cosmosClient = DataPlane.createCosmosClient(credential, config)) {
             var openAiClient = DataPlane.createAzureOpenAIClient(credential, config);
             var database = cosmosClient.getDatabase(config.databaseName());
@@ -49,15 +41,25 @@ public final class App {
             List<Map<String, Object>> documents = DataPlane.readDocuments(config);
             System.out.println("Loaded " + documents.size() + " documents");
 
-            // --- Ingest ---
-            System.out.println("Processing in batches of " + documents.size() + "...");
+            // --- Step 1: Create containers with vector indexes (ARM SDK) ---
+            ControlPlane.createContainersWithVectorIndexes(
+                    credential,
+                    config.subscriptionId(),
+                    config.resourceGroup(),
+                    config.accountName(),
+                    config.location(),
+                    config.databaseName(),
+                    config.embeddingFieldName());
+
+            // --- Step 2: Ingest documents ---
+            System.out.println("\nProcessing in batches of " + documents.size() + "...");
             for (String containerName : Config.targetContainers(config)) {
                 var container = database.getContainer(containerName);
                 var summary = DataPlane.ingestDocuments(container, containerName, documents);
-                System.out.printf("  \u2713 %s: %d upserted (%.2f RUs)%n", containerName, summary.upsertedDocuments(), summary.requestCharge());
+                System.out.printf("  \u2713 %s: %d inserted (%.2f RUs)%n", containerName, summary.upsertedDocuments(), summary.requestCharge());
             }
 
-            // --- Query ---
+            // --- Step 3: Query with all distance functions ---
             List<Float> queryEmbedding = DataPlane.generateEmbedding(openAiClient, config, config.queryText());
             System.out.println("\nQuery: \"" + config.queryText() + "\"");
             System.out.println("Embedding generated (" + queryEmbedding.size() + " dimensions)");
@@ -75,7 +77,7 @@ public final class App {
                 }
             }
 
-            // --- Comparison table ---
+            // --- Step 4: Comparison table ---
             System.out.println();
             System.out.printf("| %-14s | %-17s | %-26s | %-6s | %-26s | %-6s | %-6s |%n", "Index Type", "Distance Function", "Top 1 Result", "Score", "Top 2 Result", "Score", "Diff");
             System.out.printf("|%s|%s|%s|%s|%s|%s|%s|%n", "-".repeat(16), "-".repeat(19), "-".repeat(28), "-".repeat(8), "-".repeat(28), "-".repeat(8), "-".repeat(8));
@@ -90,6 +92,14 @@ public final class App {
                 double diff = top1Score - top2Score;
                 System.out.printf("| %-14s | %-17s | %-26s | %.4f | %-26s | %.4f | %.4f |%n", label, distanceFunction, top1Name, top1Score, top2Name, top2Score, diff);
             }
+
+            // --- Step 5: Cleanup containers ---
+            ControlPlane.cleanupContainers(
+                    credential,
+                    config.subscriptionId(),
+                    config.resourceGroup(),
+                    config.accountName(),
+                    config.databaseName());
 
             System.out.println("\nComplete");
         }

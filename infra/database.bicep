@@ -261,3 +261,6 @@ output createIndexContainers array = !empty(createIndexDatabaseName)
 output embeddedFieldNameForVectorSearch string = 'DescriptionVector'
 output embeddedFieldNameForCreateIndex string = 'embedding'
 
+output partitionKeyPathForVectorSearch string = '/HotelId'
+output partitionKeyPathForCreateIndex string = '/Region'
+

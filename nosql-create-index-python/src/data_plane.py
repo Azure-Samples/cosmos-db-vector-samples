@@ -166,13 +166,14 @@ def query_top_matches(
     distance_function: str = "Cosine",
 ) -> QuerySummary:
     embedding_field = validate_field_name(config.embedding_field_name)
-    # Critical constraint: VectorDistance CANNOT use ORDER BY clause
-    # VectorDistance automatically sorts results by similarity (highest first)
-    # Must filter by Region (the actual partition key), not HotelId
+    # ORDER BY VectorDistance(...) is REQUIRED for nearest-neighbor ranking.
+    # Without it, SELECT TOP N returns N arbitrary documents, not the closest ones.
+    # Field names cannot be query parameters in Cosmos DB SQL; interpolate them inline.
     query_text = (
         "SELECT TOP @topK c.HotelId, c.HotelName, c.Description, "
         "VectorDistance(c.{0}, @embedding, false, {{'distanceFunction': '{1}'}}) AS SimilarityScore "
-        "FROM c WHERE c.Region = @partitionKey"
+        "FROM c "
+        "ORDER BY VectorDistance(c.{0}, @embedding, false, {{'distanceFunction': '{1}'}})"
     ).format(embedding_field, distance_function)
 
     raw_results = list(
@@ -181,7 +182,6 @@ def query_top_matches(
             parameters=[
                 {"name": "@topK", "value": config.top_count},
                 {"name": "@embedding", "value": list(query_embedding)},
-                {"name": "@partitionKey", "value": config.partition_key_value},
             ],
             partition_key=config.partition_key_value,
         )

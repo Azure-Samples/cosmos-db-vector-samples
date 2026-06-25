@@ -7,7 +7,7 @@ import sys
 from azure.identity import DefaultAzureCredential
 
 from .config import algorithm_label, load_config, target_containers, validate_config
-from .control_plane import create_containers
+from .control_plane import create_containers, delete_containers
 from .data_plane import (
     create_azure_openai_client,
     create_cosmos_client,
@@ -97,6 +97,10 @@ def main() -> None:
             diff = top1_score - top2_score
             print("| {0:<14} | {1:<17} | {2:<26} | {3:.4f} | {4:<26} | {5:.4f} | {6:.4f} |".format(
                 label, distance_function, top1_name[:26], top1_score, top2_name[:26], top2_score, diff))
+
+        # --- Cleanup ---
+        print("\n=== Phase 4: Cleanup ===")
+        delete_containers(credential, config)
 
         print("\nComplete")
     except Exception as error:  # pragma: no cover - integration error path

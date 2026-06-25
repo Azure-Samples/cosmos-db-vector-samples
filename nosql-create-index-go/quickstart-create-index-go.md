@@ -12,7 +12,7 @@ ms.date: 2026-06-22
 
 In this quickstart, you run the Go create-index sample for Azure Cosmos DB for NoSQL to demonstrate two key goals:
 
-- **Goal 1 (Control Plane):** Use the ARM SDK (armcosmos/v3) to create the `HotelsCreateIndex` database and two vector-indexed containers: `hotels_diskann` (approximate search) and `hotels_quantizedflat` (exact search).
+- **Goal 1 (Control Plane):** Use the ARM SDK (armcosmos/v3) to create the `HotelsCreateIndex` database and two vector-indexed containers: `hotels_diskann_go` (approximate search) and `hotels_quantizedflat_go` (exact search).
 - **Goal 2 (Distance Functions):** Compare how the same query embedding produces different scores and rankings when using different vector distance functions: Cosine, DotProduct, and Euclidean.
 
 ## Prerequisites
@@ -31,7 +31,7 @@ In this quickstart, you run the Go create-index sample for Azure Cosmos DB for N
 >
 > 1. **Control Plane (Goal 1):** The sample uses the ARM SDK (armcosmos/v3) with `DefaultAzureCredential` to create:
 >    - Database: `HotelsCreateIndex`
->    - Containers: `hotels_diskann` (DiskANN index) and `hotels_quantizedflat` (QuantizedFlat index)
+>    - Containers: `hotels_diskann_go` (DiskANN index) and `hotels_quantizedflat_go` (QuantizedFlat index)
 >    - Partition key path: `/Region` (valid values: `Northeast`, `Midwest`, `South`, `West`)
 >    - Vector field path: `/embedding` (1536 dimensions, float32)
 >
@@ -91,7 +91,7 @@ VECTOR_ALGORITHM=
 DATA_FILE_WITH_VECTORS_AND_REGIONS=./data/HotelsData_toCosmosDB_Vector_byRegion.json
 ```
 
-Set `VECTOR_ALGORITHM` to `diskann`, `quantizedflat`, or leave it empty to run against both containers. When `AZURE_COSMOSDB_CONTAINER_NAME` and `VECTOR_ALGORITHM` are both empty, the sample iterates over both known containers (`hotels_diskann` and `hotels_quantizedflat`).
+Set `VECTOR_ALGORITHM` to `diskann`, `quantizedflat`, or leave it empty to run against both containers. When `AZURE_COSMOSDB_CONTAINER_NAME` and `VECTOR_ALGORITHM` are both empty, the sample iterates over both known containers (`hotels_diskann_go` and `hotels_quantizedflat_go`).
 
 ## Install dependencies and run
 
@@ -115,8 +115,8 @@ The sample demonstrates both goals in sequence:
 1. Authenticates with `DefaultAzureCredential`
 2. Creates a management client for Azure Resource Manager
 3. Creates the `HotelsCreateIndex` database (if needed)
-4. Creates the `hotels_diskann` container with DiskANN vector index on `/embedding`
-5. Creates the `hotels_quantizedflat` container with QuantizedFlat vector index on `/embedding`
+4. Creates the `hotels_diskann_go` container with DiskANN vector index on `/embedding`
+5. Creates the `hotels_quantizedflat_go` container with QuantizedFlat vector index on `/embedding`
 
 **Goal 2 - Data Plane (load and query with distance functions):**
 1. Loads configuration from environment variables
@@ -257,14 +257,17 @@ for _, document := range documents {
 
 ### Run vector similarity queries with different distance functions
 
-After inserting documents, the sample generates a query embedding and executes **three separate** SQL queries with different distance functions. Each query passes the embedding as a parameterized value:
+After inserting documents, the sample generates a query embedding and executes **three separate** SQL queries with different distance functions. Each query passes the embedding as a parameterized value.
+
+The vector query is scoped to a single partition by passing the partition key to `NewQueryItemsPager`. Azure Cosmos DB routes the request to the one physical partition that owns that region, so a `WHERE c.Region = ...` filter is unnecessary. This keeps the SQL focused on `ORDER BY VectorDistance(...)` for ranking and is the recommended, most efficient pattern for single-partition vector search.
 
 ```go
 // Query with Cosine distance
 queryText := fmt.Sprintf(`SELECT TOP 5
     c.HotelId, c.HotelName, c.Description,
     VectorDistance(c.embedding, @embedding, false, {'distanceFunction': 'Cosine'}) AS score
-FROM c WHERE c.Region = @partitionKey`)
+FROM c
+ORDER BY VectorDistance(c.embedding, @embedding, false, {'distanceFunction': 'Cosine'})`)
 
 options := azcosmos.QueryOptions{
     QueryParameters: []azcosmos.QueryParameter{{
@@ -283,15 +286,15 @@ pager := container.NewQueryItemsPager(queryText, partitionKey, &options)
 
 ```output
 Azure Cosmos DB vector index sample (Go)
-database=Hotels primaryContainer=hotels_diskann vectorAlgorithm=diskann dataFile=.../data/HotelsData_toCosmosDB_Vector_byRegion.json
+database=Hotels primaryContainer=hotels_diskann_go vectorAlgorithm=diskann dataFile=.../data/HotelsData_toCosmosDB_Vector_byRegion.json
 embeddingDeployment=text-embedding-3-small dimensions=1536 partitionKey=hotels
 
-=== hotels_diskann ===
+=== hotels_diskann_go ===
 inserted=50 skipped=0 failed=0 total=50 writeRU=123.45
 1. HotelId=12 | HotelName=Ocean Breeze Suites | score=0.0834 | Description=Modern waterfront hotel...
 queryRU=3.21
 
-=== hotels_quantizedflat ===
+=== hotels_quantizedflat_go ===
 inserted=50 skipped=0 failed=0 total=50 writeRU=121.88
 1. HotelId=12 | HotelName=Ocean Breeze Suites | score=0.0834 | Description=Modern waterfront hotel...
 queryRU=3.47

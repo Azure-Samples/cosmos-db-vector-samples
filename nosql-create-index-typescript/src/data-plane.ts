@@ -291,13 +291,14 @@ export async function vectorQuery(
   for (const distFunc of distanceFunctions) {
     const distanceFunction = distFunc.name;
     
-    // Query strategy: VectorDistance automatically sorts by similarity
-    // (no ORDER BY clause allowed - it's automatic and always sorts most-to-least similar)
+    // ORDER BY VectorDistance(...) is REQUIRED — without it, SELECT TOP N returns
+    // arbitrary documents, not nearest neighbors. The same expression must appear
+    // in both SELECT and ORDER BY.
     
     // Single-partition query for efficiency:
-    // - WHERE clause filters to the configured region
-    // - SDK partition key routing ensures single-partition execution
-    // - Belt-and-suspenders pattern: both mechanisms for guaranteed efficiency
+    // - SDK partition key routing scopes the query to the configured region
+    // - No SQL WHERE clause is needed because the partition key option routes
+    //   the request to the physical partition that owns that region
     const partitionKeyValue = config.partitionKeyValue;
     
     const querySpec = {
@@ -307,10 +308,9 @@ export async function vectorQuery(
                 c.Description,
                 VectorDistance(c.${embeddingField}, @embedding, false, {'distanceFunction': '${distanceFunction}'}) AS SimilarityScore
               FROM c
-              WHERE c.Region = @partitionKey`,
+              ORDER BY VectorDistance(c.${embeddingField}, @embedding, false, {'distanceFunction': '${distanceFunction}'})`,
       parameters: [
-        { name: "@embedding", value: queryEmbedding },
-        { name: "@partitionKey", value: partitionKeyValue }
+        { name: "@embedding", value: queryEmbedding }
       ],
     };
 

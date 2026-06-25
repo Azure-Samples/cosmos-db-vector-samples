@@ -14,11 +14,11 @@ products:
 
 ## Overview
 
-This sample demonstrates the **data-plane** portion of the `nosql-create-index` scenario in Go. The shared Bicep infrastructure already provisions the `hotels_diskann` and `hotels_quantizedflat` containers, so the sample only:
+This sample demonstrates the **data-plane** portion of the `nosql-create-index` scenario in Go. The shared Bicep infrastructure already provisions the `hotels_diskann_go` and `hotels_quantizedflat_go` containers, so the sample only:
 
 - authenticates with `DefaultAzureCredential`
 - loads hotel documents from the shared dataset
-- adds `PartitionKey="hotels"` during ingestion
+- uses `Region` as the partition key during ingestion
 - writes documents to both pre-provisioned containers with bounded concurrent creates
 - generates an embedding with the Azure OpenAI embeddings REST API by using a bearer token from `DefaultAzureCredential`
 - runs a `SELECT TOP 5 ... ORDER BY VectorDistance(...)` query against both containers
@@ -31,9 +31,9 @@ The sample never creates databases, containers, or vector indexes in code.
 - Azure CLI with a signed-in account: `az login`
 - An Azure Cosmos DB for NoSQL account with these existing resources:
   - database: `Hotels`
-  - containers: `hotels_diskann` and `hotels_quantizedflat`
-  - partition key: `/PartitionKey`
-  - vector field: `/DescriptionVector`
+  - containers: `hotels_diskann_go` and `hotels_quantizedflat_go`
+  - partition key: `/Region`
+  - vector field: `/embedding`
 - An Azure OpenAI embedding deployment for `text-embedding-3-small`
 
 ## Setup
@@ -64,7 +64,7 @@ The sample never creates databases, containers, or vector indexes in code.
    |---|---|
    | `AZURE_COSMOSDB_ENDPOINT` | `https://<account>.documents.azure.com:443/` |
    | `AZURE_COSMOSDB_DATABASENAME` | `Hotels` |
-   | `AZURE_COSMOSDB_CONTAINER_NAME` | Optional. `hotels_diskann` or `hotels_quantizedflat` |
+   | `AZURE_COSMOSDB_CONTAINER_NAME` | Optional. `hotels_diskann_go` or `hotels_quantizedflat_go` |
    | `AZURE_OPENAI_EMBEDDING_ENDPOINT` | `https://<resource>.openai.azure.com/` |
    | `AZURE_OPENAI_EMBEDDING_DEPLOYMENT` | `text-embedding-3-small` |
    | `VECTOR_ALGORITHM` | Optional. `diskann` or `quantizedflat` |
@@ -72,8 +72,8 @@ The sample never creates databases, containers, or vector indexes in code.
 
    Leave both `AZURE_COSMOSDB_CONTAINER_NAME` and `VECTOR_ALGORITHM` empty to run both containers. If you set both, they must match:
 
-   - `diskann` → `hotels_diskann`
-   - `quantizedflat` → `hotels_quantizedflat`
+   - `diskann` → `hotels_diskann_go`
+   - `quantizedflat` → `hotels_quantizedflat_go`
 
 4. Download dependencies:
 
@@ -123,16 +123,16 @@ The exact scores vary, but the format is consistent:
 
 ```text
 Azure Cosmos DB vector index sample (Go)
-database=Hotels primaryContainer=hotels_diskann vectorAlgorithm=diskann dataFile=C:\...\data\HotelsData_toCosmosDB_Vector_byRegion.json
+database=Hotels primaryContainer=hotels_diskann_go vectorAlgorithm=diskann dataFile=C:\...\data\HotelsData_toCosmosDB_Vector_byRegion.json
 embeddingDeployment=text-embedding-3-small dimensions=1536 partitionKey=hotels
 
-=== hotels_diskann ===
+=== hotels_diskann_go ===
 inserted=50 skipped=0 failed=0 total=50 writeRU=123.45
 1. HotelId=12 | HotelName=Ocean Breeze Suites | score=0.0834 | Description=Modern waterfront hotel near the beach and boardwalk...
 2. HotelId=34 | HotelName=Harbor View Inn | score=0.0972 | Description=Coastal stay with ocean-facing rooms and easy dining access...
 queryRU=3.21
 
-=== hotels_quantizedflat ===
+=== hotels_quantizedflat_go ===
 inserted=50 skipped=0 failed=0 total=50 writeRU=121.88
 1. HotelId=12 | HotelName=Ocean Breeze Suites | score=0.0834 | Description=Modern waterfront hotel near the beach and boardwalk...
 2. HotelId=34 | HotelName=Harbor View Inn | score=0.0972 | Description=Coastal stay with ocean-facing rooms and easy dining access...

@@ -1,8 +1,9 @@
 package com.azure.cosmos.createindex;
 
 import com.azure.core.credential.TokenCredential;
+import com.azure.core.management.AzureEnvironment;
+import com.azure.core.management.exception.ManagementException;
 import com.azure.core.management.profile.AzureProfile;
-import com.azure.identity.DefaultAzureCredentialBuilder;
 import com.azure.resourcemanager.AzureResourceManager;
 import com.azure.resourcemanager.cosmos.models.*;
 import com.azure.resourcemanager.cosmos.fluent.SqlResourcesClient;
@@ -10,109 +11,98 @@ import java.util.Arrays;
 
 /**
  * Control plane example for creating Cosmos DB SQL containers with vector indexes.
- * Demonstrates Goal 1: ARM SDK control-plane usage for container and vector index creation.
+ * Demonstrates ARM SDK control-plane usage for container and vector index creation.
+ * The database is assumed to already exist (created by azd up).
  */
 public class ControlPlane {
-    private static final String DATABASE_NAME = "HotelsCreateIndex";
     private static final String REGION_PARTITION_KEY = "/Region";
-    private static final String EMBEDDING_PATH = "/embedding";
     private static final int EMBEDDING_DIMENSIONS = 1536;
-    private static final int THROUGHPUT_RUS = 400;
-    
-    private static final String CONTAINER_DISKANN = "hotels_diskann";
-    private static final String CONTAINER_QUANTIZED_FLAT = "hotels_quantizedflat";
+
+    private static final String CONTAINER_DISKANN = "hotels_diskann_java";
+    private static final String CONTAINER_QUANTIZED_FLAT = "hotels_quantizedflat_java";
 
     public static void createContainersWithVectorIndexes(
+            TokenCredential credential,
             String subscriptionId,
             String resourceGroup,
             String accountName,
-            String location) throws Exception {
-        
-        System.out.println("\n==> Initializing Azure authentication...");
-        TokenCredential credential = new DefaultAzureCredentialBuilder().build();
-        
-        // Create Azure profile with subscription
-        AzureProfile profile = new AzureProfile(com.azure.core.management.AzureEnvironment.AZURE);
-        
-        // Authenticate and get Azure Resource Manager with subscription
+            String location,
+            String databaseName,
+            String embeddingFieldName) throws Exception {
+
+        AzureProfile profile = new AzureProfile(AzureEnvironment.AZURE);
         AzureResourceManager azure = AzureResourceManager
                 .authenticate(credential, profile)
                 .withSubscription(subscriptionId);
-        
-        System.out.printf("Subscription: %s%n", azure.subscriptionId());
-        System.out.printf("Target:       %s / %s (%s)%n", resourceGroup, accountName, location);
-        
-        try {
-            // Get the SQL resources client from the manager
-            SqlResourcesClient sqlResourcesClient = azure.cosmosDBAccounts()
-                    .manager()
-                    .serviceClient()
-                    .getSqlResources();
-            
-            // Create the database
-            System.out.printf("%n==> Creating database '%s' ...%n", DATABASE_NAME);
-            sqlResourcesClient.createUpdateSqlDatabase(
-                    resourceGroup,
-                    accountName,
-                    DATABASE_NAME,
-                    new SqlDatabaseCreateUpdateParameters()
-                            .withLocation(location)
-                            .withResource(new SqlDatabaseResource().withId(DATABASE_NAME))
-                            .withOptions(new CreateUpdateOptions()));
-            
-            System.out.println("    database created.");
-            
-            // Create containers
-            createContainer(sqlResourcesClient, resourceGroup, accountName, location,
-                    CONTAINER_DISKANN, VectorIndexType.DISK_ANN);
-            createContainer(sqlResourcesClient, resourceGroup, accountName, location,
-                    CONTAINER_QUANTIZED_FLAT, VectorIndexType.QUANTIZED_FLAT);
-            
-            System.out.println("\n✓ All containers created successfully with vector indexes.");
-            
-        } catch (Exception e) {
-            System.out.printf("FATAL: %s%n", e.getMessage());
-            throw e;
-        }
+
+        SqlResourcesClient sqlResourcesClient = azure.cosmosDBAccounts()
+                .manager()
+                .serviceClient()
+                .getSqlResources();
+
+        String embeddingPath = "/" + embeddingFieldName;
+
+        createContainer(sqlResourcesClient, resourceGroup, accountName, location,
+                databaseName, embeddingPath, CONTAINER_DISKANN, VectorIndexType.DISK_ANN);
+        createContainer(sqlResourcesClient, resourceGroup, accountName, location,
+                databaseName, embeddingPath, CONTAINER_QUANTIZED_FLAT, VectorIndexType.QUANTIZED_FLAT);
     }
-    
+
     private static void createContainer(
             SqlResourcesClient sqlResourcesClient,
             String resourceGroup,
             String accountName,
             String location,
+            String databaseName,
+            String embeddingPath,
             String containerName,
             VectorIndexType indexType) throws Exception {
-        
-        System.out.printf("%n==> Creating container '%s' with %s vector index...%n", 
-                containerName, indexType);
-        
-        // Build vector embedding policy with Cosine distance function
+
+        String indexLabel = indexType == VectorIndexType.DISK_ANN ? "diskANN" : "quantizedFlat";
+
+        System.out.println("\n=== Step 1: Create Container with Vector Index ===");
+        System.out.printf("  Container:      %s%n", containerName);
+        System.out.printf("  Index type:     %s%n", indexLabel);
+        System.out.printf("  Dimensions:     %d%n", EMBEDDING_DIMENSIONS);
+        System.out.println("  Distance func:  cosine (queried with all 3 metrics)");
+
+        System.out.println("  Deleting existing container if present...");
+        try {
+            sqlResourcesClient.getSqlContainer(resourceGroup, accountName, databaseName, containerName);
+            sqlResourcesClient.deleteSqlContainer(resourceGroup, accountName, databaseName, containerName);
+            System.out.println("  Deleted existing container");
+        } catch (ManagementException e) {
+            if (e.getResponse() != null && e.getResponse().getStatusCode() == 404) {
+                System.out.println("  Container does not exist (OK)");
+            } else {
+                throw e;
+            }
+        }
+
+        long startMs = System.currentTimeMillis();
+
         VectorEmbedding vectorEmbedding = new VectorEmbedding()
-                .withPath(EMBEDDING_PATH)
+                .withPath(embeddingPath)
                 .withDataType(VectorDataType.FLOAT32)
                 .withDimensions(EMBEDDING_DIMENSIONS)
                 .withDistanceFunction(DistanceFunction.COSINE);
-        
+
         VectorEmbeddingPolicy vectorEmbeddingPolicy = new VectorEmbeddingPolicy()
                 .withVectorEmbeddings(Arrays.asList(vectorEmbedding));
-        
-        // Build vector index
+
         VectorIndex vectorIndex = new VectorIndex()
-                .withPath(EMBEDDING_PATH)
+                .withPath(embeddingPath)
                 .withType(indexType);
-        
-        // Build indexing policy
+
         IndexingPolicy indexingPolicy = new IndexingPolicy()
                 .withIndexingMode(IndexingMode.CONSISTENT)
                 .withAutomatic(true)
                 .withIncludedPaths(Arrays.asList(new IncludedPath().withPath("/*")))
                 .withExcludedPaths(Arrays.asList(
-                        new ExcludedPath().withPath("\"_etag\"/?"),
-                        new ExcludedPath().withPath("/embedding/*")))
+                        new ExcludedPath().withPath("/_etag/?"),
+                        new ExcludedPath().withPath(embeddingPath + "/*")))
                 .withVectorIndexes(Arrays.asList(vectorIndex));
-        
-        // Build container resource
+
         SqlContainerResource containerResource = new SqlContainerResource()
                 .withId(containerName)
                 .withPartitionKey(new ContainerPartitionKey()
@@ -120,29 +110,59 @@ public class ControlPlane {
                         .withKind(PartitionKind.HASH))
                 .withVectorEmbeddingPolicy(vectorEmbeddingPolicy)
                 .withIndexingPolicy(indexingPolicy);
-        
-        // Build container creation parameters
-        SqlContainerCreateUpdateParameters containerParams = 
-                new SqlContainerCreateUpdateParameters()
-                        .withLocation(location)
-                        .withResource(containerResource)
-                        .withOptions(new CreateUpdateOptions().withThroughput(THROUGHPUT_RUS));
-        
+
+        SqlContainerCreateUpdateParameters containerParams = new SqlContainerCreateUpdateParameters()
+                .withLocation(location)
+                .withResource(containerResource)
+                .withOptions(new CreateUpdateOptions());
+
+        sqlResourcesClient.createUpdateSqlContainer(
+                resourceGroup, accountName, databaseName, containerName, containerParams);
+
+        double elapsed = (System.currentTimeMillis() - startMs) / 1000.0;
+        System.out.printf("  Created in %.1fs%n", elapsed);
+        System.out.println("  Vector index is IMMUTABLE \u2014 cannot be changed after creation");
+    }
+
+    public static void cleanupContainers(
+            TokenCredential credential,
+            String subscriptionId,
+            String resourceGroup,
+            String accountName,
+            String databaseName) {
+
+        System.out.println("\n=== Cleanup: Remove Sample Containers ===");
+
+        AzureProfile profile = new AzureProfile(AzureEnvironment.AZURE);
+        AzureResourceManager azure;
         try {
-            // Create the container
-            sqlResourcesClient.createUpdateSqlContainer(
-                    resourceGroup,
-                    accountName,
-                    DATABASE_NAME,
-                    containerName,
-                    containerParams);
-            
-            System.out.println("    container created.");
-            System.out.printf("✓ Container '%s' ready%n", containerName);
-            
+            azure = AzureResourceManager
+                    .authenticate(credential, profile)
+                    .withSubscription(subscriptionId);
         } catch (Exception e) {
-            System.out.printf("FATAL: create container %s: %s%n", containerName, e.getMessage());
-            throw e;
+            System.out.printf("  \u26a0 Failed to authenticate for cleanup: %s%n", e.getMessage());
+            return;
+        }
+
+        SqlResourcesClient sqlResourcesClient = azure.cosmosDBAccounts()
+                .manager()
+                .serviceClient()
+                .getSqlResources();
+
+        for (String containerName : new String[]{CONTAINER_DISKANN, CONTAINER_QUANTIZED_FLAT}) {
+            try {
+                sqlResourcesClient.getSqlContainer(resourceGroup, accountName, databaseName, containerName);
+                sqlResourcesClient.deleteSqlContainer(resourceGroup, accountName, databaseName, containerName);
+                System.out.printf("  \u2713 Deleted container: %s%n", containerName);
+            } catch (ManagementException e) {
+                if (e.getResponse() != null && e.getResponse().getStatusCode() == 404) {
+                    System.out.printf("  \u2713 Container does not exist: %s%n", containerName);
+                } else {
+                    System.out.printf("  \u26a0 Failed to delete %s: %s%n", containerName, e.getMessage());
+                }
+            } catch (Exception e) {
+                System.out.printf("  \u26a0 Failed to delete %s: %s%n", containerName, e.getMessage());
+            }
         }
     }
 }

@@ -21,8 +21,8 @@ The sample never creates databases, containers, or vector indexes in code.
 - Azure CLI installed and signed in with `az login`
 - An Azure Cosmos DB for NoSQL account and database already provisioned
 - The following existing containers created by shared Bicep or `azd up`:
-  - `hotels_diskann`
-  - `hotels_quantizedflat`
+  - `hotels_diskann_dotnet`
+  - `hotels_quantizedflat_dotnet`
 - Azure RBAC roles for your identity:
   - **Cosmos DB Built-in Data Contributor**
   - **Cognitive Services OpenAI User**
