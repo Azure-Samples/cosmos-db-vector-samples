@@ -212,6 +212,42 @@ foreach (var distanceFunc in distanceFunctions)
 }
 ```
 
+### Understanding the single-partition query pattern
+
+The query above demonstrates efficient single-partition vector search. The query targets only the "Northeast" partition using a **belt-and-suspenders** pattern:
+
+| Mechanism | Purpose | Code |
+|-----------|---------|------|
+| **SQL WHERE clause** | Explicit filter in query text | `WHERE c.Region = @partitionKey` |
+| **SDK partition key** | Routing hint for efficiency | `PartitionKey = new PartitionKey("Northeast")` |
+
+**Why use both?**
+
+- The **WHERE clause** makes the partition filter visible in the query text (self-documenting)
+- The **SDK partition key** ensures the query routes directly to the correct partition (optimal performance)
+- If either mechanism is misconfigured, the other still provides correct filtering
+
+**Benefits of single-partition queries:**
+
+| Metric | Single-Partition | Cross-Partition |
+|--------|------------------|-----------------|
+| **RU cost** | ~3 RUs per query | ~12 RUs per query |
+| **Documents searched** | 10-15 (one region) | 50 (all regions) |
+| **Query latency** | Lower | Higher |
+
+**Configuring the partition key:**
+
+The sample defaults to `"Northeast"` but you can override it with the `PARTITION_KEY_VALUE` environment variable:
+
+```powershell
+$env:PARTITION_KEY_VALUE = "Midwest"
+```
+
+This queries hotels in a different region while maintaining the same efficient single-partition pattern.
+
+> [!NOTE]
+> The `VectorDistance()` function automatically sorts results by similarity score. **Do not add an ORDER BY clause** — it's redundant and can cause errors with some index types.
+
 ## Example output
 
 ```output
