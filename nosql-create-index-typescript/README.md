@@ -1,13 +1,13 @@
 # Quickstart: Create Azure Cosmos DB vector indexes with the ARM SDK and TypeScript
 
-Create an Azure Cosmos DB for NoSQL container with a **vector index** using the Azure Resource Manager SDK (`@azure/arm-cosmosdb`). Then validate the configuration by generating embeddings with Azure OpenAI, inserting documents, and running a `VectorDistance()` similarity query.
+Create two Azure Cosmos DB for NoSQL containers with **vector indexes** using the Azure Resource Manager SDK (`@azure/arm-cosmosdb`) in an existing database. Then validate the configuration by generating embeddings with Azure OpenAI, inserting documents into both containers, running `VectorDistance()` similarity queries, and cleaning up the sample containers.
 
 This quickstart uses three layers:
 
 | Layer | Tool | What it does |
 |---|---|---|
 | **Azure CLI script** | `scripts/create-resources.sh` | Creates the resource group, Azure OpenAI resource, Cosmos DB account, and database |
-| **Control plane** | `src/control-plane.ts` (`@azure/arm-cosmosdb`) | Creates the container with vector index and RBAC |
+| **Control plane** | `src/control-plane.ts` (`@azure/arm-cosmosdb`) | Deletes existing sample containers, creates both containers with vector indexes, and cleans them up |
 | **Data plane** | `src/data-plane.ts` (`@azure/cosmos` + `openai`) | Inserts documents and runs vector queries |
 
 All authentication uses Microsoft Entra ID via `DefaultAzureCredential` — no API keys or connection strings.
@@ -18,7 +18,7 @@ To complete this quickstart, you need:
 
 - An Azure account with an active subscription — [create one for free](https://azure.microsoft.com/free/)
 - [Node.js LTS](https://nodejs.org/)
-- [Azure CLI](https://learn.microsoft.com/cli/azure/install-azure-cli) installed and logged in (`az login`)
+- [Azure CLI](/cli/azure/install-azure-cli) installed and logged in (`az login`)
 - [Git](https://git-scm.com/downloads)
 
 ## Clone the repository
@@ -49,11 +49,14 @@ scripts/create-resources.sh (Azure CLI)
 ```
 
 ```
-src/index.ts (orchestrator)        src/control-plane.ts          src/data-plane.ts
+src/config.ts                      src/control-plane.ts          src/data-plane.ts
 ───────────────────────────        ──────────────────────        ─────────────────
-Loads config from .env             1. Container + vector index   3. Verify embedding dimensions
-Validates required env vars        2. RBAC role + assignment     4. Insert documents (bulk)
-Creates credential                                               5. Vector similarity query
+Loads config from .env             1. Containers + vector index  3. Verify embedding dimensions
+Validates required env vars        2. Sample container cleanup  4. Insert documents (bulk)
+Resolves ./data file path                                        5. Vector similarity queries
+
+src/index.ts orchestrates the flow. The data file lives in ./data/.
+Creates credential
 Calls control-plane, then
   data-plane functions
 ```
@@ -65,7 +68,7 @@ The setup script creates the Azure resource group, Azure OpenAI resource, Cosmos
 **Option A — If you deployed with `azd up`:**
 
 ```powershell
-azd env get-values > .env
+npm run create-env
 ```
 
 **Option B — Otherwise**, use the standalone setup script:
@@ -109,42 +112,32 @@ This installs:
 
 | Package | Purpose |
 |---|---|
-| `@azure/arm-cosmosdb` | ARM SDK — control plane operations (create container, RBAC) |
+| `@azure/arm-cosmosdb` | ARM SDK — control plane operations (create and delete sample containers) |
 | `@azure/cosmos` | Data plane SDK — read/write documents and run queries |
 | `@azure/identity` | `DefaultAzureCredential` for Microsoft Entra ID authentication |
 | `openai` | Azure OpenAI client for generating embeddings |
 
 ## Run the sample
 
-**Load environment variables from `.env` first:**
-
-```powershell
-# PowerShell (strips quotes from values)
-Get-Content .env | Where-Object { $_ -match '^[^#].*=' } | ForEach-Object { $k,$v = $_ -split '=',2; [Environment]::SetEnvironmentVariable($k.Trim(), $v.Trim().Trim('"').Trim("'")) }
-```
-
-```bash
-# Bash/Linux/Mac
-set -a; source .env; set +a
-```
-
-**Then run the sample:**
+Run the package script. It compiles TypeScript and loads `.env`:
 
 ```bash
 npm start
 ```
 
-The script runs five steps. Steps 1–2 use the ARM SDK (control plane) to create the container and RBAC. Steps 3–5 use the data plane SDK to validate the configuration.
+The script creates, loads, queries, and cleans up both sample containers. Control-plane code uses the ARM SDK to create and delete the containers in an existing database. Data-plane code validates embeddings, inserts documents, and runs vector queries.
 
 ## Walk through the code
 
-The TypeScript code is split into three files:
+The TypeScript code is split into four main files:
 
 | File | Purpose |
 |---|---|
+| `src/config.ts` | Loads environment variables and resolves the data file path |
 | `src/index.ts` | Orchestrator — loads config from `.env`, creates shared credential, calls control-plane then data-plane functions |
-| `src/control-plane.ts` | ARM SDK operations (`@azure/arm-cosmosdb`) — creates container with vector index and RBAC roles |
+| `src/control-plane.ts` | ARM SDK operations (`@azure/arm-cosmosdb`) — deletes existing sample containers, creates both containers with vector indexes, and cleans them up |
 | `src/data-plane.ts` | Data plane operations (`@azure/cosmos` + `openai`) — inserts documents and runs vector queries |
+| `data/` | Local folder for `HotelsData_toCosmosDB_Vector_byRegion.json` |
 
 ### Authentication
 
@@ -153,7 +146,7 @@ The orchestrator (`src/index.ts`) creates a single `DefaultAzureCredential` and 
 ```typescript
 // src/index.ts — orchestrator
 import { DefaultAzureCredential } from "@azure/identity";
-import { createArmClient, createContainer, createRbacAccess } from "./control-plane.js";
+import { createArmClient, createContainer, cleanupSampleContainers } from "./control-plane.js";
 import { createCosmosClient, createOpenAIClient } from "./data-plane.js";
 
 const credential = new DefaultAzureCredential();
@@ -194,205 +187,82 @@ export function createOpenAIClient(credential: TokenCredential, config) {
 }
 ```
 
-### Step 1: Create the container with a vector index (control-plane.ts)
+### Step 1: Create both containers with vector indexes (control-plane.ts)
 
-This is the critical step. The container's `vectorEmbeddingPolicy` and `vectorIndexes` are **immutable after creation** — they cannot be changed afterward, regardless of whether the container was created via ARM SDK, Bicep, Portal, or CLI.
-
-### [DiskANN](#tab/tab-diskann)
-
-Set the following in your `.env` file:
-
-```dotenv
-VECTOR_INDEX_TYPE="diskANN"
-AZURE_COSMOSDB_CONTAINER_NAME="hotels_diskann_ts"
-```
+This is the critical step. The sample always creates both `hotels_diskann_ts` and `hotels_quantizedflat_ts` in the existing database. The container's `vectorEmbeddingPolicy` and `vectorIndexes` are **immutable after creation** — they cannot be changed afterward, regardless of whether the container was created via ARM SDK, Bicep, Portal, or CLI.
 
 ```typescript
-async function createContainer() {
-  const embeddingPath = "/embedding";
+export async function createContainer(
+  armClient: CosmosDBManagementClient,
+  config: SampleConfig
+) {
+  const indexTypes = [
+    { type: "diskANN", containerName: "hotels_diskann_ts" },
+    { type: "quantizedFlat", containerName: "hotels_quantizedflat_ts" },
+  ];
 
-  await armClient.sqlResources.beginCreateUpdateSqlContainerAndWait(
-    resourceGroup,
-    accountName,
-    "Hotels",
-    "hotels_diskann_ts",
-    {
-      resource: {
-        id: "hotels_diskann_ts",
-        partitionKey: {
-          paths: ["/HotelId"],
-          kind: "MultiHash",
-          version: 2,
-        },
-        indexingPolicy: {
-          indexingMode: "consistent",
-          automatic: true,
-          includedPaths: [{ path: "/*" }],
-          excludedPaths: [{ path: "/_etag/?" }],
-          vectorIndexes: [
-            {
-              path: embeddingPath,
-              type: "diskANN",
-            },
-          ],
-        },
-        vectorEmbeddingPolicy: {
-          vectorEmbeddings: [
-            {
-              path: embeddingPath,
-              dataType: "float32",
-              dimensions: 1536,
-              distanceFunction: "cosine",
-            },
-          ],
-        },
-      },
-      location: "eastus2",
-    }
-  );
-}
-```
+  const embeddingPath = `/${config.embeddingField}`;
 
-Configuration decisions:
+  for (const indexConfig of indexTypes) {
+    await deleteContainerIfExists(armClient, config, indexConfig.containerName);
 
-| Setting | Value | Why |
-|---|---|---|
-| `type` | `diskANN` | Graph-based index, optimized for low latency and efficient RU consumption at scale |
-| `dimensions` | `1536` | Must match the output of `text-embedding-3-small` |
-| `distanceFunction` | `cosine` | Standard for text similarity |
-| `dataType` | `float32` | Full-precision embeddings |
-| `path` | `/embedding` | Field in each document that stores the embedding vector |
-
-### [Quantized flat](#tab/tab-quantizedflat)
-
-Set the following in your `.env` file:
-
-```dotenv
-VECTOR_INDEX_TYPE="quantizedFlat"
-AZURE_COSMOSDB_CONTAINER_NAME="hotels_quantizedflat_ts"
-```
-
-```typescript
-async function createContainer() {
-  const embeddingPath = "/embedding";
-
-  await armClient.sqlResources.beginCreateUpdateSqlContainerAndWait(
-    resourceGroup,
-    accountName,
-    "Hotels",
-    "hotels_quantizedflat_ts",
-    {
-      resource: {
-        id: "hotels_quantizedflat_ts",
-        partitionKey: {
-          paths: ["/HotelId"],
-          kind: "MultiHash",
-          version: 2,
-        },
-        indexingPolicy: {
-          indexingMode: "consistent",
-          automatic: true,
-          includedPaths: [{ path: "/*" }],
-          excludedPaths: [{ path: "/_etag/?" }],
-          vectorIndexes: [
-            {
-              path: embeddingPath,
-              type: "quantizedFlat",
-            },
-          ],
-        },
-        vectorEmbeddingPolicy: {
-          vectorEmbeddings: [
-            {
-              path: embeddingPath,
-              dataType: "float32",
-              dimensions: 1536,
-              distanceFunction: "cosine",
-            },
-          ],
-        },
-      },
-      location: "eastus2",
-    }
-  );
-}
-```
-
-Configuration decisions:
-
-| Setting | Value | Why |
-|---|---|---|
-| `type` | `quantizedFlat` | Vector quantization, good balance of recall and performance at moderate scale |
-| `dimensions` | `1536` | Must match the output of `text-embedding-3-small` |
-| `distanceFunction` | `cosine` | Standard for text similarity |
-| `dataType` | `float32` | Full-precision embeddings |
-| `path` | `/embedding` | Field in each document that stores the embedding vector |
-
----
-
-> **Important:** Vector indexes are immutable. If you need to change the index type, dimensions, or distance function, you must create a new container and migrate data. See [What if you need to change your index?](#what-if-you-need-to-change-your-index)
-
-### Step 2: Create data-plane RBAC (control-plane.ts)
-
-The ARM SDK also creates the Cosmos DB SQL role definition and assignment. This grants your identity data-plane access to read/write documents — separate from the control-plane Contributor role.
-
-**Role definition:**
-
-```typescript
-const ROLE_DEFINITION_GUID = "e4e1a8b7-0a7e-4c6c-8f1d-000000000001";
-
-await armClient.sqlResources.beginCreateUpdateSqlRoleDefinitionAndWait(
-  ROLE_DEFINITION_GUID,
-  resourceGroup,
-  accountName,
-  {
-    roleName: "Write to Azure Cosmos DB for NoSQL data plane",
-    type: "CustomRole",
-    assignableScopes: [accountResourceId],
-    permissions: [
+    await armClient.sqlResources.beginCreateUpdateSqlContainerAndWait(
+      config.azure.resourceGroup!,
+      config.cosmos.accountName!,
+      config.cosmos.databaseName,
+      indexConfig.containerName,
       {
-        dataActions: [
-          "Microsoft.DocumentDB/databaseAccounts/readMetadata",
-          "Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers/items/*",
-          "Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers/*",
-        ],
-      },
-    ],
+        resource: {
+          id: indexConfig.containerName,
+          partitionKey: {
+            paths: ["/Region"],
+            kind: "MultiHash",
+            version: 2,
+          },
+          indexingPolicy: {
+            indexingMode: "consistent",
+            automatic: true,
+            includedPaths: [{ path: "/*" }],
+            excludedPaths: [{ path: "/_etag/?" }],
+            vectorIndexes: [
+              {
+                path: embeddingPath,
+                type: indexConfig.type,
+              },
+            ],
+          },
+          vectorEmbeddingPolicy: {
+            vectorEmbeddings: [
+              {
+                path: embeddingPath,
+                dataType: "float32",
+                dimensions: config.expectedDimensions,
+                distanceFunction: "cosine",
+              },
+            ],
+          },
+        },
+        location: config.azure.location,
+      }
+    );
   }
-);
+}
 ```
 
-**Role assignment:**
+Configuration decisions:
 
-```typescript
-const ROLE_ASSIGNMENT_GUID = "e4e1a8b7-0a7e-4c6c-8f1d-000000000002";
+| Setting | Value | Why |
+|---|---|---|
+| `type` | `diskANN` and `quantizedFlat` | The sample compares a graph-based index with an index that uses vector quantization techniques |
+| `partitionKey` | `/Region`, `MultiHash`, version `2` | Matches the code's regional partition-key routing |
+| `dimensions` | `1536` | Must match the output of `text-embedding-3-small` |
+| `distanceFunction` | `cosine` | Standard for text similarity |
+| `dataType` | `float32` | Full-precision embeddings |
+| `path` | `/embedding` | Field in each document that stores the embedding vector |
 
-await armClient.sqlResources.beginCreateUpdateSqlRoleAssignmentAndWait(
-  ROLE_ASSIGNMENT_GUID,
-  resourceGroup,
-  accountName,
-  {
-    roleDefinitionId: `${accountResourceId}/sqlRoleDefinitions/${ROLE_DEFINITION_GUID}`,
-    scope: accountResourceId,
-    principalId: userPrincipalId,
-  }
-);
-```
+> **Important:** Vector indexes are immutable. If you need to change the index type, dimensions, or distance function, delete and recreate the sample containers or create new containers and migrate data. RBAC role definitions and assignments are handled by deployment, not by `src/control-plane.ts`.
 
-The deterministic GUIDs make this operation idempotent — running the script again updates rather than duplicates the role definition and assignment.
-
-These data-plane permissions allow:
-
-| Action | Allowed |
-|---|---|
-| Read/write documents | Yes |
-| Read container metadata | Yes |
-| Create or delete databases/containers | No |
-| Modify indexing policies | No |
-
-> **Note:** After creating the RBAC assignment, the code waits 15 seconds for propagation before attempting data-plane operations.
-
-### Step 3: Verify embedding dimensions (data-plane.ts)
+### Step 2: Verify embedding dimensions (data-plane.ts)
 
 Before inserting data, confirm the embedding model produces vectors that match the container's configured `dimensions: 1536`:
 
@@ -415,9 +285,9 @@ async function verifyEmbeddingDimensions(openaiClient, config) {
 
 A mismatch here means the container was created with the wrong `dimensions` value. Since this is immutable, you must recreate the container with the correct value.
 
-### Step 4: Insert documents from data file (data-plane.ts)
+### Step 3: Insert documents from data file (data-plane.ts)
 
-The sample loads pre-vectorized hotel data from `data/HotelsData_toCosmosDB_Vector_byRegion.json` and inserts all documents using the Cosmos DB bulk execution API:
+The sample loads pre-vectorized hotel data from `./data/HotelsData_toCosmosDB_Vector_byRegion.json` by default and inserts all documents into both containers using the Cosmos DB bulk execution API:
 
 ```typescript
 async function insertDocuments(container, config) {
@@ -436,7 +306,7 @@ async function insertDocuments(container, config) {
   const operations = data.map((item) => ({
     operationType: BulkOperationType.Create,
     resourceBody: { id: item.HotelId, ...item },
-    partitionKey: [item.HotelId],
+    partitionKey: [item.Region],
   }));
 
   const response = await container.items.executeBulkOperations(operations);
@@ -450,18 +320,18 @@ Key points about this approach:
 - **Idempotent** — if the container already has documents, the insert is skipped.
 - **409 conflicts** — individual document conflicts (already exists) are treated as success.
 
-### Step 5: Run a vector similarity query (data-plane.ts)
+### Step 4: Run vector similarity queries (data-plane.ts)
 
-Use `VectorDistance()` to find documents similar to a natural language query:
+Use `VectorDistance()` to find documents similar to a natural language query. `src/index.ts` runs this function for both sample containers:
 
 ```typescript
-async function vectorQuery(container, openaiClient, config) {
+async function vectorQuery(container, containerName, openaiClient, config) {
   const queryText = "hotel near the ocean";
-  const queryEmbedding = await generateEmbedding(
-    openaiClient,
-    config.openai.embeddingDeployment,
-    queryText
-  );
+  const response = await openaiClient.embeddings.create({
+    model: config.openai.embeddingDeployment,
+    input: [queryText],
+  });
+  const queryEmbedding = response.data[0].embedding;
 
   const embeddingField = config.embeddingField;
 
@@ -471,19 +341,27 @@ async function vectorQuery(container, openaiClient, config) {
     throw new Error(`Invalid embedding field name: ${embeddingField}`);
   }
 
-  const { resources, requestCharge } = await container.items
-    .query({
-      query: `SELECT TOP 3 c.id, c.Description,
-                VectorDistance(c.${embeddingField}, @embedding) AS similarity
-              FROM c
-              ORDER BY VectorDistance(c.${embeddingField}, @embedding)`,
-      parameters: [{ name: "@embedding", value: queryEmbedding }],
-    })
-    .fetchAll();
+  const distanceFunctions = [
+    { name: "Cosine", orderDirection: "DESC" },
+    { name: "DotProduct", orderDirection: "DESC" },
+    { name: "Euclidean", orderDirection: "ASC" },
+  ];
 
-  resources.forEach((r, i) => {
-    console.log(`${i + 1}. ${r.Description} (similarity: ${r.similarity.toFixed(4)})`);
-  });
+  for (const distFunc of distanceFunctions) {
+    const distanceFunction = distFunc.name;
+    const { resources, requestCharge } = await container.items
+      .query({
+        query: `SELECT TOP 5 c.HotelId, c.HotelName, c.Description,
+                  VectorDistance(c.${embeddingField}, @embedding, false, {'distanceFunction': '${distanceFunction}'}) AS SimilarityScore
+                FROM c
+                ORDER BY VectorDistance(c.${embeddingField}, @embedding, false, {'distanceFunction': '${distanceFunction}'})`,
+        parameters: [{ name: "@embedding", value: queryEmbedding }],
+      }, { partitionKey: config.partitionKeyValue })
+      .fetchAll();
+
+    // src/index.ts prints the top 1 and top 2 rows in a consolidated table.
+    console.log(`  ✓ ${containerName} queried (${requestCharge.toFixed(2)} RUs)`);
+  }
 }
 ```
 
@@ -491,125 +369,50 @@ async function vectorQuery(container, openaiClient, config) {
 
 ## Expected output
 
-When you run `npm start`, the console output resembles the following:
-
-> **Tip:** The non-zero similarity scores in Step 5 confirm the vector search pipeline is working end-to-end — the vector index was created with the correct dimensions, embeddings are stored in the documents, and `VectorDistance()` is computing actual cosine distances. If the vector configuration were incorrect, the query would either fail with an error or return `null` similarity scores.
-
-### [DiskANN](#tab/tab-diskann)
+When you run `npm start`, the console output shows both containers being created, loaded, queried, and cleaned up. The final results are consolidated across metrics and containers:
 
 ```
-======================================================================
-Azure Cosmos DB — Create Container with Vector Index via ARM SDK
-======================================================================
+================================================================================
+CONSOLIDATED RESULTS — Vector Query with All Metrics & Index Types
+================================================================================
 
-=== Step 1: Create Container with Vector Index ===
-  Container:         hotels_diskann_ts
-  Dimensions:        1536
-  Distance function: cosine
-  Created in 4.7s
-  Vector index is IMMUTABLE — cannot be changed after creation
+| Container          | Metric     | Top 1 Result               | Score  | Top 2 Result               | Score  | Diff   |
+|--------------------|------------|----------------------------|--------|----------------------------|--------|--------|
+| hotels_diskann_ts  | Cosine     | City Center Summer Wind Re | 0.4025 | Red Tide Hotel             | 0.4000 | 0.0025 |
+| hotels_diskann_ts  | DotProduct | City Center Summer Wind Re | 0.4025 | Red Tide Hotel             | 0.4001 | 0.0025 |
+| hotels_diskann_ts  | Euclidean  | City Center Summer Wind Re | 1.0933 | Red Tide Hotel             | 1.0956 | 0.0023 |
+| hotels_quantizedflat_ts | Cosine     | City Center Summer Wind Re | 0.4025 | Red Tide Hotel             | 0.4000 | 0.0025 |
+| hotels_quantizedflat_ts | DotProduct | City Center Summer Wind Re | 0.4027 | Red Tide Hotel             | 0.4001 | 0.0025 |
+| hotels_quantizedflat_ts | Euclidean  | City Center Summer Wind Re | 1.0934 | Red Tide Hotel             | 1.0957 | 0.0023 |
 
-=== Step 2: Create Data-Plane RBAC Access ===
-  Creating role definition...
-  Role definition created
-  Assigning role to current user...
-  Role assigned to principal: 00000000-0000-0000-0000-000000000000
+=== Cleanup: Remove Sample Containers ===
+  ✓ Deleted container: hotels_diskann_ts
+  ✓ Deleted container: hotels_quantizedflat_ts
 
-  Waiting 15 s for RBAC propagation...
-
-=== Step 3: Verify Embedding Dimensions ===
-  Model:    text-embedding-3-small
-  Actual:   1536
-  Expected: 1536
-  Dimensions match
-
-=== Step 4: Insert Documents ===
-  Data file: /path/to/data/HotelsData_toCosmosDB_Vector_byRegion.json
-  Loaded 50 documents (embeddings already included)
-  Inserting 50 items using executeBulkOperations...
-  Bulk insert completed in 3.21s
-  Inserted: 50/50 | Failed: 0 | RU: 542.30
-
-=== Step 5: Vector Similarity Query ===
-  Query:   "hotel near the ocean"
-  Latency: 42ms | RU: 3.12 | Results: 3
-    1. Luxury hotel with ocean views and a private beach (similarity: 0.8234)
-    2. Budget-friendly downtown location near public transit (similarity: 0.6012)
-    3. Mountain resort with ski-in/ski-out access (similarity: 0.5891)
-
-======================================================================
-Complete — container, vector index, and RBAC created
-======================================================================
+Complete
 ```
 
-### [Quantized flat](#tab/tab-quantizedflat)
-
-```
-======================================================================
-Azure Cosmos DB — Create Container with Vector Index via ARM SDK
-======================================================================
-
-=== Step 1: Create Container with Vector Index ===
-  Container:         hotels_quantizedflat_ts
-  Dimensions:        1536
-  Distance function: cosine
-  Created in 4.7s
-  Vector index is IMMUTABLE — cannot be changed after creation
-
-=== Step 2: Create Data-Plane RBAC Access ===
-  Creating role definition...
-  Role definition created
-  Assigning role to current user...
-  Role assigned to principal: 00000000-0000-0000-0000-000000000000
-
-  Waiting 15 s for RBAC propagation...
-
-=== Step 3: Verify Embedding Dimensions ===
-  Model:    text-embedding-3-small
-  Actual:   1536
-  Expected: 1536
-  Dimensions match
-
-=== Step 4: Insert Documents ===
-  Data file: /path/to/data/HotelsData_toCosmosDB_Vector_byRegion.json
-  Loaded 50 documents (embeddings already included)
-  Inserting 50 items using executeBulkOperations...
-  Bulk insert completed in 3.21s
-  Inserted: 50/50 | Failed: 0 | RU: 542.30
-
-=== Step 5: Vector Similarity Query ===
-  Query:   "hotel near the ocean"
-  Latency: 42ms | RU: 3.12 | Results: 3
-    1. Luxury hotel with ocean views and a private beach (similarity: 0.8234)
-    2. Budget-friendly downtown location near public transit (similarity: 0.6012)
-    3. Mountain resort with ski-in/ski-out access (similarity: 0.5891)
-
-======================================================================
-Complete — container, vector index, and RBAC created
-======================================================================
-```
-
----
+> **Tip:** The non-zero similarity scores confirm the vector search pipeline is working end-to-end — the vector indexes were created with the correct dimensions, embeddings are stored in the documents, and `VectorDistance()` is computing actual distances or similarity scores. If the vector configuration were incorrect, the query would either fail with an error or return `null` similarity scores.
 
 ## Verify the vector index is working
 
-After running `npm start`, use these checks to confirm the vector index was created correctly, the query used it, and the results are genuinely from vector search.
+During the run, before the cleanup step deletes the sample containers, use these checks to confirm the vector indexes were created correctly, the queries used them, and the results are genuinely from vector search. After cleanup, `container show` returns not found by design.
 
-### 1. Confirm the vector index exists on the container
+### 1. Confirm the vector indexes exist on the containers
 
-Use Azure CLI to inspect the container's indexing policy and vector embedding policy:
+Use Azure CLI to inspect each container's indexing policy and vector embedding policy:
 
 ```bash
 az cosmosdb sql container show \
   --account-name $AZURE_COSMOSDB_ACCOUNT_NAME \
   --resource-group $AZURE_RESOURCE_GROUP \
-  --database-name Hotels \
+  --database-name $AZURE_COSMOSDB_CREATE_INDEX_DATABASENAME \
   --name hotels_diskann_ts \
   --query "{vectorIndexes: resource.indexingPolicy.vectorIndexes, vectorEmbeddingPolicy: resource.vectorEmbeddingPolicy}" \
   --output json
 ```
 
-The output should show the `vectorIndexes` array with your path and index type, and a `vectorEmbeddingPolicy` with matching dimensions, data type, and distance function. If either is `null` or empty, the container was not created with vector support.
+The output should show the `vectorIndexes` array with your path and index type, and a `vectorEmbeddingPolicy` with matching dimensions, data type, and distance function. Repeat the check for `hotels_quantizedflat_ts`. If either is `null` or empty, the container was not created with vector support.
 
 You can also verify in the Azure Portal: navigate to your Cosmos DB account → **Data Explorer** → select your database and container → **Settings** → **Indexing Policy** to see the `vectorIndexes` and `vectorEmbeddingPolicy` configuration.
 
@@ -618,7 +421,7 @@ You can also verify in the Azure Portal: navigate to your Cosmos DB account → 
 Two signals confirm the vector index was actually used:
 
 - **The query succeeded** — `ORDER BY VectorDistance()` requires a vector index. Without one, Cosmos DB returns an error like `"The order by item requires a corresponding vector index."` If you see results, the index was used.
-- **Low RU charge** — a vector index query against 50 documents typically costs 2–5 RU. A brute-force scan (flat index) on the same data would cost significantly more. The `RU` value in Step 5 output reflects this.
+- **Low RU charge** — a vector index query against 50 documents typically costs 2–5 RU. A brute-force scan (flat index) on the same data would cost significantly more. The query output includes the RU value for each metric/container.
 
 ### 3. Confirm results are from vector search, not a regular query
 
@@ -642,7 +445,7 @@ The regular query returns documents in arbitrary order with no relevance to "hot
 
 ## Index type comparison
 
-This sample uses **diskANN** or **quantizedFlat**. Here's how the available index types compare:
+This sample uses both **diskANN** and **quantizedFlat**. Here's how the available index types compare:
 
 | Index Type | Best For | Technique | Recall |
 |---|---|---|---|
@@ -651,17 +454,17 @@ This sample uses **diskANN** or **quantizedFlat**. Here's how the available inde
 
 > **Important:** QuantizedFlat uses vector quantization techniques. DiskANN is graph-based. These are distinct approaches.
 
-To use a different index type, change `VECTOR_INDEX_TYPE` and `AZURE_COSMOSDB_CONTAINER_NAME` in your `.env` file (see [Step 1](#step-1-create-the-container-with-a-vector-index-control-planets) tabs), then run `npm start` again. You must use a new container name since the index type on an existing container is immutable.
+The current code creates both supported index types in every run.
 
 ## What if you need to change your index?
 
 Vector indexes are **immutable after container creation**. If you need to change the index type, dimensions, or distance function:
 
-1. **Update `.env`** — set `VECTOR_INDEX_TYPE` to the desired algorithm and `AZURE_COSMOSDB_CONTAINER_NAME` to a new container name
-2. **Run `npm start`** — creates the new container (the account and database already exist and are idempotent)
-3. **Migrate data** — copy documents from the old container to the new container
+1. **Update code or infrastructure intentionally** — choose the desired algorithm and container name
+2. **Run `npm start`** — deletes and recreates the sample containers in the existing database
+3. **Migrate data** — copy documents if you are changing a non-sample container
 4. **Update your application** — point to the new container name
-5. **Delete the old container** — clean up via Azure Portal or Azure CLI
+5. **Delete old containers** — clean up via Azure Portal or Azure CLI
 
 > **Tip:** It's much cheaper to recreate an empty test container than to migrate production data. Test with representative data volumes before committing to an index type.
 
@@ -674,50 +477,35 @@ This quickstart uses both planes:
 | Create account | Control | `scripts/create-resources.sh` (Azure CLI) | Contributor (on resource group) |
 | Create database | Control | `scripts/create-resources.sh` (Azure CLI) | Contributor |
 | Create container + vector index | Control | `src/control-plane.ts` (`@azure/arm-cosmosdb`) | Contributor |
-| Create RBAC role definition | Control | `src/control-plane.ts` (`@azure/arm-cosmosdb`) | Contributor |
-| Create RBAC role assignment | Control | `src/control-plane.ts` (`@azure/arm-cosmosdb`) | Contributor |
 | Read/write documents | Data | `src/data-plane.ts` (`@azure/cosmos`) | Custom data-plane role |
 | Run vector queries | Data | `src/data-plane.ts` (`@azure/cosmos`) | Custom data-plane role |
 
-The **Contributor** role (assigned by `scripts/create-resources.sh`) grants control-plane access to create and manage resources. The **custom SQL role** (created by `src/control-plane.ts` step 2) grants data-plane access to read and write documents.
+The **Contributor** role (assigned by deployment or `scripts/create-resources.sh`) grants control-plane access to create and manage resources. Data-plane RBAC is also assigned by deployment or setup tooling; `src/control-plane.ts` does not create SQL role definitions or assignments.
 
 ## Environment variables
 
-All values are written to `.env` by `scripts/create-resources.sh`:
+The code reads these values from `.env`:
 
 | Variable | Description |
 |---|---|
-| `AZURE_TOKEN_CREDENTIALS` | Tells `DefaultAzureCredential` to use the Azure CLI token directly instead of searching the full credential chain |
-| `AZURE_SUBSCRIPTION_ID` | Azure subscription ID |
-| `AZURE_RESOURCE_GROUP` | Resource group name |
+| `AZURE_SUBSCRIPTION_ID` | Azure subscription ID for ARM SDK operations |
+| `AZURE_RESOURCE_GROUP` | Resource group that contains the Cosmos DB account |
 | `AZURE_LOCATION` | Azure region (default: `eastus2`) |
-| `AZURE_USER_PRINCIPAL_ID` | Your Microsoft Entra ID object ID |
 | `AZURE_COSMOSDB_ACCOUNT_NAME` | Cosmos DB account name |
 | `AZURE_COSMOSDB_ENDPOINT` | Cosmos DB document endpoint URL |
-| `AZURE_COSMOSDB_DATABASENAME` | Database name (default: `Hotels`) |
-| `VECTOR_INDEX_TYPE` | Vector index algorithm: `diskANN` or `quantizedFlat` (default: `diskANN`) |
+| `AZURE_COSMOSDB_CREATE_INDEX_DATABASENAME` | Existing database name (default: `HotelsCreateIndex`) |
+| `AZURE_COSMOSDB_CONTAINER_NAME` | Loaded for compatibility, but this sample uses the fixed containers `hotels_diskann_ts` and `hotels_quantizedflat_ts` |
+| `VECTOR_INDEX_TYPE` | Loaded for compatibility, but this sample creates both `diskANN` and `quantizedFlat` containers |
 | `AZURE_OPENAI_ENDPOINT` | Azure OpenAI endpoint URL |
 | `AZURE_OPENAI_EMBEDDING_DEPLOYMENT` | Embedding model deployment name |
-| `AZURE_OPENAI_EMBEDDING_API_VERSION` | Embedding API version |
-| `EMBEDDED_FIELD` | Document field for embedding vectors |
-| `EMBEDDING_DIMENSIONS` | Expected embedding dimensions |
-| `DATA_FILE_WITH_VECTORS_AND_REGIONS` | Path to pre-vectorized data file (default: `../data/HotelsData_toCosmosDB_Vector_byRegion.json`) |
+| `AZURE_OPENAI_EMBEDDING_API_VERSION` | Embedding API version (default: `2024-08-01-preview`) |
+| `AZURE_COSMOSDB_CREATE_INDEX_EMBEDDED_FIELD` | Document field for embedding vectors (default: `embedding`) |
+| `EMBEDDING_DIMENSIONS` | Expected embedding dimensions (default: `1536`) |
+| `DATA_FILE_WITH_VECTORS_AND_REGIONS` | Path to pre-vectorized data file |
+| `DATA_FILE_WITH_VECTORS` | Fallback path to pre-vectorized data file |
+| `PARTITION_KEY_VALUE` | Region partition key value for queries (default: `Northeast`) |
 
-The container name depends on the index type:
-
-### [DiskANN](#tab/tab-diskann)
-
-| Variable | Value |
-|---|---|
-| `AZURE_COSMOSDB_CONTAINER_NAME` | `hotels_diskann_ts` |
-
-### [Quantized flat](#tab/tab-quantizedflat)
-
-| Variable | Value |
-|---|---|
-| `AZURE_COSMOSDB_CONTAINER_NAME` | `hotels_quantizedflat_ts` |
-
----
+If neither data file variable is set, the code uses `./data/HotelsData_toCosmosDB_Vector_byRegion.json`, resolved from the compiled `dist` folder as the sample directory's `data/` subdirectory.
 
 ## Key takeaways
 
@@ -726,7 +514,7 @@ The following table summarizes the core concepts demonstrated in this quickstart
 | Concept | Detail |
 |---|---|
 | Vector indexes are immutable | Defined at container creation via the ARM SDK `vectorEmbeddingPolicy` and `vectorIndexes`, cannot be changed afterward |
-| ARM SDK for container creation | `src/control-plane.ts` uses `@azure/arm-cosmosdb` to create the container with vector index and RBAC |
+| ARM SDK for container creation | `src/control-plane.ts` uses `@azure/arm-cosmosdb` to create and delete both sample containers with vector indexes |
 | Data plane for documents | `src/data-plane.ts` uses `@azure/cosmos` to read/write documents and run `VectorDistance()` queries |
 | Entra ID everywhere | `DefaultAzureCredential` authenticates to all three services — no keys or connection strings |
 | Dimension match is critical | Embedding model output must equal the container's `vectorEmbeddingPolicy.dimensions` |
@@ -751,8 +539,8 @@ The script performs two steps:
 
 Explore these resources to learn more about vector search and the ARM SDK:
 
-- [Azure Cosmos DB vector search](https://learn.microsoft.com/azure/cosmos-db/gen-ai/vector-search) — Understanding DiskANN and vector search
-- [Vector indexing policies](https://learn.microsoft.com/azure/cosmos-db/index-policy) — Detailed index configuration reference
+- [Azure Cosmos DB vector search](/azure/cosmos-db/gen-ai/vector-search) — Understanding DiskANN and vector search
+- [Vector indexing policies](/azure/cosmos-db/index-policy) — Detailed index configuration reference
 - [@azure/arm-cosmosdb SDK reference](https://www.npmjs.com/package/@azure/arm-cosmosdb) — ARM SDK documentation
-- [Configure RBAC with Microsoft Entra ID](https://learn.microsoft.com/azure/cosmos-db/how-to-setup-rbac) — Setting up identity-based access
-- [Quickstart: Vector store with Azure Cosmos DB for NoSQL](https://learn.microsoft.com/azure/cosmos-db/quickstart-vector-store-nodejs) — End-to-end guide with data-plane container creation
+- [Configure RBAC with Microsoft Entra ID](/azure/cosmos-db/how-to-setup-rbac) — Setting up identity-based access
+- [Quickstart: Vector store with Azure Cosmos DB for NoSQL](/azure/cosmos-db/quickstart-vector-store-nodejs) — End-to-end guide with data-plane container creation

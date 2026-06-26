@@ -2,30 +2,31 @@
 
 ## Overview
 
-This sample demonstrates **data-plane only** vector search operations against Azure Cosmos DB for NoSQL containers that already exist.
+This sample demonstrates vector index creation and vector search against Azure Cosmos DB for NoSQL. It uses ARM control-plane APIs to recreate and delete its sample containers, and data-plane SDK APIs to ingest documents and run queries.
 
 The sample:
 - authenticates with `DefaultAzureCredential`
-- connects to the existing `HotelsCreateIndex` database and existing vector containers
+- connects to the existing `HotelsCreateIndex` database
+- recreates `hotels_diskann_dotnet` and `hotels_quantizedflat_dotnet` with vector indexes
 - loads pre-vectorized hotel documents from `.\data\HotelsData_toCosmosDB_Vector_byRegion.json`
 - validates `Region` values and upserts one transactional batch per region (`Northeast`, `Midwest`, `South`, `West`)
 - generates a query embedding with the Azure OpenAI client
 - runs single-partition `VectorDistance()` queries for `Cosine`, `DotProduct`, and `Euclidean`
-- prints the top 5 matches for each container
+- prints a comparison table using the top matches for each container and distance function
+- deletes both sample containers during cleanup
 
-The sample never creates databases, containers, or vector indexes in code.
+DiskANN is graph-based. QuantizedFlat uses vector quantization techniques.
 
 ## Prerequisites
 
 - .NET 8.0 SDK
 - Azure CLI installed and signed in with `az login`
-- An Azure Cosmos DB for NoSQL account and database already provisioned
-- The following existing containers created by shared Bicep or `azd up`:
-  - `hotels_diskann_dotnet`
-  - `hotels_quantizedflat_dotnet`
+- An Azure Cosmos DB for NoSQL account with vector search enabled and an existing `HotelsCreateIndex` database
+- Your Azure subscription ID, resource group name, and Cosmos DB account name
 - Azure RBAC roles for your identity:
   - **Cosmos DB Built-in Data Contributor**
   - **Cognitive Services OpenAI User**
+- Azure RBAC permissions to read the Cosmos DB account and database and to create, update, and delete SQL containers through Azure Resource Manager
 - An Azure OpenAI embedding deployment for `text-embedding-3-small`
 
 ## Setup
@@ -36,37 +37,58 @@ The sample never creates databases, containers, or vector indexes in code.
    Set-Location .\nosql-create-index-dotnet
    ```
 
-2. Populate configuration.
+2. Generate `appsettings.json`.
 
-   **If you deployed with `azd up`**, set environment variables that override `appsettings.json`:
+   If you deployed with `azd up`, run the helper script from the `scripts` directory to generate `appsettings.json` from your `azd` environment values:
 
    ```powershell
-   azd env get-values | ForEach-Object {
-     if ($_ -match '^([^=]+)=["'']?(.+?)["'']?$') {
-       $key = $matches[1]; $val = $matches[2]
-       [Environment]::SetEnvironmentVariable($key, $val)
-     }
-   }
+   Set-Location .\scripts
+   .\generate-appsettings.ps1
+   Set-Location ..
    ```
 
-   **Otherwise**, edit `appsettings.json` directly with values from the Azure portal:
+   On macOS or Linux:
+
+   ```bash
+   cd scripts
+   chmod +x generate-appsettings.sh
+   ./generate-appsettings.sh
+   cd ..
+   ```
+
+   **Otherwise**, copy `appsettings.example.json` to `appsettings.json` and edit it directly with values from the Azure portal:
 
    ```json
    {
-     "AZURE_COSMOSDB_ENDPOINT": "https://<your-account>.documents.azure.com:443/",
-     "AZURE_OPENAI_EMBEDDING_ENDPOINT": "https://<your-openai>.openai.azure.com/"
+     "CosmosDbSettings": {
+       "Endpoint": "https://<your-account>.documents.azure.com:443/",
+       "DatabaseName": "HotelsCreateIndex",
+       "ContainerName": "",
+       "PartitionKeyValue": "Northeast",
+       "SubscriptionId": "<your-subscription-id>",
+       "ResourceGroup": "<your-resource-group>",
+       "AccountName": "<your-account-name>"
+     },
+     "OpenAiSettings": {
+       "Endpoint": "https://<your-openai>.openai.azure.com/",
+       "Deployment": "text-embedding-3-small",
+       "ApiVersion": "2024-08-01-preview"
+     },
+     "VectorAlgorithm": "",
+     "EmbeddedField": "embedding",
+     "DataFilePath": "./data/HotelsData_toCosmosDB_Vector_byRegion.json"
    }
    ```
 
-   You can also set values as environment variables — they override `appsettings.json`.
+   `DataFilePath` defaults to `./data/HotelsData_toCosmosDB_Vector_byRegion.json`.
 
 3. Notes:
-   - `VECTOR_ALGORITHM` accepts `diskann` or `quantizedflat`.
-   - Leave `VECTOR_ALGORITHM` empty to run **both** containers.
-   - Leave `AZURE_COSMOSDB_CONTAINER_NAME` empty unless you want to target one container by name.
-   - `PARTITION_KEY_VALUE` must be one of `Northeast`, `Midwest`, `South`, or `West`.
-   - `AZURE_OPENAI_EMBEDDING_API_VERSION` is kept for cross-language consistency with the other samples.
-   - `DATA_FILE_WITH_VECTORS_AND_REGIONS` is the preferred data-file setting and defaults to the region-partitioned dataset used by the create-index samples.
+   - `VectorAlgorithm` accepts `diskann` or `quantizedflat`.
+   - Leave `VectorAlgorithm` empty to ingest and query **both** containers.
+   - The sample always creates and cleans up both sample containers, even when `VectorAlgorithm` focuses ingestion and queries on one container.
+   - Leave `CosmosDbSettings:ContainerName` empty unless you want to ingest and query one container by name.
+   - `CosmosDbSettings:PartitionKeyValue` must be one of `Northeast`, `Midwest`, `South`, or `West`.
+   - `OpenAiSettings:ApiVersion` is kept for cross-language consistency with the other samples.
 
 4. Restore dependencies.
 
@@ -76,19 +98,7 @@ The sample never creates databases, containers, or vector indexes in code.
 
 ## Run
 
-**Load environment variables from `.env` first (if not using appsettings.json):**
-
-```powershell
-# PowerShell (strips quotes from values)
-Get-Content .env | Where-Object { $_ -match '^[^#].*=' } | ForEach-Object { $k,$v = $_ -split '=',2; [Environment]::SetEnvironmentVariable($k.Trim(), $v.Trim().Trim('"').Trim("'")) }
-```
-
-```bash
-# Bash/Linux/Mac
-set -a; source .env; set +a
-```
-
-**Then run the sample:**
+Run the sample:
 
 ```powershell
 dotnet run --project .\nosql-create-index-dotnet.csproj
@@ -97,15 +107,13 @@ dotnet run --project .\nosql-create-index-dotnet.csproj
 Examples:
 
 ```powershell
-# Run both containers (default when VECTOR_ALGORITHM is empty)
+# Run both containers for ingestion and queries (default when VectorAlgorithm is empty)
 dotnet run --project .\nosql-create-index-dotnet.csproj
 
-# Run only DiskANN
-$env:VECTOR_ALGORITHM = 'diskann'
+# To focus ingestion and queries on DiskANN, set "VectorAlgorithm": "diskann" in appsettings.json
 dotnet run --project .\nosql-create-index-dotnet.csproj
 
-# Run only QuantizedFlat
-$env:VECTOR_ALGORITHM = 'quantizedflat'
+# To focus ingestion and queries on QuantizedFlat, set "VectorAlgorithm": "quantizedflat" in appsettings.json
 dotnet run --project .\nosql-create-index-dotnet.csproj
 ```
 
@@ -114,7 +122,9 @@ dotnet run --project .\nosql-create-index-dotnet.csproj
 The sample prints:
 - configuration validation
 - embedding dimension verification for `text-embedding-3-small`
+- container creation status for both sample containers
 - ingestion status for each target container
-- top 5 vector matches for each queried container
+- query status and a comparison table for each queried container and distance function
+- cleanup status for both sample containers
 
 See `output/sample-output.txt` for an example output file.

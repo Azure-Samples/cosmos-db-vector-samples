@@ -8,11 +8,11 @@ ms.topic: quickstart
 ms.date: 2026-06-22
 ---
 
-# Quickstart: Create and query vector indexes in Azure Cosmos DB for NoSQL using Go
+# Quickstart: Create vector index in Azure Cosmos DB for NoSQL using Go
 
 In this quickstart, you run the Go create-index sample for Azure Cosmos DB for NoSQL to demonstrate two key goals:
 
-- **Goal 1 (Control Plane):** Use the ARM SDK (armcosmos/v3) to create the `HotelsCreateIndex` database and two vector-indexed containers: `hotels_diskann_go` (approximate search) and `hotels_quantizedflat_go` (exact search).
+- **Goal 1 (Control Plane):** Use the ARM SDK (armcosmos/v3) to create the `HotelsCreateIndex` database and two vector-indexed containers: `hotels_diskann_go` (DiskANN approximate search) and `hotels_quantizedflat_go` (QuantizedFlat uses vector quantization techniques).
 - **Goal 2 (Distance Functions):** Compare how the same query embedding produces different scores and rankings when using different vector distance functions: Cosine, DotProduct, and Euclidean.
 
 ## Prerequisites
@@ -22,6 +22,7 @@ In this quickstart, you run the Go create-index sample for Azure Cosmos DB for N
 - [Go 1.23 or later](https://go.dev/dl/) installed.
 - An Azure Cosmos DB for NoSQL account with vector search enabled.
 - Microsoft Entra ID roles for your identity:
+  - Management-plane permission to create and delete SQL databases and containers in the Azure Cosmos DB account
   - **Cosmos DB Built-in Data Contributor** on the Azure Cosmos DB account
   - **Cognitive Services OpenAI User** on the Azure OpenAI resource
 - An Azure OpenAI resource with a `text-embedding-3-small` deployment.
@@ -37,7 +38,7 @@ In this quickstart, you run the Go create-index sample for Azure Cosmos DB for N
 >
 > 2. **Data Plane (Goal 2):** After containers are created, the sample:
 >    - Loads pre-vectorized hotel documents
->    - Inserts them concurrently using Region-based batches
+>    - Inserts them sequentially using Region-based partition keys
 >    - Generates a query embedding with Azure OpenAI
 >    - Runs `VectorDistance()` queries with three distance functions: **Cosine**, **DotProduct**, and **Euclidean**
 >    - Displays rankings for each distance function to show how results differ
@@ -49,23 +50,15 @@ git clone https://github.com/Azure-Samples/cosmos-db-vector-samples.git
 cd cosmos-db-vector-samples/nosql-create-index-go
 ```
 
-## Set up the data directory
+## Set up the data file
 
-The sample requires `HotelsData_toCosmosDB_Vector_byRegion.json` to be in a local `data/` subdirectory:
+The sample requires `HotelsData_toCosmosDB_Vector_byRegion.json`. The repository includes the shared file at `../data/HotelsData_toCosmosDB_Vector_byRegion.json` relative to this sample directory, which matches the `DATA_FILE_WITH_VECTORS_AND_REGIONS` value shown in the environment-variable block.
 
-```bash
-# Create the data directory if it doesn't exist
-mkdir -p ./data
-
-# Copy the data file from the shared location
-cp ../HotelsData_toCosmosDB_Vector_byRegion.json ./data/
-```
-
-The sample expects the data file at: `./data/HotelsData_toCosmosDB_Vector_byRegion.json`
+The code resolves relative paths from the current working directory and the sample directory. If you use a different file location, set `DATA_FILE_WITH_VECTORS_AND_REGIONS` to that path before running the sample.
 
 ## Configure environment variables
 
-Configure environment variables.
+Configure environment variables. The Go code calls `os.Getenv` directly and doesn't load `.env` files automatically. If you create a `.env` file from `azd` or `.env.example`, export or set the values in your shell before running `go run .`.
 
 **If you deployed with `azd up`:**
 
@@ -79,16 +72,21 @@ azd env get-values > .env
 cp .env.example .env
 ```
 
-The `.env.example` file contains the following variables:
+The code requires these environment variable names:
 
 ```dotenv
 AZURE_COSMOSDB_ENDPOINT=https://YOUR-COSMOS-ACCOUNT.documents.azure.com:443/
-AZURE_COSMOSDB_DATABASENAME=HotelsCreateIndex
+AZURE_COSMOSDB_CREATE_INDEX_DATABASENAME=HotelsCreateIndex
 AZURE_COSMOSDB_CONTAINER_NAME=
 AZURE_OPENAI_EMBEDDING_ENDPOINT=https://YOUR-AOAI-RESOURCE.openai.azure.com/
 AZURE_OPENAI_EMBEDDING_DEPLOYMENT=text-embedding-3-small
 VECTOR_ALGORITHM=
-DATA_FILE_WITH_VECTORS_AND_REGIONS=./data/HotelsData_toCosmosDB_Vector_byRegion.json
+AZURE_COSMOSDB_CREATE_INDEX_EMBEDDED_FIELD=embedding
+DATA_FILE_WITH_VECTORS_AND_REGIONS=../data/HotelsData_toCosmosDB_Vector_byRegion.json
+AZURE_SUBSCRIPTION_ID=YOUR-SUBSCRIPTION-ID
+AZURE_RESOURCE_GROUP=YOUR-RESOURCE-GROUP
+AZURE_COSMOSDB_ACCOUNT_NAME=YOUR-COSMOS-ACCOUNT-NAME
+AZURE_LOCATION=YOUR-AZURE-REGION
 ```
 
 Set `VECTOR_ALGORITHM` to `diskann`, `quantizedflat`, or leave it empty to run against both containers. When `AZURE_COSMOSDB_CONTAINER_NAME` and `VECTOR_ALGORITHM` are both empty, the sample iterates over both known containers (`hotels_diskann_go` and `hotels_quantizedflat_go`).
@@ -101,9 +99,17 @@ Download Go module dependencies:
 go mod download
 ```
 
-Run the sample:
+Export the variables and run the sample. The command `go run .` is valid because this directory contains `package main` and `main.go`.
 
 ```bash
+export $(grep -v '^#' .env | xargs)
+go run .
+```
+
+For PowerShell:
+
+```powershell
+Get-Content .env | Where-Object { $_ -match '^[^#].*=' } | ForEach-Object { $k,$v = $_ -split '=',2; [Environment]::SetEnvironmentVariable($k.Trim(), $v.Trim()) }
 go run .
 ```
 
@@ -121,15 +127,19 @@ The sample demonstrates both goals in sequence:
 **Goal 2 - Data Plane (load and query with distance functions):**
 1. Loads configuration from environment variables
 2. Creates an Azure Cosmos DB data plane client
-3. Reads `data/HotelsData_toCosmosDB_Vector_byRegion.json` and prepares documents
+3. Reads the configured `DATA_FILE_WITH_VECTORS_AND_REGIONS` file and prepares documents
 4. Generates a query embedding by calling the Azure OpenAI REST API
 5. For each target container:
-   - Inserts documents concurrently (max 10 goroutines) using `CreateItem`
+   - Inserts documents sequentially (`maxInsertConcurrency = 1`) using `CreateItem`
    - Runs **three separate** `VectorDistance()` SQL queries with different distance functions:
      - **Cosine:** Measures angle between vectors (values: 0 to 2)
      - **DotProduct:** Inner product of vectors (values: any real number)
      - **Euclidean:** Straight-line distance between vectors (values: 0 to √6144)
    - Prints the top 5 matching hotels for each distance function, showing how rankings differ
+
+**Cleanup:**
+1. Deletes both vector-indexed containers with the ARM SDK
+2. Prints `Complete`
 
 ## Understand the project structure
 
@@ -141,8 +151,11 @@ nosql-create-index-go/
 ├── go.sum
 ├── config.go
 ├── config_test.go
+├── controlplane.go
 ├── dataplane.go
 ├── main.go
+├── data/
+│   └── HotelsData_toCosmosDB_Vector_byRegion.json
 ├── output/
 │   └── sample-output.txt
 └── tests/
@@ -152,9 +165,10 @@ nosql-create-index-go/
 | File | Purpose |
 |------|---------|
 | `config.go` | Loads and validates environment variables. |
+| `controlplane.go` | Creates the database and vector-indexed containers, verifies index settings, and deletes containers during cleanup. |
 | `dataplane.go` | Implements document ingestion, embedding generation, and vector queries. |
 | `main.go` | Entry point; orchestrates configuration, ingestion, and queries. |
-| `go.mod` | Module definition; declares `azidentity` and `azcosmos` dependencies. |
+| `go.mod` | Module definition; declares Azure identity, data plane, and ARM SDK dependencies. |
 
 ## Key implementation details
 
@@ -211,7 +225,7 @@ containerPoller, err := client.BeginCreateUpdateSQLContainer(ctx, resourceGroup,
 
 ### Goal 2: Load configuration and generate embeddings
 
-Configuration is loaded from environment variables using `godotenv`:
+Configuration is loaded from process environment variables using `os.Getenv`:
 
 ```go
 cfg, err := LoadConfig()
@@ -233,9 +247,9 @@ request.Header.Set("Authorization", "Bearer "+token.Token)
 resp, err := http.DefaultClient.Do(request)
 ```
 
-### Insert documents concurrently
+### Insert documents sequentially
 
-The sample fans out document inserts across up to 10 goroutines using a semaphore channel. HTTP 409 Conflict responses (duplicate IDs) are treated as safe-to-skip:
+The sample inserts documents sequentially because `maxInsertConcurrency` is set to `1`. HTTP 409 Conflict responses (duplicate IDs) are treated as safe-to-skip:
 
 ```go
 partitionKey := azcosmos.NewPartitionKey().AppendString(partitionKeyFieldValue)
@@ -285,19 +299,73 @@ pager := container.NewQueryItemsPager(queryText, partitionKey, &options)
 ## Example output
 
 ```output
-Azure Cosmos DB vector index sample (Go)
-database=Hotels primaryContainer=hotels_diskann_go vectorAlgorithm=diskann dataFile=.../data/HotelsData_toCosmosDB_Vector_byRegion.json
-embeddingDeployment=text-embedding-3-small dimensions=1536 partitionKey=hotels
+✓ Region validation passed. Found regions: Midwest, Northeast, South, West
+  Region 'Northeast': 10 documents
+  Region 'Midwest': 10 documents
+  Region 'South': 14 documents
+  Region 'West': 16 documents
+Using Azure OpenAI Embedding Deployment/Model: text-embedding-3-small
+Reading JSON file from C:\project-dina-data-ai\repos\cosmos-db-vector-samples-2\nosql-create-index-go\data\HotelsData_toCosmosDB_Vector_byRegion.json
+Loaded 50 documents
 
-=== hotels_diskann_go ===
-inserted=50 skipped=0 failed=0 total=50 writeRU=123.45
-1. HotelId=12 | HotelName=Ocean Breeze Suites | score=0.0834 | Description=Modern waterfront hotel...
-queryRU=3.21
+=== Phase 1: Create Database ===
+  Database: HotelsCreateIndex
+  ✓ Database created or already exists
 
-=== hotels_quantizedflat_go ===
-inserted=50 skipped=0 failed=0 total=50 writeRU=121.88
-1. HotelId=12 | HotelName=Ocean Breeze Suites | score=0.0834 | Description=Modern waterfront hotel...
-queryRU=3.47
+=== Creating Container: hotels_diskann_go ===
+  Index type:     diskANN
+  Embedding path: /embedding
+  Dimensions:     1536
+  Distance func:  cosine (queried with all 3 metrics)
+  Cleaning up existing container...
+  Deleted existing container
+  Creating container with vector index...
+  ✓ Container created in 6.61s
+
+=== Creating Container: hotels_quantizedflat_go ===
+  Index type:     quantizedFlat
+  Embedding path: /embedding
+  Dimensions:     1536
+  Distance func:  cosine (queried with all 3 metrics)
+  Cleaning up existing container...
+  Deleted existing container
+  Creating container with vector index...
+  ✓ Container created in 6.16s
+
+✓ All containers created successfully
+Processing in batches of 50...
+  ✓ hotels_diskann_go: 50 inserted (5243.74 RUs)
+  ✓ Verified: 10 documents in partition 'Northeast'
+  ✓ hotels_quantizedflat_go: 50 inserted (2621.83 RUs)
+  ✓ Verified: 10 documents in partition 'Northeast'
+
+⏳ Waiting 5 seconds for index stabilization...
+
+Query: "hotel near the ocean"
+Embedding generated (1536 dimensions)
+
+Running search (top 5 results for each distance function)...
+  ✓ hotels_diskann_go queried (3.65 RUs)
+  ✓ hotels_diskann_go queried (3.65 RUs)
+  ✓ hotels_diskann_go queried (3.65 RUs)
+  ✓ hotels_quantizedflat_go queried (3.65 RUs)
+  ✓ hotels_quantizedflat_go queried (3.65 RUs)
+  ✓ hotels_quantizedflat_go queried (3.65 RUs)
+
+| Container            | Metric     | Top 1 Result               | Score  | Top 2 Result               | Score  | Diff   |
+|----------------------|------------|----------------------------|--------|----------------------------|--------|--------|
+| hotels_diskann_go    | Cosine     | City Center Summer Wind... | 0.4025 | Red Tide Hotel             | 0.4000 | 0.0025 |
+| hotels_diskann_go    | DotProduct | City Center Summer Wind... | 0.4027 | Red Tide Hotel             | 0.4001 | 0.0025 |
+| hotels_diskann_go    | Euclidean  | City Center Summer Wind... | 1.0934 | Red Tide Hotel             | 1.0957 | -0.0023 |
+| hotels_quantizedf... | Cosine     | City Center Summer Wind... | 0.4025 | Red Tide Hotel             | 0.4000 | 0.0025 |
+| hotels_quantizedf... | DotProduct | City Center Summer Wind... | 0.4027 | Red Tide Hotel             | 0.4001 | 0.0025 |
+| hotels_quantizedf... | Euclidean  | City Center Summer Wind... | 1.0934 | Red Tide Hotel             | 1.0957 | -0.0023 |
+
+=== Phase 4: Cleanup ===
+  ✓ Deleted hotels_diskann_go
+  ✓ Deleted hotels_quantizedflat_go
+
+Complete
 ```
 
 A full recorded run is saved in `output/sample-output.txt`.
@@ -306,7 +374,7 @@ A full recorded run is saved in `output/sample-output.txt`.
 
 | Issue | Resolution |
 |-------|-----------|
-| `configuration error: missing required environment variables` | Verify `.env` exists and all required variables are set. Run `cp .env.example .env` and fill in the values. |
+| `configuration error: missing required environment variables` | Verify all required variables are exported in your shell. The code doesn't auto-load `.env`; run `cp .env.example .env`, fill in the values, and export or set them before `go run .`. |
 | `failed to create Azure Cosmos DB client` / 403 Forbidden | Confirm your identity has the **Cosmos DB Built-in Data Contributor** role. RBAC propagation can take several minutes after assignment. |
 | `failed to insert N documents` | One or more concurrent inserts failed. Check container throughput settings and confirm each document is under 2 MB. |
 | `embedding dimensions mismatch: got X, expected 1536` | The deployment returns a different vector size than expected. Verify you're using `text-embedding-3-small` without dimension truncation. |
