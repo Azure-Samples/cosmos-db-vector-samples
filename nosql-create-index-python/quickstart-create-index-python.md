@@ -8,11 +8,11 @@ ms.topic: quickstart
 ms.date: 2026-06-22
 ---
 
-# Quickstart: Create and query vector indexes in Azure Cosmos DB for NoSQL using Python
+# Quickstart: Create vector index in Azure Cosmos DB for NoSQL using Python
 
 In this quickstart, you run the Python create-index sample for Azure Cosmos DB for NoSQL to demonstrate two key goals:
 
-- **Goal 1 (Control Plane):** Use the ARM SDK to create the `HotelsCreateIndex` database and two vector-indexed containers: `hotels_diskann_py` (approximate search) and `hotels_quantizedflat_py` (exact search).
+- **Goal 1 (Control Plane):** Use the ARM SDK to diagnose an existing `HotelsCreateIndex` database and recreate two vector-indexed containers: `hotels_diskann_py` (approximate search) and `hotels_quantizedflat_py` (QuantizedFlat uses vector quantization techniques).
 - **Goal 2 (Distance Functions):** Compare how the same query embedding produces different scores and rankings when using different vector distance functions: Cosine, DotProduct, and Euclidean.
 
 Find the sample code on GitHub in [`nosql-create-index-python`](https://github.com/Azure-Samples/cosmos-db-vector-samples/tree/main/nosql-create-index-python).
@@ -31,8 +31,8 @@ Find the sample code on GitHub in [`nosql-create-index-python`](https://github.c
 > [!IMPORTANT]
 > **Two Phases:**
 >
-> 1. **Control Plane (Goal 1):** The sample uses the ARM SDK with `DefaultAzureCredential` to create:
->    - Database: `HotelsCreateIndex`
+> 1. **Control Plane (Goal 1):** The sample uses the ARM SDK with `DefaultAzureCredential` to diagnose an existing database and recreate:
+>    - Existing database: `HotelsCreateIndex`
 >    - Containers: `hotels_diskann_py` (DiskANN index) and `hotels_quantizedflat_py` (QuantizedFlat index)
 >    - Partition key path: `/Region` (valid values: `Northeast`, `Midwest`, `South`, `West`)
 >    - Vector field path: `/embedding` (1536 dimensions, float32)
@@ -85,8 +85,11 @@ The sample expects the data file at: `./data/HotelsData_toCosmosDB_Vector_byRegi
 
    ```dotenv
    AZURE_COSMOSDB_ENDPOINT="https://<your-account>.documents.azure.com:443/"
-   AZURE_COSMOSDB_DATABASENAME="HotelsCreateIndex"
+   AZURE_COSMOSDB_CREATE_INDEX_DATABASENAME="HotelsCreateIndex"
    AZURE_COSMOSDB_CONTAINER_NAME=""
+   AZURE_SUBSCRIPTION_ID="<your-subscription-id>"
+   AZURE_RESOURCE_GROUP="<your-resource-group>"
+   AZURE_COSMOSDB_ACCOUNT_NAME="<your-account-name>"
    AZURE_OPENAI_EMBEDDING_ENDPOINT="https://<your-openai-resource>.openai.azure.com/"
    AZURE_OPENAI_EMBEDDING_DEPLOYMENT="text-embedding-3-small"
    AZURE_OPENAI_EMBEDDING_API_VERSION="2024-08-01-preview"
@@ -115,6 +118,9 @@ source .venv/bin/activate
 
 # Install the required packages
 pip install -r requirements.txt
+
+# Install the control-plane SDK used by src/control_plane.py
+pip install azure-mgmt-cosmosdb
 ```
 
 Run the sample:
@@ -129,9 +135,9 @@ The sample demonstrates both goals in sequence:
 
 **Goal 1 - Control Plane (create containers with vector indexes):**
 1. Authenticates with `DefaultAzureCredential`
-2. Creates the `HotelsCreateIndex` database (if needed)
-3. Creates the `hotels_diskann_py` container with DiskANN vector index on `/embedding`
-4. Creates the `hotels_quantizedflat_py` container with QuantizedFlat vector index on `/embedding`
+2. Diagnoses the existing `HotelsCreateIndex` database
+3. Deletes and recreates the `hotels_diskann_py` container with DiskANN vector index on `/embedding`
+4. Deletes and recreates the `hotels_quantizedflat_py` container with QuantizedFlat vector index on `/embedding`
 
 **Goal 2 - Data Plane (load and query with distance functions):**
 1. Loads pre-vectorized hotel documents from `./data/HotelsData_toCosmosDB_Vector_byRegion.json`
@@ -158,6 +164,7 @@ nosql-create-index-python/
 ├── src/
 │   ├── __init__.py
 │   ├── config.py
+│   ├── control_plane.py
 │   ├── data_plane.py
 │   └── index.py
 └── tests/
@@ -232,14 +239,16 @@ openai_client = AzureOpenAI(
 
 ### Insert documents using transactional batches
 
-The sample splits documents into chunks and uses `execute_item_batch` to insert each chunk atomically:
+The sample groups documents by `Region` and uses `execute_item_batch` to insert one transactional batch per region:
 
 ```python
-for batch in _chunked(documents, BATCH_SIZE):
-    operations = [("upsert", (document,)) for document in batch]
+docs_by_region = _group_by_region(documents)
+
+for region, region_docs in docs_by_region.items():
+    operations = [("upsert", (document,)) for document in region_docs]
     results = container.execute_item_batch(
         batch_operations=operations,
-        partition_key="hotels",
+        partition_key=region,
     )
 ```
 
@@ -273,38 +282,73 @@ results_cosine = list(container.query_items(
 ## Example output
 
 ```output
-========================================================================
-Azure Cosmos DB for NoSQL - create and query vector indexes with Python
-========================================================================
-Database: Hotels
-Data file: .../data/HotelsData_toCosmosDB_Vector_byRegion.json
-Target containers: hotels_diskann_py, hotels_quantizedflat_py
+=== Diagnostic Check ===
+Cosmos DB Endpoint: https://<your-account>.documents.azure.com:443/
+Database name: HotelsCreateIndex
+✓ Database 'HotelsCreateIndex' exists
+  Containers found: 2
 
-=== Verify embedding dimensions ===
-Deployment: text-embedding-3-small
-Model:      text-embedding-3-small
-Actual:     1536
-Expected:   1536
+=== Control Plane ===
 
-=== Ingest documents: hotels_diskann_py ===
-Inserted 50/50 documents using transactional batches. RU: 6812.47
+=== Phase 1: Create Container with Vector Index ===
+  Container:      hotels_diskann_py
+  Index type:     diskANN
+  Dimensions:     1536
+  Distance func:  cosine (queried with all 3 metrics)
+  Deleted existing container
+  Created in ~1s
+  Vector index is IMMUTABLE — cannot be changed after creation
 
-=== Ingest documents: hotels_quantizedflat_py ===
-Inserted 50/50 documents using transactional batches. RU: 6810.92
+=== Phase 1: Create Container with Vector Index ===
+  Container:      hotels_quantizedflat_py
+  Index type:     QuantizedFlat
+  Dimensions:     1536
+  Distance func:  cosine (queried with all 3 metrics)
+  Deleted existing container
+  Created in ~1s
+  Vector index is IMMUTABLE — cannot be changed after creation
+Using Azure OpenAI Embedding Deployment/Model: text-embedding-3-small
+Reading JSON file from ...\data\HotelsData_toCosmosDB_Vector_byRegion.json
+Loaded 50 documents
+Processing in batches of 50...
+✓ Region validation passed. Found regions: ['Midwest', 'Northeast', 'South', 'West']
+  Region 'Midwest': 10 documents
+  Region 'Northeast': 10 documents
+  Region 'South': 14 documents
+  Region 'West': 16 documents
+  ✓ hotels_diskann_py: 50 inserted (5243.72 RUs)
+✓ Region validation passed. Found regions: ['Midwest', 'Northeast', 'South', 'West']
+  Region 'Midwest': 10 documents
+  Region 'Northeast': 10 documents
+  Region 'South': 14 documents
+  Region 'West': 16 documents
+  ✓ hotels_quantizedflat_py: 50 inserted (2621.86 RUs)
 
-Query text: hotel near the ocean
+Query: "hotel near the ocean"
+Embedding generated (1536 dimensions)
 
-=== Query results: hotels_diskann_py (DiskANN) ===
-Request charge: 5.33 RUs
-1. HotelId=11 | HotelName=Royal Cottage Resort | score=0.4991 | Description=Your home away from home...
+Running searches (top 5 results for each distance function)...
+  ✓ hotels_diskann_py queried (4.73 RUs)
+  ✓ hotels_diskann_py queried (4.73 RUs)
+  ✓ hotels_diskann_py queried (4.73 RUs)
+  ✓ hotels_quantizedflat_py queried (4.73 RUs)
+  ✓ hotels_quantizedflat_py queried (4.73 RUs)
+  ✓ hotels_quantizedflat_py queried (4.73 RUs)
 
-=== Query results: hotels_quantizedflat_py (QuantizedFlat) ===
-Request charge: 5.35 RUs
-1. HotelId=11 | HotelName=Royal Cottage Resort | score=0.4991 | Description=Your home away from home...
+| Index Type     | Distance Function | Top 1 Result               | Score  | Top 2 Result               | Score  | Diff   |
+|----------------|-------------------|----------------------------|--------|----------------------------|--------|--------|
+| DiskANN        | Cosine            | City Center Summer Wind Re | 0.4025 | Red Tide Hotel             | 0.4000 | 0.0025 |
+| DiskANN        | DotProduct        | City Center Summer Wind Re | 0.4027 | Red Tide Hotel             | 0.4001 | 0.0025 |
+| DiskANN        | Euclidean         | City Center Summer Wind Re | 1.0934 | Red Tide Hotel             | 1.0957 | -0.0023 |
+| QuantizedFlat  | Cosine            | City Center Summer Wind Re | 0.4025 | Red Tide Hotel             | 0.4000 | 0.0025 |
+| QuantizedFlat  | DotProduct        | City Center Summer Wind Re | 0.4027 | Red Tide Hotel             | 0.4001 | 0.0025 |
+| QuantizedFlat  | Euclidean         | City Center Summer Wind Re | 1.0934 | Red Tide Hotel             | 1.0957 | -0.0023 |
 
-========================================================================
+=== Phase 4: Cleanup ===
+  ✓ Deleted hotels_diskann_py
+  ✓ Deleted hotels_quantizedflat_py
+
 Complete
-========================================================================
 ```
 
 ## Troubleshooting

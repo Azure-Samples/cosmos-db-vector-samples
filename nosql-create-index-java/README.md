@@ -1,16 +1,17 @@
 # Azure Cosmos DB for NoSQL create-index sample with Java
 
-This sample shows how to load pre-vectorized hotel documents into existing Azure Cosmos DB for NoSQL containers and run vector similarity queries with Java.
+This sample shows how to recreate vector-indexed Azure Cosmos DB for NoSQL containers, load pre-vectorized hotel documents, run vector similarity queries, and clean up the sample containers with Java.
 
 It uses:
 - `DefaultAzureCredential` for Azure Cosmos DB and the Azure OpenAI client
-- existing `Hotels` database resources created by `azd up`
-- the shared `..\data\HotelsData_toCosmosDB_Vector_byRegion.json` dataset
-- bulk upsert operations for `hotels_diskann_java` and `hotels_quantizedflat_java`
+- an existing `HotelsCreateIndex` database created before running the sample
+- the local `.\data\HotelsData_toCosmosDB_Vector_byRegion.json` dataset
+- ARM SDK container creation and bulk upsert operations for `hotels_diskann_java` and `hotels_quantizedflat_java`
 - `VectorDistance()` SQL queries for similarity search
+- cleanup that deletes both sample containers
 
 > [!IMPORTANT]
-> This sample is data-plane only. It does not create databases, containers, or vector indexes. Run `azd up` from the repo root before you run this sample.
+> This sample uses control-plane APIs to delete and recreate the sample containers with vector indexes. It assumes the `HotelsCreateIndex` database already exists; run `azd up` from the repo root or create the database before running this sample.
 
 ## Prerequisites
 
@@ -22,7 +23,7 @@ It uses:
   - **Cosmos DB Built-in Data Contributor**
   - **Cognitive Services OpenAI User**
 
-The sample expects these existing containers in the `Hotels` database:
+The sample expects the `HotelsCreateIndex` database to exist. It deletes and recreates these sample containers:
 - `hotels_diskann_java`
 - `hotels_quantizedflat_java`
 
@@ -42,15 +43,34 @@ The sample expects these existing containers in the `Hotels` database:
    Copy-Item .env.example .env
    ```
 
-2. Verify `.env` has your Azure Cosmos DB endpoint and Azure OpenAI settings.
+2. Verify `.env` has the required Azure resource, Azure Cosmos DB, and Azure OpenAI settings.
+
+   ```dotenv
+   AZURE_SUBSCRIPTION_ID="<your-subscription-id>"
+   AZURE_RESOURCE_GROUP="<your-resource-group>"
+   AZURE_COSMOSDB_ACCOUNT_NAME="<your-account-name>"
+   AZURE_LOCATION="<your-account-location>"
+   AZURE_COSMOSDB_ENDPOINT="https://<your-account>.documents.azure.com:443/"
+   AZURE_COSMOSDB_CREATE_INDEX_DATABASENAME="HotelsCreateIndex"
+   AZURE_OPENAI_EMBEDDING_ENDPOINT="https://<your-openai-resource>.openai.azure.com/"
+   AZURE_OPENAI_EMBEDDING_DEPLOYMENT="text-embedding-3-small"
+   ```
 
    Notes:
+   - The code reads `AZURE_COSMOSDB_CREATE_INDEX_DATABASENAME` for the database name.
    - Leave `AZURE_COSMOSDB_CONTAINER_NAME` empty to run all supported containers.
    - Leave `VECTOR_ALGORITHM` empty to run both algorithms.
    - Set `VECTOR_ALGORITHM` to `diskann` or `quantizedflat` to run one algorithm.
    - Set `AZURE_COSMOSDB_CONTAINER_NAME` only if you want to target one container directly.
 
-3. Build the project.
+3. Set up the data directory.
+
+   ```powershell
+   New-Item -ItemType Directory -Force .\data
+   Copy-Item ..\HotelsData_toCosmosDB_Vector_byRegion.json .\data\
+   ```
+
+4. Build the project.
 
    ```powershell
    mvn compile
@@ -76,17 +96,9 @@ set -a; source .env; set +a
 mvn exec:java
 ```
 
-### Note about SLF4J logging messages
+### Note about SLF4J logging
 
-When you run `mvn exec:java`, you may see these lines:
-
-```text
-SLF4J: Failed to load class "org.slf4j.impl.StaticLoggerBinder".
-SLF4J: Defaulting to no-operation (NOP) logger implementation
-SLF4J: See http://www.slf4j.org/codes.html#StaticLoggerBinder for further details.
-```
-
-This message is informational, not an error. The Azure SDK uses SLF4J as a logging facade, but no logging backend is on the classpath, so SLF4J defaults to a no-op logger that discards SDK internal log output. The sample's `System.out` output is unaffected. These lines print to stderr, so `> output.txt` doesn't capture them. To see SDK logs, add an SLF4J binding such as `slf4j-simple` or `logback-classic` as a dependency.
+The sample includes the `slf4j-nop` runtime dependency so Azure SDK internal logs are suppressed by default. You shouldn't see the `StaticLoggerBinder` warning when you run `mvn exec:java`. If you remove `slf4j-nop` and don't add another SLF4J backend, that warning can appear. To see SDK logs, replace `slf4j-nop` with an SLF4J binding such as `slf4j-simple` or `logback-classic`.
 
 Examples:
 
@@ -110,6 +122,7 @@ The sample prints:
 - embedding dimension verification for `text-embedding-3-small`
 - bulk ingestion status for each container
 - top vector matches from each queried container
+- cleanup status after deleting both sample containers
 
 See `output/sample-output.txt` for example console output.
 
@@ -126,5 +139,6 @@ nosql-create-index-java/
 └── src/main/java/com/azure/cosmos/createindex/
     ├── App.java
     ├── Config.java
+    ├── ControlPlane.java
     └── DataPlane.java
 ```

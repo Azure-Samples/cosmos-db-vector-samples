@@ -8,11 +8,11 @@ ms.topic: quickstart
 ms.date: 2026-06-22
 ---
 
-# Quickstart: Create and query vector indexes in Azure Cosmos DB for NoSQL using Java
+# Quickstart: Create vector index in Azure Cosmos DB for NoSQL using Java
 
 In this quickstart, you run the Java create-index sample for Azure Cosmos DB for NoSQL to demonstrate two key goals:
 
-- **Goal 1 (Control Plane):** Use the ARM SDK to create the `HotelsCreateIndex` database and two vector-indexed containers: `hotels_diskann_java` (approximate search) and `hotels_quantizedflat_java` (exact search).
+- **Goal 1 (Control Plane):** Use the ARM SDK to recreate two vector-indexed containers in the existing `HotelsCreateIndex` database: `hotels_diskann_java` (DiskANN approximate search) and `hotels_quantizedflat_java` (QuantizedFlat uses vector quantization techniques).
 - **Goal 2 (Distance Functions):** Compare how the same query embedding produces different scores and rankings when using different vector distance functions: Cosine, DotProduct, and Euclidean.
 
 ## Prerequisites
@@ -30,9 +30,9 @@ In this quickstart, you run the Java create-index sample for Azure Cosmos DB for
 > [!IMPORTANT]
 > **Two Phases:**
 >
-> 1. **Control Plane (Goal 1):** The sample uses the ARM SDK (azure-resourcemanager-cosmos 2.54.3) with `DefaultAzureCredential` to create:
->    - Database: `HotelsCreateIndex`
->    - Containers: `hotels_diskann_java` (DiskANN index) and `hotels_quantizedflat_java` (QuantizedFlat index)
+> 1. **Control Plane (Goal 1):** The sample uses the ARM SDK (azure-resourcemanager-cosmos 2.49.0) with `DefaultAzureCredential` to manage:
+>    - Uses the existing database: `HotelsCreateIndex`
+>    - Deletes and recreates containers: `hotels_diskann_java` (DiskANN index) and `hotels_quantizedflat_java` (QuantizedFlat index)
 >    - Partition key path: `/Region` (valid values: `Northeast`, `Midwest`, `South`, `West`)
 >    - Vector field path: `/embedding` (1536 dimensions, float32)
 >
@@ -42,6 +42,7 @@ In this quickstart, you run the Java create-index sample for Azure Cosmos DB for
 >    - Generates a query embedding with Azure OpenAI
 >    - Runs `VectorDistance()` queries with three distance functions: **Cosine**, **DotProduct**, and **Euclidean**
 >    - Displays rankings for each distance function to show how results differ
+>    - Deletes both sample containers during cleanup
 
 ## Clone the repository
 
@@ -70,7 +71,7 @@ The Java create-index sample demonstrates both control plane and data plane oper
 
 | Layer | Tool | Responsibility |
 |---|---|---|
-| Provisioning | Java ARM SDK | Creates the Azure Cosmos DB database and containers with vector policies |
+| Provisioning | Java ARM SDK | Assumes the database exists, then deletes and recreates containers with vector policies |
 | Runtime | Java data plane SDK | Loads documents, generates query embeddings, and runs `VectorDistance()` queries |
 
 Both phases use `DefaultAzureCredential` for authentication, so you don't need to manage API keys or connection strings.
@@ -97,8 +98,12 @@ Both phases use `DefaultAzureCredential` for authentication, so you don't need t
 2. Update `.env` with your Azure resource values:
 
    ```dotenv
+   AZURE_SUBSCRIPTION_ID="<your-subscription-id>"
+   AZURE_RESOURCE_GROUP="<your-resource-group>"
+   AZURE_COSMOSDB_ACCOUNT_NAME="<your-account-name>"
+   AZURE_LOCATION="<your-account-location>"
    AZURE_COSMOSDB_ENDPOINT="https://<your-account>.documents.azure.com:443/"
-   AZURE_COSMOSDB_DATABASENAME="HotelsCreateIndex"
+   AZURE_COSMOSDB_CREATE_INDEX_DATABASENAME="HotelsCreateIndex"
    AZURE_COSMOSDB_CONTAINER_NAME=""
    AZURE_OPENAI_EMBEDDING_ENDPOINT="https://<your-openai-resource>.openai.azure.com/"
    AZURE_OPENAI_EMBEDDING_DEPLOYMENT="text-embedding-3-small"
@@ -118,6 +123,18 @@ Compile the sample:
 mvn compile
 ```
 
+Load environment variables from `.env` first. The sample reads only process environment variables through `System.getenv`; creating `.env` isn't enough.
+
+```powershell
+# PowerShell (strips quotes from values)
+Get-Content .env | Where-Object { $_ -match '^[^#].*=' } | ForEach-Object { $k,$v = $_ -split '=',2; [Environment]::SetEnvironmentVariable($k.Trim(), $v.Trim().Trim('"').Trim("'")) }
+```
+
+```bash
+# Bash/Linux/Mac
+set -a; source .env; set +a
+```
+
 Run it:
 
 ```bash
@@ -132,9 +149,9 @@ The sample demonstrates both goals in sequence:
 1. Loads configuration from environment variables
 2. Authenticates with `DefaultAzureCredential`
 3. Creates an Azure Resource Manager client
-4. Creates the `HotelsCreateIndex` database (if needed)
-5. Creates the `hotels_diskann_java` container with DiskANN vector index on `/embedding`
-6. Creates the `hotels_quantizedflat_java` container with QuantizedFlat vector index on `/embedding`
+4. Uses the existing `HotelsCreateIndex` database
+5. Deletes any existing `hotels_diskann_java` container, then creates it with DiskANN vector index on `/embedding`
+6. Deletes any existing `hotels_quantizedflat_java` container, then creates it with QuantizedFlat vector index on `/embedding`
 
 **Goal 2 - Data Plane (load and query with distance functions):**
 1. Creates a Cosmos DB data plane client using `DefaultAzureCredential`
@@ -147,6 +164,7 @@ The sample demonstrates both goals in sequence:
    - **Euclidean:** Straight-line distance between vectors (values: 0 to √6144)
 6. Scopes each vector query to one region by passing the partition key through `CosmosQueryRequestOptions.setPartitionKey`
 7. Prints the top 5 matching hotels for each distance function, showing how rankings differ
+8. Deletes both sample containers during cleanup
 
 ## Review the Java project structure
 
@@ -161,12 +179,13 @@ nosql-create-index-java/
 └── src/main/java/com/azure/cosmos/createindex/
     ├── App.java
     ├── Config.java
+    ├── ControlPlane.java
     └── DataPlane.java
 ```
 
 ### ControlPlane.java
 
-`ControlPlane.java` uses the ARM SDK (azure-resourcemanager-cosmos 2.54.3) to create the database and containers with vector indexes. This demonstrates **Goal 1** (control plane).
+`ControlPlane.java` uses the ARM SDK (azure-resourcemanager-cosmos 2.49.0) to delete and recreate containers with vector indexes in an existing database. This demonstrates **Goal 1** (control plane).
 
 ### App.java
 
@@ -187,9 +206,9 @@ nosql-create-index-java/
 
 ## Key implementation details
 
-### Goal 1: Create containers using ARM SDK (azure-resourcemanager-cosmos 2.54.3)
+### Goal 1: Create containers using ARM SDK (azure-resourcemanager-cosmos 2.49.0)
 
-The control-plane phase uses the ARM SDK with `DefaultAzureCredential` to create containers with vector policies:
+The control-plane phase uses the ARM SDK with `DefaultAzureCredential` to recreate containers with vector policies in an existing database:
 
 ```java
 // Create Azure credential
@@ -206,15 +225,7 @@ SqlResourcesClient sqlResourcesClient = azure.cosmosDBAccounts()
     .serviceClient()
     .getSqlResources();
 
-// Create database
-sqlResourcesClient.createUpdateSqlDatabase(
-    resourceGroup,
-    accountName,
-    DATABASE_NAME,
-    new SqlDatabaseCreateUpdateParameters()
-        .withLocation(location)
-        .withResource(new SqlDatabaseResource().withId(DATABASE_NAME))
-        .withOptions(new CreateUpdateOptions()));
+// The database is assumed to already exist.
 
 // Build vector embedding policy
 VectorEmbedding vectorEmbedding = new VectorEmbedding()
@@ -246,8 +257,7 @@ sqlResourcesClient.createUpdateSqlContainer(
                 .withKind(PartitionKind.HASH))
             .withVectorEmbeddingPolicy(vectorEmbeddingPolicy)
             .withIndexingPolicy(buildIndexingPolicy(vectorIndex)))
-        .withOptions(new CreateUpdateOptions()
-            .withThroughput(THROUGHPUT_RUS)));
+        .withOptions(new CreateUpdateOptions()));
 ```
 
 ### Goal 2: Bulk-insert documents and query with distance functions
@@ -262,18 +272,22 @@ CosmosClient cosmosClient = new CosmosClientBuilder()
     .buildClient();
 
 // Load and bulk-insert documents
-List<HotelDocument> documents = loadDocuments();
-container.executeBulkOperations(
-    documents.stream()
-        .map(doc -> new CosmosItemOperation(CosmosItemOperationType.UPSERT, doc.getId(), doc))
-        .collect(Collectors.toList())
-);
+List<Map<String, Object>> documents = readDocuments(config);
+List<CosmosItemOperation> operations = new ArrayList<>(documents.size());
+for (Map<String, Object> document : documents) {
+    Object region = document.get("Region");
+    operations.add(CosmosBulkOperations.getUpsertItemOperation(
+        document,
+        new PartitionKeyBuilder().add(String.valueOf(region)).build()));
+}
+container.executeBulkOperations(operations);
 
 // Generate query embedding using Azure OpenAI
-EmbeddingsOptions embeddingOptions = new EmbeddingsOptions(Arrays.asList(queryText))
-    .setDimensions(EMBEDDING_DIMENSIONS);
-EmbeddingsUsage embeddingUsage = openaiClient.getEmbeddings(EMBEDDING_DEPLOYMENT, embeddingOptions);
-List<Float> queryEmbedding = embeddingUsage.getData().get(0).getEmbedding();
+EmbeddingsOptions embeddingOptions = new EmbeddingsOptions(Arrays.asList(queryText));
+List<Float> queryEmbedding = openaiClient.getEmbeddings(EMBEDDING_DEPLOYMENT, embeddingOptions)
+    .getData()
+    .get(0)
+    .getEmbedding();
 
 // Query with each distance function
 String[] distanceFunctions = {"Cosine", "DotProduct", "Euclidean"};
@@ -291,13 +305,15 @@ for (String distanceFunc : distanceFunctions) {
             new SqlParameter("@topK", 5),
             new SqlParameter("@embedding", queryEmbedding)));
 
-    CosmosQueryRequestOptions options = new CosmosQueryRequestOptions()
-        .setPartitionKey(new PartitionKey("Northeast"));
+    CosmosQueryRequestOptions options = new CosmosQueryRequestOptions();
+    options.setPartitionKey(new PartitionKeyBuilder().add("Northeast").build());
 
-    container.queryItems(querySpec, options, HotelDocument.class)
-        .stream()
-        .limit(5)
-        .forEach(doc -> System.out.printf("  %s (score: %.4f)%n", doc.getHotelName(), doc.getSimilarityScore()));
+    for (var page : container.queryItems(querySpec, options, Map.class).iterableByPage()) {
+        for (Object item : page.getResults()) {
+            Map<String, Object> result = (Map<String, Object>) item;
+            System.out.printf("  %s (score: %.4f)%n", result.get("HotelName"), result.get("SimilarityScore"));
+        }
+    }
 }
 ```
 
@@ -305,7 +321,7 @@ Scope the vector query to a single partition by passing the partition key throug
 
 ## Expected output
 
-The sample prints embedding validation, ingestion status, and query results for each container. A representative output file is included in `output/sample-output.txt`.
+The sample prints embedding validation, ingestion status, query results for each container, and cleanup status. A representative output file is included in `output/sample-output.txt`.
 
 ## Next steps
 

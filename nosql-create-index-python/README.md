@@ -2,28 +2,28 @@
 
 ## Overview
 
-This sample demonstrates **data-plane only** vector search operations against Azure Cosmos DB for NoSQL containers that were provisioned ahead of time by shared Bicep.
+This sample demonstrates control-plane vector index creation and data-plane vector search operations against an existing Azure Cosmos DB for NoSQL database.
 
 The sample:
 - authenticates with `DefaultAzureCredential`
-- loads the shared hotel dataset from the repo root
-- adds `PartitionKey="hotels"` during ingestion
-- upserts data into `hotels_diskann_py` and `hotels_quantizedflat_py`
+- diagnoses the existing database, then deletes and recreates `hotels_diskann_py` and `hotels_quantizedflat_py`
+- loads the shared hotel dataset from `./data/HotelsData_toCosmosDB_Vector_byRegion.json`
+- groups documents by `Region` and upserts each region with `execute_item_batch(..., partition_key=region)`
 - generates a query embedding with the Azure OpenAI client
-- runs `VectorDistance()` queries and prints the top 5 matches
+- runs `VectorDistance()` queries for Cosine, DotProduct, and Euclidean and prints a comparison table
+- deletes the sample containers during cleanup
 
 ## Prerequisites
 
 - Python 3.9+
 - Azure CLI installed and signed in with `az login`
-- An Azure Cosmos DB for NoSQL account and database already provisioned
-- The following existing containers created by shared Bicep:
-  - `hotels_diskann_py`
-  - `hotels_quantizedflat_py`
+- An Azure Cosmos DB for NoSQL account and existing database
+- Azure subscription ID, resource group name, and Cosmos DB account name for the control-plane container create/delete step
 - Azure RBAC roles for your identity:
   - **Cosmos DB Built-in Data Contributor**
   - **Cognitive Services OpenAI User**
 - An Azure OpenAI embedding deployment for **`text-embedding-3-small`**
+- The `azure-mgmt-cosmosdb` package in addition to `requirements.txt`
 
 ## Setup
 
@@ -38,6 +38,7 @@ The sample:
 
    ```powershell
    pip install -r requirements.txt
+   pip install azure-mgmt-cosmosdb
    ```
 
 3. Populate environment variables.
@@ -57,10 +58,29 @@ The sample:
 4. Verify `.env` has your values.
 
    Notes:
+   - `AZURE_COSMOSDB_CREATE_INDEX_DATABASENAME` is the existing database name.
+   - `AZURE_SUBSCRIPTION_ID`, `AZURE_RESOURCE_GROUP`, and `AZURE_COSMOSDB_ACCOUNT_NAME` are required by `src/control_plane.py`.
+   - `AZURE_OPENAI_EMBEDDING_ENDPOINT` is the Azure OpenAI endpoint used to generate query embeddings.
    - `VECTOR_ALGORITHM` accepts `diskann` or `quantizedflat`.
    - Leave `VECTOR_ALGORITHM` empty to run **both** containers.
    - Leave `AZURE_COSMOSDB_CONTAINER_NAME` empty unless you want to target one container by name.
-   - `DATA_FILE_WITH_VECTORS_AND_REGIONS` points to the shared repo-root dataset.
+   - `DATA_FILE_WITH_VECTORS_AND_REGIONS` defaults to `./data/HotelsData_toCosmosDB_Vector_byRegion.json`.
+
+   Example `.env` values:
+
+   ```dotenv
+   AZURE_COSMOSDB_ENDPOINT="https://<your-account>.documents.azure.com:443/"
+   AZURE_COSMOSDB_CREATE_INDEX_DATABASENAME="HotelsCreateIndex"
+   AZURE_COSMOSDB_CONTAINER_NAME=""
+   AZURE_SUBSCRIPTION_ID="<your-subscription-id>"
+   AZURE_RESOURCE_GROUP="<your-resource-group>"
+   AZURE_COSMOSDB_ACCOUNT_NAME="<your-account-name>"
+   AZURE_OPENAI_EMBEDDING_ENDPOINT="https://<your-openai-resource>.openai.azure.com/"
+   AZURE_OPENAI_EMBEDDING_DEPLOYMENT="text-embedding-3-small"
+   AZURE_OPENAI_EMBEDDING_API_VERSION="2024-08-01-preview"
+   VECTOR_ALGORITHM=""
+   DATA_FILE_WITH_VECTORS_AND_REGIONS="./data/HotelsData_toCosmosDB_Vector_byRegion.json"
+   ```
 
 ## Run
 
@@ -101,8 +121,10 @@ python -m src.index
 
 The sample prints:
 - configuration validation
+- database diagnostics and control-plane container recreation
 - embedding dimension verification for `text-embedding-3-small`
 - ingestion status for each target container
-- top 5 vector matches for each queried container
+- six vector search rows: each target container queried with Cosine, DotProduct, and Euclidean
+- cleanup status for the created containers
 
 See `output/sample-output.txt` for an example output file.
