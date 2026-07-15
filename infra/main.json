@@ -5,7 +5,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.42.1.51946",
-      "templateHash": "7384976880792864054"
+      "templateHash": "8712338387192404290"
     }
   },
   "parameters": {
@@ -2610,7 +2610,7 @@
             "_generator": {
               "name": "bicep",
               "version": "0.42.1.51946",
-              "templateHash": "3996361863594043086"
+              "templateHash": "4335015701171652752"
             },
             "description": "Create database accounts."
           },
@@ -2662,6 +2662,9 @@
                   "excludedPaths": [
                     {
                       "path": "/_etag/?"
+                    },
+                    {
+                      "path": "/DescriptionVector/*"
                     }
                   ],
                   "vectorIndexes": [
@@ -3362,6 +3365,9 @@
                       "excludedPaths": [
                         {
                           "path": "/_etag/?"
+                        },
+                        {
+                          "path": "/DescriptionVector/*"
                         }
                       ],
                       "vectorIndexes": [

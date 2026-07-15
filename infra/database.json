@@ -5,7 +5,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.42.1.51946",
-      "templateHash": "13451566095277367724"
+      "templateHash": "4335015701171652752"
     },
     "description": "Create database accounts."
   },
@@ -57,6 +57,9 @@
           "excludedPaths": [
             {
               "path": "/_etag/?"
+            },
+            {
+              "path": "/DescriptionVector/*"
             }
           ],
           "vectorIndexes": [
@@ -720,7 +723,7 @@
       },
       "type": "Microsoft.Resources/deployments",
       "apiVersion": "2025-04-01",
-      "name": "[format('cosmos-db-create-index-container-{0}', copyIndex())]",
+      "name": "[format('cosmos-db-create-index-container-{0}', range(0, if(not(empty(parameters('createIndexDatabaseName'))), 2, 0))[copyIndex()])]",
       "properties": {
         "expressionEvaluationOptions": {
           "scope": "inner"
@@ -757,6 +760,9 @@
               "excludedPaths": [
                 {
                   "path": "/_etag/?"
+                },
+                {
+                  "path": "/DescriptionVector/*"
                 }
               ],
               "vectorIndexes": [
@@ -1195,7 +1201,23 @@
     },
     "createIndexContainers": {
       "type": "array",
-      "value": "[if(not(empty(parameters('createIndexDatabaseName'))), createArray(createObject('name', reference(resourceId('Microsoft.Resources/deployments', format('cosmos-db-create-index-container-{0}', 0)), '2025-04-01').outputs.name.value), createObject('name', reference(resourceId('Microsoft.Resources/deployments', format('cosmos-db-create-index-container-{0}', 1)), '2025-04-01').outputs.name.value)), createArray())]"
+      "value": "[if(not(empty(parameters('createIndexDatabaseName'))), createArray(createObject('name', reference(resourceId('Microsoft.Resources/deployments', format('cosmos-db-create-index-container-{0}', range(0, if(not(empty(parameters('createIndexDatabaseName'))), 2, 0))[0])), '2025-04-01').outputs.name.value), createObject('name', reference(resourceId('Microsoft.Resources/deployments', format('cosmos-db-create-index-container-{0}', range(0, if(not(empty(parameters('createIndexDatabaseName'))), 2, 0))[1])), '2025-04-01').outputs.name.value)), createArray())]"
+    },
+    "embeddedFieldNameForVectorSearch": {
+      "type": "string",
+      "value": "DescriptionVector"
+    },
+    "embeddedFieldNameForCreateIndex": {
+      "type": "string",
+      "value": "embedding"
+    },
+    "partitionKeyPathForVectorSearch": {
+      "type": "string",
+      "value": "/HotelId"
+    },
+    "partitionKeyPathForCreateIndex": {
+      "type": "string",
+      "value": "/Region"
     }
   }
 }
