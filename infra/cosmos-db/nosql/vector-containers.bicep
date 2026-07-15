@@ -42,6 +42,9 @@ var containers = [
       {
         path: '/_etag/?'
       }
+      {
+        path: '${vectorPath}/*'
+      }
     ]
   }
   {
