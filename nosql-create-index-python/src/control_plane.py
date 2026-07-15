@@ -45,7 +45,7 @@ def _build_container_payload(
             "indexingMode": "Consistent",
             "automatic": True,
             "includedPaths": [{"path": "/*"}],
-            "excludedPaths": [{"path": "/_etag/?"}],
+            "excludedPaths": [{"path": "/_etag/?"}, {"path": f"{embedding_field}/*"}],
             "vectorIndexes": [
                 {
                     "path": embedding_field,

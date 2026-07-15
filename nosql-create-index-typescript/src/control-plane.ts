@@ -92,7 +92,7 @@ export async function createContainer(
             indexingMode: "consistent",
             automatic: true,
             includedPaths: [{ path: "/*" }],
-            excludedPaths: [{ path: "/_etag/?" }],
+            excludedPaths: [{ path: "/_etag/?" }, { path: `${embeddingPath}/*` }],
             vectorIndexes: [
               {
                 path: embeddingPath,
