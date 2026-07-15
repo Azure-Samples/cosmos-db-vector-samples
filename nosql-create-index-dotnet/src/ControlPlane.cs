@@ -134,6 +134,7 @@ public static class ControlPlane
         };
         indexingPolicy.IncludedPaths.Add(new CosmosDBIncludedPath { Path = "/*" });
         indexingPolicy.ExcludedPaths.Add(new CosmosDBExcludedPath { Path = "/_etag/?" });
+        indexingPolicy.ExcludedPaths.Add(new CosmosDBExcludedPath { Path = $"{embeddingPath}/*" });
         indexingPolicy.VectorIndexes.Add(new CosmosDBVectorIndex(embeddingPath, indexType));
 
         var resource = new CosmosDBSqlContainerResourceInfo(containerName)
