@@ -444,3 +444,4 @@ target/
 
 # Allow sample.env templates
 !**/sample.env
+nosql-create-index-*/data/*.json
