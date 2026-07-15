@@ -30,9 +30,6 @@ var vectorSearchContainerDefinitions = [
         {
           path: '/_etag/?'
         }
-        {
-          path: '/DescriptionVector/*'
-        }
       ]
       vectorIndexes: [
         {
@@ -171,9 +168,6 @@ module createIndexContainers './cosmos-db/nosql/container.bicep' = [
           {
             path: '/_etag/?'
           }
-          {
-            path: '/DescriptionVector/*'
-          }
         ]
         vectorIndexes: [
           {
@@ -269,3 +263,4 @@ output embeddedFieldNameForCreateIndex string = 'embedding'
 
 output partitionKeyPathForVectorSearch string = '/HotelId'
 output partitionKeyPathForCreateIndex string = '/Region'
+
