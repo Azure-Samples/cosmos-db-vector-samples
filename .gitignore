@@ -444,3 +444,6 @@ target/
 
 # Allow sample.env templates
 !**/sample.env
+
+# Compiled ARM JSON from Bicep — deploy from .bicep directly, never commit generated templates
+infra/*.json
