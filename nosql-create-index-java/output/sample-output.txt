@@ -1,0 +1,80 @@
+[INFO] Scanning for projects...
+[INFO] 
+[INFO] ---------< com.azure.samples.cosmosdb:nosql-create-index-java >---------
+[INFO] Building Azure Cosmos DB NoSQL Create Index - Java 1.0.0
+[INFO]   from pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- exec:3.5.0:java (default-cli) @ nosql-create-index-java ---
+Using Azure OpenAI Embedding Deployment/Model: text-embedding-3-small
+Reading JSON file from C:\project-dina-data-ai\repos\cosmos-db-vector-samples-2\nosql-create-index-java\data\HotelsData_toCosmosDB_Vector_byRegion.json
+? Region validation passed. Found regions: Northeast, Midwest, South, West
+  Region 'Northeast': 10 documents
+  Region 'Midwest': 10 documents
+  Region 'South': 14 documents
+  Region 'West': 16 documents
+Loaded 50 documents
+
+=== Step 1: Create Container with Vector Index ===
+  Container:      hotels_diskann_java
+  Index type:     diskANN
+  Dimensions:     1536
+  Distance func:  cosine (queried with all 3 metrics)
+  Deleting existing container if present...
+  Container does not exist (OK)
+  Created in 31.1s
+  Vector index is IMMUTABLE — cannot be changed after creation
+
+=== Step 1: Create Container with Vector Index ===
+  Container:      hotels_quantizedflat_java
+  Index type:     quantizedFlat
+  Dimensions:     1536
+  Distance func:  cosine (queried with all 3 metrics)
+  Deleting existing container if present...
+  Container does not exist (OK)
+  Created in 30.9s
+  Vector index is IMMUTABLE — cannot be changed after creation
+
+Processing in batches of 50...
+  Region 'Midwest': 10 documents
+  Region 'Northeast': 10 documents
+  Region 'South': 14 documents
+  Region 'West': 16 documents
+  ? hotels_diskann_java: 50 inserted (5243.73 RUs)
+  Region 'Midwest': 10 documents
+  Region 'Northeast': 10 documents
+  Region 'South': 14 documents
+  Region 'West': 16 documents
+  ? hotels_quantizedflat_java: 50 inserted (2621.86 RUs)
+
+Query: "hotel near the ocean"
+Embedding generated (1536 dimensions)
+
+Running searches (top 5 results for each distance function)...
+  ? hotels_diskann_java queried (3.75 RUs)
+  ? hotels_diskann_java queried (3.75 RUs)
+  ? hotels_diskann_java queried (3.75 RUs)
+  ? hotels_quantizedflat_java queried (3.75 RUs)
+  ? hotels_quantizedflat_java queried (3.75 RUs)
+  ? hotels_quantizedflat_java queried (3.75 RUs)
+
+| Index Type     | Distance Function | Top 1 Result               | Score  | Top 2 Result               | Score  | Diff   |
+|----------------|-------------------|----------------------------|--------|----------------------------|--------|--------|
+| DiskANN        | Cosine            | City Center Summer Wind... | 0.4025 | Red Tide Hotel             | 0.4000 | 0.0025 |
+| DiskANN        | DotProduct        | City Center Summer Wind... | 0.4027 | Red Tide Hotel             | 0.4001 | 0.0025 |
+| DiskANN        | Euclidean         | City Center Summer Wind... | 1.0934 | Red Tide Hotel             | 1.0957 | -0.0023 |
+| QuantizedFlat  | Cosine            | City Center Summer Wind... | 0.4025 | Red Tide Hotel             | 0.4000 | 0.0025 |
+| QuantizedFlat  | DotProduct        | City Center Summer Wind... | 0.4027 | Red Tide Hotel             | 0.4001 | 0.0025 |
+| QuantizedFlat  | Euclidean         | City Center Summer Wind... | 1.0934 | Red Tide Hotel             | 1.0957 | -0.0023 |
+
+=== Cleanup: Remove Sample Containers ===
+  ? Deleted container: hotels_diskann_java
+  ? Deleted container: hotels_quantizedflat_java
+
+Complete
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD SUCCESS
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  02:31 min
+[INFO] Finished at: 2026-06-25T12:34:06-07:00
+[INFO] ------------------------------------------------------------------------

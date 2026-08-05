@@ -196,7 +196,7 @@ AZURE_USER_PRINCIPAL_ID="${USER_OBJECT_ID}"
 AZURE_COSMOSDB_ACCOUNT_NAME="${COSMOS_ACCOUNT_NAME}"
 AZURE_COSMOSDB_ENDPOINT="${COSMOS_ENDPOINT}"
 AZURE_COSMOSDB_DATABASENAME="Hotels"
-AZURE_COSMOSDB_CONTAINER_NAME="hotels_diskann"
+AZURE_COSMOSDB_CONTAINER_NAME="hotels_diskann_ts"
 
 # Azure OpenAI
 AZURE_OPENAI_ENDPOINT="${OPENAI_ENDPOINT}"
@@ -205,11 +205,11 @@ AZURE_OPENAI_EMBEDDING_API_VERSION="2024-08-01-preview"
 
 # Vector index configuration
 VECTOR_INDEX_TYPE="diskANN"
-EMBEDDED_FIELD="DescriptionVector"
+EMBEDDED_FIELD="embedding"
 EMBEDDING_DIMENSIONS="1536"
 
 # Data file with pre-computed vectors (relative to dist/)
-DATA_FILE_WITH_VECTORS="../data/HotelsData_toCosmosDB_Vector.json"
+DATA_FILE_WITH_VECTORS_AND_REGIONS="../data/HotelsData_toCosmosDB_Vector_byRegion.json"
 EOF
 
 echo ""
