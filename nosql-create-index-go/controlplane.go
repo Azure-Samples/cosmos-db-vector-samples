@@ -42,35 +42,11 @@ func CreateContainersWithVectorIndexes(
 		return fmt.Errorf("failed to create ARM client: %w", err)
 	}
 
-	// Ensure database exists first
-	fmt.Printf("\n=== Phase 1: Create Database ===\n")
+	// Note: The database (HotelsCreateIndex) is assumed to already exist.
+	// This sample only creates and manages containers within the existing database.
+
+	fmt.Printf("\n=== Creating Containers with Vector Indexes ===\n")
 	fmt.Printf("  Database: %s\n", config.DatabaseName)
-
-	dbPoller, err := client.BeginCreateUpdateSQLDatabase(
-		ctx,
-		config.ResourceGroup,
-		config.AccountName,
-		config.DatabaseName,
-		armcosmos.SQLDatabaseCreateUpdateParameters{
-			Location: ptr(config.Location),
-			Properties: &armcosmos.SQLDatabaseCreateUpdateProperties{
-				Resource: &armcosmos.SQLDatabaseResource{
-					ID: ptr(config.DatabaseName),
-				},
-				Options: &armcosmos.CreateUpdateOptions{},
-			},
-		},
-		nil,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to begin creating database: %w", err)
-	}
-
-	if _, err := dbPoller.PollUntilDone(ctx, &runtime.PollUntilDoneOptions{Frequency: 5 * time.Second}); err != nil {
-		return fmt.Errorf("failed to create database: %w", err)
-	}
-
-	fmt.Printf("  ✓ Database created or already exists\n")
 
 	// Create containers with vector indexes
 	indexConfigs := []struct {
