@@ -22,6 +22,9 @@ param location string
 @description('Id of the principal to assign database and application roles.')
 param deploymentUserPrincipalId string = ''
 
+@description('Enable create-index database and containers. Leave empty for vector search only. Set to "HotelsCreateIndex" to enable both vector search and create-index scenarios.')
+param createIndexDatabaseName string = ''
+
 var resourceToken = toLower(uniqueString(subscription().id, environmentName, location))
 var tags = { 'azd-env-name': environmentName }
 var prefix = '${environmentName}${resourceToken}'
@@ -75,7 +78,6 @@ var dataFileWithVectors = './data/HotelsData_toCosmosDB_Vector.json'
 var dataFileWithVectorsAndRegions = './data/HotelsData_toCosmosDB_Vector_byRegion.json'
 var dataFileWithoutVectors = './data/HotelsData_toCosmosDB.JSON'
 var databaseName = 'Hotels'
-var createIndexDatabaseName = 'HotelsCreateIndex'
 var fieldToEmbed = 'Description'
 var embeddedFieldName = 'DescriptionVector'
 var embeddingDimensions = '1536'

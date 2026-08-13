@@ -26,7 +26,7 @@ The sample uses a hotel dataset in a JSON file with pre-calculated vectors from 
     - Data plane: **Cosmos DB Built-in Data Contributor**
 - An Azure OpenAI resource with a `text-embedding-3-small` deployment and the following RBAC role assigned to your signed-in identity:
     - Data plane: **Cognitive Services OpenAI User**
-- A `HotelsCreateIndex` database already provisioned on your Azure Cosmos DB account. The sample creates and deletes only the containers; it does not create the database or account.
+- To enable infrastructure provisioning for the create-index scenario, set `AZURE_COSMOSDB_CREATE_INDEX_DATABASE_NAME=HotelsCreateIndex` before running `azd up`. The infrastructure creates both the `Hotels` (vector search) and `HotelsCreateIndex` (create-index) databases. The sample creates and deletes only the containers; it does not create the database or account.
 - (Optional) [Visual Studio Code](https://code.visualstudio.com/) with the **Azure Databases** extension installed, to browse the containers after ingestion.
 
 > [!TIP]

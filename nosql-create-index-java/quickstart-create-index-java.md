@@ -26,6 +26,7 @@ In this quickstart, you run the Java create-index sample for Azure Cosmos DB for
   - **Cosmos DB Built-in Data Contributor**
   - **Cognitive Services OpenAI User**
 - An Azure OpenAI resource with a `text-embedding-3-small` deployment.
+- To enable infrastructure provisioning for the create-index scenario, set `AZURE_COSMOSDB_CREATE_INDEX_DATABASE_NAME=HotelsCreateIndex` before running `azd up`. The infrastructure creates both the `Hotels` (vector search) and `HotelsCreateIndex` (create-index) databases.
 
 > [!IMPORTANT]
 > **Two Phases:**

@@ -26,6 +26,7 @@ In this quickstart, you run the Go create-index sample for Azure Cosmos DB for N
   - **Cosmos DB Built-in Data Contributor** on the Azure Cosmos DB account
   - **Cognitive Services OpenAI User** on the Azure OpenAI resource
 - An Azure OpenAI resource with a `text-embedding-3-small` deployment.
+- To enable infrastructure provisioning for the create-index scenario, set `AZURE_COSMOSDB_CREATE_INDEX_DATABASE_NAME=HotelsCreateIndex` before running `azd up`. The infrastructure creates both the `Hotels` (vector search) and `HotelsCreateIndex` (create-index) databases.
 
 > [!IMPORTANT]
 > **Two Phases:**
