@@ -1,0 +1,2 @@
+infra/post-provision.sh eol=lf working-tree-encoding=UTF-8
+infra/pre-down.sh eol=lf working-tree-encoding=UTF-8
