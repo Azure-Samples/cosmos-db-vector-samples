@@ -99,14 +99,14 @@ echo "Repository root: $REPO_ROOT"
 echo "Source data directory: $SOURCE_DATA_DIR"
 echo ""
 
-# Check if createIndexDatabaseName environment variable was set (indicates create-index scenario)
-# NOTE: Variable name must match what is used in bicep parameter file:
-#   AZURE_COSMOSDB_CREATE_INDEX_DATABASE_NAME (with underscore between INDEX and DATABASE)
-if [ -n "${AZURE_COSMOSDB_CREATE_INDEX_DATABASE_NAME:-}" ]; then
+# Check if createIndexDatabaseName was output by Bicep (indicates create-index scenario)
+# NOTE: Bicep outputs this as AZURE_COSMOSDB_CREATE_INDEX_DATABASENAME (no underscore),
+# which is what's stored in .env after deployment
+if [ -n "${AZURE_COSMOSDB_CREATE_INDEX_DATABASENAME:-}" ]; then
     # ================================================================
     # CREATE-INDEX SCENARIO: Copy region-based data files
     # ================================================================
-    CREATE_INDEX_DB_NAME="${AZURE_COSMOSDB_CREATE_INDEX_DATABASE_NAME}"
+    CREATE_INDEX_DB_NAME="${AZURE_COSMOSDB_CREATE_INDEX_DATABASENAME}"
     
     echo "📍 DEPLOYMENT SCENARIO: CREATE-INDEX"
     echo "   Database name: '$CREATE_INDEX_DB_NAME'"

@@ -92,8 +92,10 @@ Write-Host "Repository root: $RepoRoot"
 Write-Host "Source data directory: $sourceDataDir"
 Write-Host ""
 
-# Check if createIndexDatabaseName environment variable was set (indicates create-index scenario)
-$createIndexDbName = $env:AZURE_COSMOSDB_CREATE_INDEX_DATABASE_NAME
+# Check if createIndexDatabaseName was output by Bicep (indicates create-index scenario)
+# NOTE: Bicep outputs this as AZURE_COSMOSDB_CREATE_INDEX_DATABASENAME (no underscore),
+# which is what's stored in .env after deployment
+$createIndexDbName = $env:AZURE_COSMOSDB_CREATE_INDEX_DATABASENAME
 $isCreateIndexScenario = -not [string]::IsNullOrEmpty($createIndexDbName)
 
 if ($isCreateIndexScenario) {
