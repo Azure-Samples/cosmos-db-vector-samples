@@ -68,60 +68,75 @@ azd up
 
 #### Create Index Scenario (Requires Env Variable)
 
+You have two options to set the environment variable:
+
+**Option 1: Session Environment Variable (Quickest)**
+
 **Windows (PowerShell):**
 ```powershell
-# Set for current session (variable persists until you close PowerShell or clear it)
+# Set for current session (variable persists until you close PowerShell)
 $env:AZURE_COSMOSDB_CREATE_INDEX_DATABASE_NAME='HotelsCreateIndex'
 
 # Verify it's set
 $env:AZURE_COSMOSDB_CREATE_INDEX_DATABASE_NAME
 
-# Now provision - variable will persist for azd up AND azd down in same session
+# Provision - variable persists for azd up AND azd down in same session
 azd up
+```
 
-# Later, when tearing down in the SAME PowerShell session:
-azd down
+**Bash/Linux/macOS/WSL:**
+```bash
+# Set for current session (variable persists in this terminal)
+export AZURE_COSMOSDB_CREATE_INDEX_DATABASE_NAME='HotelsCreateIndex'
 
-# Or, set it permanently in your system (visible in all future PowerShell sessions):
+# Verify it's set
+echo $AZURE_COSMOSDB_CREATE_INDEX_DATABASE_NAME
+
+# Provision - variable persists for azd up AND azd down in same session
+azd up
+```
+
+**Option 2: AZD Environment (Recommended for Repeated Deployments)**
+
+Store the variable in your azd environment so it persists across sessions:
+
+```powershell
+# PowerShell
+azd env set AZURE_COSMOSDB_CREATE_INDEX_DATABASE_NAME "HotelsCreateIndex"
+
+# Verify it's set
+azd env get-values | findstr /i "CREATE_INDEX"
+
+# Now you can run deployments in new PowerShell sessions
+azd up
+```
+
+```bash
+# Bash
+azd env set AZURE_COSMOSDB_CREATE_INDEX_DATABASE_NAME "HotelsCreateIndex"
+
+# Verify it's set
+azd env get-values | grep CREATE_INDEX
+
+# Now you can run deployments in new terminal sessions
+azd up
+```
+
+**Option 3: Permanent System Environment (Persists Across All Sessions)**
+
+**Windows (PowerShell):**
+```powershell
 [Environment]::SetEnvironmentVariable('AZURE_COSMOSDB_CREATE_INDEX_DATABASE_NAME', 'HotelsCreateIndex', 'User')
 # Restart PowerShell to see the permanent setting
+azd up
 ```
 
 **Bash/Linux/macOS:**
 ```bash
-# Set for current session (variable persists in this terminal until you close it)
-export AZURE_COSMOSDB_CREATE_INDEX_DATABASE_NAME='HotelsCreateIndex'
-
-# Verify it's set
-echo $AZURE_COSMOSDB_CREATE_INDEX_DATABASE_NAME
-
-# Now provision - variable will persist for azd up AND azd down in same session
-azd up
-
-# Later, when tearing down in the SAME terminal session:
-azd down
-
-# Or, set it permanently in your shell configuration (~/.bashrc, ~/.zshrc, etc.):
-echo "export AZURE_COSMOSDB_CREATE_INDEX_DATABASE_NAME='HotelsCreateIndex'" >> ~/.bashrc
-source ~/.bashrc  # Reload configuration
-```
-
-**Windows Subsystem for Linux (WSL - Bash):**
-```bash
-# Set for current session
-export AZURE_COSMOSDB_CREATE_INDEX_DATABASE_NAME='HotelsCreateIndex'
-
-# Verify it's set
-echo $AZURE_COSMOSDB_CREATE_INDEX_DATABASE_NAME
-
-# Provision and teardown
-azd up
-# ... later in same terminal ...
-azd down
-
-# For permanent setup, add to ~/.bashrc:
+# Add to your shell configuration (~/.bashrc, ~/.zshrc, etc.)
 echo "export AZURE_COSMOSDB_CREATE_INDEX_DATABASE_NAME='HotelsCreateIndex'" >> ~/.bashrc
 source ~/.bashrc
+azd up
 ```
 
 ### Quick Example (TypeScript + Vector Search)

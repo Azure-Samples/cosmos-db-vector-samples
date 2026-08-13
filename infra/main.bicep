@@ -185,6 +185,10 @@ output AZURE_COSMOSDB_QUANTIZEDFLAT_CONTAINER_NAME string = empty(createIndexDat
 output AZURE_COSMOSDB_PARTITION_KEY_PATH string = database.outputs.partitionKeyPathForVectorSearch
 
 output AZURE_COSMOSDB_CREATE_INDEX_DATABASENAME string = !empty(createIndexDatabaseName) ? createIndexDatabaseName : ''
+// NOTE: CREATE-INDEX containers are created by post-provision hook (post-provision.sh/.ps1)
+// because they are scenario-dependent (diskANN vs quantizedFlat). The hook copies data files
+// and the sample code (control-plane.ts) creates containers with vector indexes dynamically.
+// These container names are not output by Bicep — they are determined by the sample code.
 output AZURE_COSMOSDB_CREATE_INDEX_DISKANN_CONTAINER_NAME string = ''
 output AZURE_COSMOSDB_CREATE_INDEX_QUANTIZEDFLAT_CONTAINER_NAME string = ''
 output AZURE_COSMOSDB_CREATE_INDEX_EMBEDDED_FIELD string = database.outputs.embeddedFieldNameForCreateIndex
