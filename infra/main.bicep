@@ -180,8 +180,8 @@ output AZURE_OPENAI_EMBEDDING_API_VERSION string = embeddingModelApiVersion
 output AZURE_COSMOSDB_ACCOUNT_NAME string = database.outputs.accountName
 output AZURE_COSMOSDB_ENDPOINT string =  database.outputs.endpoint
 output AZURE_COSMOSDB_DATABASENAME string = databaseName
-output AZURE_COSMOSDB_DISKANN_CONTAINER_NAME string = database.outputs.containers[0].name
-output AZURE_COSMOSDB_QUANTIZEDFLAT_CONTAINER_NAME string = database.outputs.containers[1].name
+output AZURE_COSMOSDB_DISKANN_CONTAINER_NAME string = empty(createIndexDatabaseName) ? database.outputs.containers[0].name : ''
+output AZURE_COSMOSDB_QUANTIZEDFLAT_CONTAINER_NAME string = empty(createIndexDatabaseName) ? database.outputs.containers[1].name : ''
 output AZURE_COSMOSDB_PARTITION_KEY_PATH string = database.outputs.partitionKeyPathForVectorSearch
 
 output AZURE_COSMOSDB_CREATE_INDEX_DATABASENAME string = !empty(createIndexDatabaseName) ? createIndexDatabaseName : ''
