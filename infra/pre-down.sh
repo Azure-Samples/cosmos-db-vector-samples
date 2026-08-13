@@ -54,16 +54,18 @@ REPO_ROOT="$(dirname "$SCRIPT_DIR")"
 echo "Repository root: $REPO_ROOT"
 
 # Detect deployment scenario via environment variable
-# The presence/absence of AZURE_COSMOSDB_CREATE_INDEX_DATABASENAME determines the scenario
-# This environment variable is set by the user at deployment time: $env:AZURE_COSMOSDB_CREATE_INDEX_DATABASENAME='HotelsCreateIndex'; azd up
-if [ -n "${AZURE_COSMOSDB_CREATE_INDEX_DATABASENAME:-}" ]; then
+# The presence/absence of AZURE_COSMOSDB_CREATE_INDEX_DATABASE_NAME determines the scenario
+# This environment variable is set by the user at deployment time: $env:AZURE_COSMOSDB_CREATE_INDEX_DATABASE_NAME='HotelsCreateIndex'; azd up
+# NOTE: Variable name must match what is used in bicep parameter file and post-provision hook:
+#   AZURE_COSMOSDB_CREATE_INDEX_DATABASE_NAME (with underscore between INDEX and DATABASE)
+if [ -n "${AZURE_COSMOSDB_CREATE_INDEX_DATABASE_NAME:-}" ]; then
     IS_CREATE_INDEX_SCENARIO=true
     echo "Detected CREATE-INDEX scenario — cleaning up create-index samples"
-    echo "  (Environment variable AZURE_COSMOSDB_CREATE_INDEX_DATABASENAME = '$AZURE_COSMOSDB_CREATE_INDEX_DATABASENAME')"
+    echo "  (Environment variable AZURE_COSMOSDB_CREATE_INDEX_DATABASE_NAME = '$AZURE_COSMOSDB_CREATE_INDEX_DATABASE_NAME')"
 else
     IS_CREATE_INDEX_SCENARIO=false
     echo "Detected VECTOR-SEARCH scenario — cleaning up vector-search samples"
-    echo "  (Environment variable AZURE_COSMOSDB_CREATE_INDEX_DATABASENAME not set or empty)"
+    echo "  (Environment variable AZURE_COSMOSDB_CREATE_INDEX_DATABASE_NAME not set or empty)"
 fi
 
 if [ "$IS_CREATE_INDEX_SCENARIO" = true ]; then

@@ -77,8 +77,10 @@ $sourceDataDir = Join-Path $RepoRoot "data"
 # ============================================================================
 # Read environment variable that was set during "azd up" or "azd provision"
 # Examples:
-#   $env:AZURE_COSMOSDB_CREATE_INDEX_DATABASENAME='HotelsCreateIndex' → CREATE-INDEX scenario
+#   $env:AZURE_COSMOSDB_CREATE_INDEX_DATABASE_NAME='HotelsCreateIndex' → CREATE-INDEX scenario
 #   (unset) → VECTOR-SEARCH scenario (default)
+#   NOTE: Variable name must match what is used in bicep parameter file:
+#   AZURE_COSMOSDB_CREATE_INDEX_DATABASE_NAME (with underscore between INDEX and DATABASE)
 
 Write-Host ""
 Write-Host "╔════════════════════════════════════════════════════════════════╗"
@@ -91,7 +93,7 @@ Write-Host "Source data directory: $sourceDataDir"
 Write-Host ""
 
 # Check if createIndexDatabaseName environment variable was set (indicates create-index scenario)
-$createIndexDbName = $env:AZURE_COSMOSDB_CREATE_INDEX_DATABASENAME
+$createIndexDbName = $env:AZURE_COSMOSDB_CREATE_INDEX_DATABASE_NAME
 $isCreateIndexScenario = -not [string]::IsNullOrEmpty($createIndexDbName)
 
 if ($isCreateIndexScenario) {

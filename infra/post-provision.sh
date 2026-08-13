@@ -100,11 +100,13 @@ echo "Source data directory: $SOURCE_DATA_DIR"
 echo ""
 
 # Check if createIndexDatabaseName environment variable was set (indicates create-index scenario)
-if [ -n "${AZURE_COSMOSDB_CREATE_INDEX_DATABASENAME:-}" ]; then
+# NOTE: Variable name must match what is used in bicep parameter file:
+#   AZURE_COSMOSDB_CREATE_INDEX_DATABASE_NAME (with underscore between INDEX and DATABASE)
+if [ -n "${AZURE_COSMOSDB_CREATE_INDEX_DATABASE_NAME:-}" ]; then
     # ================================================================
     # CREATE-INDEX SCENARIO: Copy region-based data files
     # ================================================================
-    CREATE_INDEX_DB_NAME="${AZURE_COSMOSDB_CREATE_INDEX_DATABASENAME}"
+    CREATE_INDEX_DB_NAME="${AZURE_COSMOSDB_CREATE_INDEX_DATABASE_NAME}"
     
     echo "📍 DEPLOYMENT SCENARIO: CREATE-INDEX"
     echo "   Database name: '$CREATE_INDEX_DB_NAME'"

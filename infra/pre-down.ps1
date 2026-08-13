@@ -52,12 +52,14 @@ $RepoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 Write-Host "Repository root: $RepoRoot"
 
 # Detect deployment scenario via environment variable
-$CreateIndexDatabaseName = $env:AZURE_COSMOSDB_CREATE_INDEX_DATABASENAME
+# NOTE: Variable name must match what is used in bicep parameter file and post-provision hook:
+#   AZURE_COSMOSDB_CREATE_INDEX_DATABASE_NAME (with underscore between INDEX and DATABASE)
+$CreateIndexDatabaseName = $env:AZURE_COSMOSDB_CREATE_INDEX_DATABASE_NAME
 $IsCreateIndexScenario = -not [string]::IsNullOrEmpty($CreateIndexDatabaseName)
 
 if ($IsCreateIndexScenario) {
     Write-Host "Detected CREATE-INDEX scenario — cleaning up create-index samples"
-    Write-Host "  (Environment variable AZURE_COSMOSDB_CREATE_INDEX_DATABASENAME = '$CreateIndexDatabaseName')"
+    Write-Host "  (Environment variable AZURE_COSMOSDB_CREATE_INDEX_DATABASE_NAME = '$CreateIndexDatabaseName')"
     
     # Find all create-index sample directories
     # Pattern: nosql-create-index-* matches nosql-create-index-typescript, nosql-create-index-python, etc.
