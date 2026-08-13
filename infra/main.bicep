@@ -185,8 +185,8 @@ output AZURE_COSMOSDB_QUANTIZEDFLAT_CONTAINER_NAME string = empty(createIndexDat
 output AZURE_COSMOSDB_PARTITION_KEY_PATH string = database.outputs.partitionKeyPathForVectorSearch
 
 output AZURE_COSMOSDB_CREATE_INDEX_DATABASENAME string = !empty(createIndexDatabaseName) ? createIndexDatabaseName : ''
-output AZURE_COSMOSDB_CREATE_INDEX_DISKANN_CONTAINER_NAME string = !empty(createIndexDatabaseName) ? database.outputs.createIndexContainers[0].name : ''
-output AZURE_COSMOSDB_CREATE_INDEX_QUANTIZEDFLAT_CONTAINER_NAME string = !empty(createIndexDatabaseName) ? database.outputs.createIndexContainers[1].name : ''
+output AZURE_COSMOSDB_CREATE_INDEX_DISKANN_CONTAINER_NAME string = ''
+output AZURE_COSMOSDB_CREATE_INDEX_QUANTIZEDFLAT_CONTAINER_NAME string = ''
 output AZURE_COSMOSDB_CREATE_INDEX_EMBEDDED_FIELD string = database.outputs.embeddedFieldNameForCreateIndex
 output AZURE_COSMOSDB_CREATE_INDEX_PARTITION_KEY_PATH string = database.outputs.partitionKeyPathForCreateIndex
 output AZURE_COSMOSDB_CREATE_INDEX_EMBEDDING_DIMENSIONS string = '1536'
