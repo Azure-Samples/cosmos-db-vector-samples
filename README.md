@@ -42,18 +42,24 @@ This project demonstrates:
 
 ## 🎯 Getting Started
 
-1. **Choose a sample** from the repository structure above
-2. **Navigate to the sample directory** and follow its README
-3. **Configure environment variables** with your Azure resource information
-4. **Run the sample** to see vector search in action
+### Deployment Scenarios
 
-### Quick Example (TypeScript + NoSQL API)
+This repository supports **two distinct deployment scenarios** based on what you want to demonstrate:
+
+| Scenario | Database | Env Variable | Use Case |
+|----------|----------|---|----------|
+| **Vector Search** | Standard Cosmos DB NoSQL with vector search | Not set (default) | Query existing vectors with similarity search |
+| **Create Index** | Cosmos DB NoSQL with custom vector indexing | `AZURE_COSMOSDB_CREATE_INDEX_DATABASE_NAME='HotelsCreateIndex'` | Demonstrate building and configuring vector indexes |
+
+**⚠️ Important:** You must **set the environment variable BEFORE running `azd up`** (not just pass it on the command line). The variable needs to persist throughout the deployment and teardown lifecycle.
+
+### Quick Example (TypeScript + Vector Search)
 
 ```bash
 # Clone the repository
 git clone https://github.com/Azure-Samples/cosmos-db-vector-samples.git
 
-# Provision Azure resources with Azure Developer CLI
+# Provision Azure resources with Azure Developer CLI (default: vector-search scenario)
 azd auth login
 azd up
 
@@ -63,12 +69,55 @@ cd cosmos-db-vector-samples/nosql-vector-search-typescript
 # Install dependencies
 npm install
 
-# Set environment variables from provisioned infrstructure
+# Set environment variables from provisioned infrastructure
 azd env get-values > .env
 
 # Build and run
 npm run build
 npm run start:diskann
+```
+
+### Deployment with Create Index Scenario
+
+```powershell
+# IMPORTANT: Set the environment variable PERSISTENTLY before running azd up
+$env:AZURE_COSMOSDB_CREATE_INDEX_DATABASE_NAME='HotelsCreateIndex'
+
+# Now provision Azure resources (variable will persist for this session)
+azd up
+
+# Later, when tearing down, the variable must still be set in the SAME SESSION
+# or in your system environment for cleanup to work correctly
+azd down
+```
+
+**Why the environment variable matters:**
+- **Post-provision hook** reads this variable to determine which data files to copy
+- **Pre-down hook** reads this variable to determine which data files to clean up
+- If you only pass it inline (`$env:VAR='value'; azd up`), it's lost after that command
+- When you run `azd down` later in a new session, the variable isn't set, causing the cleanup script to look for the wrong filenames
+
+### Persistent Environment Variable Setup
+
+#### On Windows (PowerShell)
+```powershell
+# Set permanently in current session (for azd up AND azd down in same session)
+$env:AZURE_COSMOSDB_CREATE_INDEX_DATABASE_NAME='HotelsCreateIndex'
+
+# Or set permanently in system environment (visible in all future sessions)
+[Environment]::SetEnvironmentVariable('AZURE_COSMOSDB_CREATE_INDEX_DATABASE_NAME', 'HotelsCreateIndex', 'User')
+
+# Verify it's set
+$env:AZURE_COSMOSDB_CREATE_INDEX_DATABASE_NAME
+```
+
+#### On Bash/Linux/macOS
+```bash
+# Set for current session
+export AZURE_COSMOSDB_CREATE_INDEX_DATABASE_NAME='HotelsCreateIndex'
+
+# Verify it's set
+echo $AZURE_COSMOSDB_CREATE_INDEX_DATABASE_NAME
 ```
 
 ## 📖 Key Concepts

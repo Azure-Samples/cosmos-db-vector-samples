@@ -125,6 +125,19 @@ if [ "$IS_CREATE_INDEX_SCENARIO" = true ]; then
             fi
         done
         
+        # Also clean up vector-search files if they exist (handles scenario mismatch)
+        # This can occur if post-provision was run with different env var state than pre-down
+        vector_search_files=("HotelsData_toCosmosDB.JSON" "HotelsData_toCosmosDB_Vector.json")
+        for filename in "${vector_search_files[@]}"; do
+            filepath="$data_dir/$filename"
+            if [ -f "$filepath" ]; then
+                rm -f "$filepath"
+                echo "    ℹ Also removed: $filename (vector-search scenario mismatch)"
+                ((files_removed++))
+                ((total_files_removed++))
+            fi
+        done
+        
         echo "    Summary: Removed $files_removed file(s) from $sample_name/data/"
     done
     
@@ -189,6 +202,19 @@ else
                 ((total_files_removed++))
             else
                 echo "    ℹ File not found: $filename (already removed)"
+            fi
+        done
+        
+        # Also clean up create-index files if they exist (handles scenario mismatch)
+        # This can occur if post-provision was run with env var set, then pre-down runs without it
+        create_index_files=("HotelsData_toCosmosDB_byRegion.json" "HotelsData_toCosmosDB_Vector_byRegion.json")
+        for filename in "${create_index_files[@]}"; do
+            filepath="$data_dir/$filename"
+            if [ -f "$filepath" ]; then
+                rm -f "$filepath"
+                echo "    ℹ Also removed: $filename (create-index scenario mismatch)"
+                ((files_removed++))
+                ((total_files_removed++))
             fi
         done
         

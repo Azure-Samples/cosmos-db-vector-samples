@@ -1,6 +1,142 @@
 # scripts/
 
-Pre-flight utilities for the `cosmos-db-vector-samples` AZD deployment.
+Pre-flight utilities and hook documentation for the `cosmos-db-vector-samples` AZD deployment.
+
+## Quick Links
+
+- **Want to deploy the samples?** → See [DEPLOYMENT.md](../DEPLOYMENT.md) in the root
+- **Understanding post-provision and pre-down hooks?** → See [Hook Architecture](#hook-architecture) below
+- **Checking Azure quota before deploying?** → See [check-quota.sh](#check-quotash)
+
+## Hook Architecture
+
+### Overview
+
+The deployment uses two Azure Developer CLI lifecycle hooks to automate data file management:
+
+| Hook | When it Runs | What it Does |
+|------|---|---|
+| **post-provision** | After `azd up` succeeds | Copies sample data files to language sample directories |
+| **predown** | Before `azd down` deletes resources | Removes copied data files from language sample directories |
+
+**Hook files:**
+- `infra/post-provision.sh` (Bash version for Linux/WSL)
+- `infra/post-provision.ps1` (PowerShell version for Windows)
+- `infra/pre-down.sh` (Bash version for Linux/WSL)
+- `infra/pre-down.ps1` (PowerShell version for Windows)
+
+### Scenario Detection
+
+Both hooks detect which deployment scenario is active by checking the **`AZURE_COSMOSDB_CREATE_INDEX_DATABASE_NAME`** environment variable:
+
+| Variable State | Scenario | Data Files Used |
+|---|---|---|
+| **Set** (e.g., `'HotelsCreateIndex'`) | Create Index | Region-organized: `*_byRegion.json` files |
+| **Not set or empty** | Vector Search | Flat structure: `*.JSON` and `*.json` files |
+
+**⚠️ Important:** The variable must be set **before** running `azd up` and should remain set for the `azd down` command to ensure cleanup uses the correct filenames.
+
+### Discovery Pattern
+
+The hooks automatically discover all language samples without hardcoding individual directories:
+
+**Create Index samples:** Glob pattern `nosql-create-index-*`
+```
+nosql-create-index-typescript/
+nosql-create-index-python/
+nosql-create-index-java/
+nosql-create-index-go/
+nosql-create-index-dotnet/
+```
+
+**Vector Search samples:** Glob pattern `nosql-vector-search-*`
+```
+nosql-vector-search-typescript/
+nosql-vector-search-python/
+nosql-vector-search-java/
+nosql-vector-search-go/
+nosql-vector-search-dotnet/
+```
+
+When you add a new language sample (e.g., `nosql-create-index-rust/`), the hooks automatically discover and process it without any code changes.
+
+### Post-Provision Hook Workflow
+
+**When:** Runs automatically after `azd provision` completes  
+**Trigger:** Defined in `azure.yaml` as a `postprovision` hook  
+**Log location:** Visible in `azd up` command output
+
+**Steps:**
+1. Read `AZURE_COSMOSDB_CREATE_INDEX_DATABASE_NAME` to detect scenario
+2. Discover all sample directories matching the scenario pattern
+3. For each sample directory:
+   - Create `data/` subdirectory if missing
+   - Copy appropriate data files from repo root `./data/` to sample's `data/` subdirectory
+   - Log each copy action or error
+4. Exit with status code 0 (success) — hook does not fail even if some files were missing
+
+**Example output (Create Index scenario):**
+```
+Detected CREATE-INDEX scenario — copying data files to create-index samples
+(Environment variable AZURE_COSMOSDB_CREATE_INDEX_DATABASENAME = 'HotelsCreateIndex')
+
+Found create-index sample directory(ies):
+  Processing: nosql-create-index-typescript
+    ✓ Copied HotelsData_toCosmosDB_byRegion.json
+    ✓ Copied HotelsData_toCosmosDB_Vector_byRegion.json
+  Processing: nosql-create-index-python
+    ✓ Copied HotelsData_toCosmosDB_byRegion.json
+    ✓ Copied HotelsData_toCosmosDB_Vector_byRegion.json
+  (... more samples ...)
+
+Post-provision data file setup completed successfully.
+```
+
+### Pre-Down Hook Workflow
+
+**When:** Runs during `azd down` before resources are deleted  
+**Trigger:** Defined in `azure.yaml` as a `predown` hook  
+**Log location:** Visible in `azd hooks run predown` or `azd down` command output
+
+**Steps:**
+1. Read `AZURE_COSMOSDB_CREATE_INDEX_DATABASE_NAME` to detect scenario
+2. Discover all sample directories matching the scenario pattern
+3. For each sample directory:
+   - Look for data files from the detected scenario
+   - Remove each file found (or skip if missing)
+   - Log each removal or skip action
+4. Exit with status code 0 (success) — no failures even if some files were already gone
+
+**Example output (Vector Search scenario):**
+```
+Detected VECTOR-SEARCH scenario — cleaning up vector-search samples
+(Environment variable AZURE_COSMOSDB_CREATE_INDEX_DATABASENAME not set or empty)
+
+Found vector-search sample directory(ies):
+  Processing: nosql-vector-search-typescript
+    ✓ Removed HotelsData_toCosmosDB.JSON
+    ✓ Removed HotelsData_toCosmosDB_Vector.json
+  Processing: nosql-vector-search-python
+    ✓ Removed HotelsData_toCosmosDB.JSON
+    ✓ Removed HotelsData_toCosmosDB_Vector.json
+  (... more samples ...)
+
+Pre-down cleanup completed successfully.
+```
+
+### Scenario Mismatch Resilience
+
+The pre-down hook includes fallback logic to handle cases where the environment variable state differs between `azd up` and `azd down`:
+
+**Example scenario:**
+1. Deploy with `AZURE_COSMOSDB_CREATE_INDEX_DATABASE_NAME='HotelsCreateIndex'` set
+   - Post-provision copies `*_byRegion.json` files
+2. Run `azd down` WITHOUT re-setting the variable
+   - Pre-down runs without the variable set → assumes Vector Search scenario
+   - Pre-down looks for flat JSON files first, doesn't find them
+   - Pre-down then tries to remove `_byRegion` files as fallback → **finds and removes them** ✓
+
+This means cleanup always works correctly, regardless of whether the environment variable is set during the teardown phase.
 
 ## check-quota.sh
 

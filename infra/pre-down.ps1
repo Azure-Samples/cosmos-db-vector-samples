@@ -152,7 +152,7 @@ else {
         
         $FilesRemovedCount = 0
         
-        # Remove each data file
+        # Remove each data file for vector-search scenario
         foreach ($FileName in $FilesToRemove) {
             $FilePath = Join-Path -Path $DataDir -ChildPath $FileName
             
@@ -168,6 +168,24 @@ else {
             }
             else {
                 Write-Host "    ℹ File not found: $FileName (already removed)"
+            }
+        }
+        
+        # Also clean up create-index files if they exist (handles scenario mismatch)
+        # This can occur if post-provision was run with env var set, then pre-down runs without it
+        $CreateIndexFiles = @("HotelsData_toCosmosDB_byRegion.json", "HotelsData_toCosmosDB_Vector_byRegion.json")
+        foreach ($FileName in $CreateIndexFiles) {
+            $FilePath = Join-Path -Path $DataDir -ChildPath $FileName
+            
+            if (Test-Path -Path $FilePath -PathType Leaf) {
+                try {
+                    Remove-Item -Path $FilePath -Force
+                    Write-Host "    ℹ Also removed: $FileName (create-index scenario mismatch)"
+                    $FilesRemovedCount++
+                }
+                catch {
+                    Write-Warning "Failed to remove $FilePath`: $_"
+                }
             }
         }
         
