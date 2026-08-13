@@ -79,9 +79,10 @@ def create_containers(credential: DefaultAzureCredential, config: SampleConfig) 
     )
 
     embedding_path = f"/{config.embedding_field_name}"
+    from . import config as config_module
     containers_config = [
-        {"type": "diskANN", "container_name": "hotels_diskann_py"},
-        {"type": "QuantizedFlat", "container_name": "hotels_quantizedflat_py"},
+        {"type": "diskANN", "container_name": config_module.KNOWN_CONTAINERS["diskann"]},
+        {"type": "QuantizedFlat", "container_name": config_module.KNOWN_CONTAINERS["quantizedflat"]},
     ]
 
     for container_config in containers_config:
@@ -146,7 +147,8 @@ def delete_containers(credential: DefaultAzureCredential, config: SampleConfig) 
     )
 
     # Always try to delete both containers, regardless of which one is active
-    container_names = ["hotels_diskann_py", "hotels_quantizedflat_py"]
+    from . import config as config_module
+    container_names = list(config_module.KNOWN_CONTAINERS.values())
 
     for container_name in container_names:
         try:

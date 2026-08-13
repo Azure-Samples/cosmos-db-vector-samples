@@ -100,6 +100,29 @@ The **Cosmos DB Built-in Data Contributor** role (step 8 in `full` mode) grants 
 
 After completion, the script writes a `.env` file with all values the TypeScript code needs.
 
+## Set up environment variables
+
+**⚠️ Important:** Environment variables MUST be loaded in your current session BEFORE running the sample. They are not passed via the `azd` command—they are read by `src/config.ts` at runtime.
+
+| Action | PowerShell | Bash |
+|--------|-----------|------|
+| Load from `.env` file | `Get-Content .env \| ForEach-Object { if ($_ -match "^([^=]+)=(.*)$") { [Environment]::SetEnvironmentVariable($matches[1], $matches[2]) } }` | `export $(grep -v "^#" .env \| xargs)` |
+| Set single variable | `[Environment]::SetEnvironmentVariable("AZURE_COSMOSDB_ENDPOINT", "https://your-account.documents.azure.com:443/")` | `export AZURE_COSMOSDB_ENDPOINT="https://your-account.documents.azure.com:443/"` |
+
+**Required environment variables:**
+- `AZURE_COSMOSDB_ENDPOINT` — Cosmos DB endpoint URL
+- `AZURE_COSMOSDB_DATABASENAME` — Database name (e.g., "HotelsCreateIndex")
+- `AZURE_SUBSCRIPTION_ID` — Your Azure subscription ID
+- `AZURE_RESOURCE_GROUP` — Your Azure resource group name
+- `AZURE_COSMOSDB_ACCOUNT_NAME` — Your Cosmos DB account name
+- `AZURE_OPENAI_ENDPOINT` — Azure OpenAI endpoint URL
+- `AZURE_OPENAI_EMBEDDING_DEPLOYMENT` — Deployment name (e.g., "text-embedding-3-small")
+
+**Optional environment variables:**
+- `VECTOR_ALGORITHM` — "diskann" or "quantizedflat"; leave empty to run **both** containers
+- `AZURE_COSMOSDB_CREATE_INDEX_DISKANN_CONTAINER_NAME` — Custom diskANN container name (default: "hotels_diskann")
+- `AZURE_COSMOSDB_CREATE_INDEX_QUANTIZEDFLAT_CONTAINER_NAME` — Custom quantizedFlat container name (default: "hotels_quantizedflat")
+
 ## Install dependencies
 
 Install the required npm packages:

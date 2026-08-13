@@ -34,14 +34,14 @@ The sample:
    .\.venv\Scripts\Activate.ps1
    ```
 
-2. Install dependencies.
+2. Install control plane dependencies.
 
    ```powershell
    pip install -r requirements.txt
    pip install azure-mgmt-cosmosdb
    ```
 
-3. Populate environment variables.
+3. Set environment variables.
 
    **If you deployed with `azd up`:**
 
@@ -55,29 +55,32 @@ The sample:
    Copy-Item .env.example .env
    ```
 
-4. Verify `.env` has your values.
+   **Before running the sample, load environment variables into your session:**
 
-   Notes:
-   - `AZURE_COSMOSDB_CREATE_INDEX_DATABASENAME` is the existing database name.
-   - `AZURE_SUBSCRIPTION_ID`, `AZURE_RESOURCE_GROUP`, and `AZURE_COSMOSDB_ACCOUNT_NAME` are required by `src/control_plane.py`.
-   - `AZURE_OPENAI_EMBEDDING_ENDPOINT` is the Azure OpenAI endpoint used to generate query embeddings.
-   - `VECTOR_ALGORITHM` accepts `diskann` or `quantizedflat`.
-   - Leave `VECTOR_ALGORITHM` empty to run **both** containers.
-   - Leave `AZURE_COSMOSDB_CONTAINER_NAME` empty unless you want to target one container by name.
-   - `DATA_FILE_WITH_VECTORS_AND_REGIONS` defaults to `./data/HotelsData_toCosmosDB_Vector_byRegion.json`.
+   | Action | PowerShell | Bash |
+   |--------|-----------|------|
+   | Load from `.env` file | `Get-Content .env \| ForEach-Object { if ($_ -match "^([^=]+)=(.*)$") { [Environment]::SetEnvironmentVariable($matches[1], $matches[2]) } }` | `export $(grep -v "^#" .env \| xargs)` |
+   | Set single variable | `[Environment]::SetEnvironmentVariable("AZURE_COSMOSDB_ENDPOINT", "https://your-account.documents.azure.com:443/")` | `export AZURE_COSMOSDB_ENDPOINT="https://your-account.documents.azure.com:443/"` |
 
-   Example `.env` values:
+   **⚠️ Important:** Environment variables MUST be set in your current session BEFORE running the sample. They are not passed via the `azd` command—they are read by the Python process at runtime.
 
-   ```dotenv
-   AZURE_COSMOSDB_ENDPOINT="https://<your-account>.documents.azure.com:443/"
-   AZURE_COSMOSDB_CREATE_INDEX_DATABASENAME="HotelsCreateIndex"
-   AZURE_COSMOSDB_CONTAINER_NAME=""
-   AZURE_SUBSCRIPTION_ID="<your-subscription-id>"
-   AZURE_RESOURCE_GROUP="<your-resource-group>"
-   AZURE_COSMOSDB_ACCOUNT_NAME="<your-account-name>"
-   AZURE_OPENAI_EMBEDDING_ENDPOINT="https://<your-openai-resource>.openai.azure.com/"
-   AZURE_OPENAI_EMBEDDING_DEPLOYMENT="text-embedding-3-small"
-   AZURE_OPENAI_EMBEDDING_API_VERSION="2024-08-01-preview"
+4. Verify your configuration.
+
+   These environment variables are required:
+   - `AZURE_COSMOSDB_ENDPOINT` — Cosmos DB endpoint URL
+   - `AZURE_COSMOSDB_CREATE_INDEX_DATABASENAME` — Database name (e.g., "HotelsCreateIndex")
+   - `AZURE_SUBSCRIPTION_ID` — Your Azure subscription ID
+   - `AZURE_RESOURCE_GROUP` — Your Azure resource group name
+   - `AZURE_COSMOSDB_ACCOUNT_NAME` — Your Cosmos DB account name
+   - `AZURE_OPENAI_EMBEDDING_ENDPOINT` — Azure OpenAI endpoint URL
+   - `AZURE_OPENAI_EMBEDDING_DEPLOYMENT` — Deployment name (e.g., "text-embedding-3-small")
+
+   Optional environment variables:
+   - `VECTOR_ALGORITHM` — "diskann" or "quantizedflat"; leave empty to run **both** containers
+   - `AZURE_COSMOSDB_CONTAINER_NAME` — Target container by name; leave empty to process all
+   - `DATA_FILE_WITH_VECTORS_AND_REGIONS` — Data file path (defaults to `./data/HotelsData_toCosmosDB_Vector_byRegion.json`)
+   - `AZURE_COSMOSDB_CREATE_INDEX_DISKANN_CONTAINER_NAME` — Custom diskANN container name (default: "hotels_diskann")
+   - `AZURE_COSMOSDB_CREATE_INDEX_QUANTIZEDFLAT_CONTAINER_NAME` — Custom quantizedFlat container name (default: "hotels_quantizedflat")
    VECTOR_ALGORITHM=""
    DATA_FILE_WITH_VECTORS_AND_REGIONS="./data/HotelsData_toCosmosDB_Vector_byRegion.json"
    ```

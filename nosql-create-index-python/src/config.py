@@ -8,8 +8,8 @@ from pathlib import Path
 from typing import Mapping, Optional, Sequence
 
 KNOWN_CONTAINERS = {
-    "diskann": "hotels_diskann_py",
-    "quantizedflat": "hotels_quantizedflat_py",
+    "diskann": os.getenv("AZURE_COSMOSDB_CREATE_INDEX_DISKANN_CONTAINER_NAME", "hotels_diskann"),
+    "quantizedflat": os.getenv("AZURE_COSMOSDB_CREATE_INDEX_QUANTIZEDFLAT_CONTAINER_NAME", "hotels_quantizedflat"),
 }
 
 REQUIRED_ENV_VARS = (

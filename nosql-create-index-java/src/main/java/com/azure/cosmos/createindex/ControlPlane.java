@@ -18,9 +18,6 @@ public class ControlPlane {
     private static final String REGION_PARTITION_KEY = "/Region";
     private static final int EMBEDDING_DIMENSIONS = 1536;
 
-    private static final String CONTAINER_DISKANN = "hotels_diskann_java";
-    private static final String CONTAINER_QUANTIZED_FLAT = "hotels_quantizedflat_java";
-
     public static void createContainersWithVectorIndexes(
             TokenCredential credential,
             String subscriptionId,
@@ -28,7 +25,9 @@ public class ControlPlane {
             String accountName,
             String location,
             String databaseName,
-            String embeddingFieldName) throws Exception {
+            String embeddingFieldName,
+            String diskannContainerName,
+            String quantizedflatContainerName) throws Exception {
 
         AzureProfile profile = new AzureProfile(AzureEnvironment.AZURE);
         AzureResourceManager azure = AzureResourceManager
@@ -43,9 +42,9 @@ public class ControlPlane {
         String embeddingPath = "/" + embeddingFieldName;
 
         createContainer(sqlResourcesClient, resourceGroup, accountName, location,
-                databaseName, embeddingPath, CONTAINER_DISKANN, VectorIndexType.DISK_ANN);
+                databaseName, embeddingPath, diskannContainerName, VectorIndexType.DISK_ANN);
         createContainer(sqlResourcesClient, resourceGroup, accountName, location,
-                databaseName, embeddingPath, CONTAINER_QUANTIZED_FLAT, VectorIndexType.QUANTIZED_FLAT);
+                databaseName, embeddingPath, quantizedflatContainerName, VectorIndexType.QUANTIZED_FLAT);
     }
 
     private static void createContainer(
@@ -129,7 +128,9 @@ public class ControlPlane {
             String subscriptionId,
             String resourceGroup,
             String accountName,
-            String databaseName) {
+            String databaseName,
+            String diskannContainerName,
+            String quantizedflatContainerName) {
 
         System.out.println("\n=== Cleanup: Remove Sample Containers ===");
 
@@ -149,7 +150,7 @@ public class ControlPlane {
                 .serviceClient()
                 .getSqlResources();
 
-        for (String containerName : new String[]{CONTAINER_DISKANN, CONTAINER_QUANTIZED_FLAT}) {
+        for (String containerName : new String[]{diskannContainerName, quantizedflatContainerName}) {
             try {
                 sqlResourcesClient.getSqlContainer(resourceGroup, accountName, databaseName, containerName);
                 sqlResourcesClient.deleteSqlContainer(resourceGroup, accountName, databaseName, containerName);

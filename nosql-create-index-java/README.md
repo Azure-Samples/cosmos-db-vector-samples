@@ -29,7 +29,7 @@ The sample expects the `HotelsCreateIndex` database to exist. It deletes and rec
 
 ## Set up the sample
 
-1. Populate environment variables.
+1. Create the environment variables file.
 
    **If you deployed with `azd up`:**
 
@@ -43,52 +43,42 @@ The sample expects the `HotelsCreateIndex` database to exist. It deletes and rec
    Copy-Item .env.example .env
    ```
 
-2. Verify `.env` has the required Azure resource, Azure Cosmos DB, and Azure OpenAI settings.
-
-   ```dotenv
-   AZURE_SUBSCRIPTION_ID="<your-subscription-id>"
-   AZURE_RESOURCE_GROUP="<your-resource-group>"
-   AZURE_COSMOSDB_ACCOUNT_NAME="<your-account-name>"
-   AZURE_LOCATION="<your-account-location>"
-   AZURE_COSMOSDB_ENDPOINT="https://<your-account>.documents.azure.com:443/"
-   AZURE_COSMOSDB_CREATE_INDEX_DATABASENAME="HotelsCreateIndex"
-   AZURE_OPENAI_EMBEDDING_ENDPOINT="https://<your-openai-resource>.openai.azure.com/"
-   AZURE_OPENAI_EMBEDDING_DEPLOYMENT="text-embedding-3-small"
-   ```
-
-   Notes:
-   - The code reads `AZURE_COSMOSDB_CREATE_INDEX_DATABASENAME` for the database name.
-   - Leave `AZURE_COSMOSDB_CONTAINER_NAME` empty to run all supported containers.
-   - Leave `VECTOR_ALGORITHM` empty to run both algorithms.
-   - Set `VECTOR_ALGORITHM` to `diskann` or `quantizedflat` to run one algorithm.
-   - Set `AZURE_COSMOSDB_CONTAINER_NAME` only if you want to target one container directly.
-
-3. Set up the data directory.
+2. Set up the data directory.
 
    ```powershell
    New-Item -ItemType Directory -Force .\data
    Copy-Item ..\HotelsData_toCosmosDB_Vector_byRegion.json .\data\
    ```
 
-4. Build the project.
+3. Build the project.
 
    ```powershell
    mvn compile
    ```
 
-## Run the sample
+## Load environment variables and run the sample
 
-**Load environment variables from `.env` first:**
+**⚠️ Important:** Environment variables MUST be loaded in your current session BEFORE running the sample. They are not passed via the `azd` command—they are read by `src/main/java/com/azure/cosmos/createindex/App.java` at runtime.
 
-```powershell
-# PowerShell (strips quotes from values)
-Get-Content .env | Where-Object { $_ -match '^[^#].*=' } | ForEach-Object { $k,$v = $_ -split '=',2; [Environment]::SetEnvironmentVariable($k.Trim(), $v.Trim().Trim('"').Trim("'")) }
-```
+| Action | PowerShell | Bash |
+|--------|-----------|------|
+| Load from `.env` file | `Get-Content .env \| ForEach-Object { if ($_ -match "^([^=]+)=(.*)$") { [Environment]::SetEnvironmentVariable($matches[1], $matches[2]) } }` | `export $(grep -v "^#" .env \| xargs)` |
+| Set single variable | `[Environment]::SetEnvironmentVariable("AZURE_COSMOSDB_ENDPOINT", "https://your-account.documents.azure.com:443/")` | `export AZURE_COSMOSDB_ENDPOINT="https://your-account.documents.azure.com:443/"` |
 
-```bash
-# Bash/Linux/Mac
-set -a; source .env; set +a
-```
+**Required environment variables:**
+- `AZURE_COSMOSDB_ENDPOINT` — Cosmos DB endpoint URL
+- `AZURE_COSMOSDB_CREATE_INDEX_DATABASENAME` — Database name (e.g., "HotelsCreateIndex")
+- `AZURE_SUBSCRIPTION_ID` — Your Azure subscription ID
+- `AZURE_RESOURCE_GROUP` — Your Azure resource group name
+- `AZURE_COSMOSDB_ACCOUNT_NAME` — Your Cosmos DB account name
+- `AZURE_OPENAI_EMBEDDING_ENDPOINT` — Azure OpenAI endpoint URL
+- `AZURE_OPENAI_EMBEDDING_DEPLOYMENT` — Deployment name (e.g., "text-embedding-3-small")
+
+**Optional environment variables:**
+- `VECTOR_ALGORITHM` — "diskann" or "quantizedflat"; leave empty to run **both** containers
+- `AZURE_COSMOSDB_CONTAINER_NAME` — Target container by name; leave empty to process all
+- `AZURE_COSMOSDB_CREATE_INDEX_DISKANN_CONTAINER_NAME` — Custom diskANN container name (default: "hotels_diskann")
+- `AZURE_COSMOSDB_CREATE_INDEX_QUANTIZEDFLAT_CONTAINER_NAME` — Custom quantizedFlat container name (default: "hotels_quantizedflat")
 
 **Then run the sample:**
 

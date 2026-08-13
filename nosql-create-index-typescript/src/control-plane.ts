@@ -58,8 +58,8 @@ export async function createContainer(
   config: SampleConfig
 ) {
   const indexTypes = [
-    { type: "diskANN", containerName: "hotels_diskann_ts" },
-    { type: "quantizedFlat", containerName: "hotels_quantizedflat_ts" },
+    { type: "diskANN", containerName: config.cosmos.diskannContainerName },
+    { type: "quantizedFlat", containerName: config.cosmos.quantizedflatContainerName },
   ];
 
   const embeddingPath = `/${config.embeddingField}`;

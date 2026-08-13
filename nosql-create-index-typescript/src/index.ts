@@ -60,7 +60,7 @@ export async function main() {
   const allResults: Array<{ container: string; metric: string; top1: string; top1Score: number; top2: string; top2Score: number; diff: number; ru: number }> = [];
 
   for (const indexType of indexTypes) {
-    const containerName = indexType === "diskANN" ? "hotels_diskann_ts" : "hotels_quantizedflat_ts";
+    const containerName = indexType === "diskANN" ? config.cosmos.diskannContainerName : config.cosmos.quantizedflatContainerName;
     const container = database.container(containerName);
 
     console.log(`\n${"=".repeat(50)}`);

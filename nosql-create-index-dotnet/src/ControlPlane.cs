@@ -46,8 +46,8 @@ public static class ControlPlane
         // Create separate containers for each index type
         var indexConfigs = new[]
         {
-            (Name: "hotels_diskann_dotnet", IndexType: CosmosDBVectorIndexType.DiskAnn),
-            (Name: "hotels_quantizedflat_dotnet", IndexType: CosmosDBVectorIndexType.QuantizedFlat)
+            (Name: config.DiskANNContainerName, IndexType: CosmosDBVectorIndexType.DiskAnn),
+            (Name: config.QuantizedFlatContainerName, IndexType: CosmosDBVectorIndexType.QuantizedFlat)
         };
 
         foreach (var indexConfig in indexConfigs)
@@ -95,7 +95,7 @@ public static class ControlPlane
         var database = await account.Value.GetCosmosDBSqlDatabaseAsync(config.DatabaseName, cancellationToken);
         var containers = database.Value.GetCosmosDBSqlContainers();
 
-        var containerNames = new[] { "hotels_diskann_dotnet", "hotels_quantizedflat_dotnet" };
+        var containerNames = new[] { config.DiskANNContainerName, config.QuantizedFlatContainerName };
 
         Console.WriteLine("\n=== Cleanup: Remove Sample Containers ===");
         foreach (var containerName in containerNames)

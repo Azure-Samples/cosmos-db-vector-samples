@@ -43,7 +43,7 @@ The sample creates and deletes containers in code by using the Azure Cosmos DB A
    Set-Location .\nosql-create-index-go
    ```
 
-2. Populate environment variables. The Go code calls `os.Getenv` directly and doesn't load `.env` files automatically, so export or set these values in your shell before running the sample.
+2. Create the environment variables file.
 
    **If you deployed with `azd up`:**
 
@@ -57,37 +57,39 @@ The sample creates and deletes containers in code by using the Azure Cosmos DB A
    Copy-Item .env.example .env
    ```
 
-3. Set the canonical environment variables:
-
-   | Variable | Example value |
-   |---|---|
-   | `AZURE_COSMOSDB_ENDPOINT` | `https://<account>.documents.azure.com:443/` |
-   | `AZURE_COSMOSDB_CREATE_INDEX_DATABASENAME` | `HotelsCreateIndex` |
-   | `AZURE_COSMOSDB_CONTAINER_NAME` | Optional. `hotels_diskann_go` or `hotels_quantizedflat_go` |
-   | `AZURE_OPENAI_EMBEDDING_ENDPOINT` | `https://<resource>.openai.azure.com/` |
-   | `AZURE_OPENAI_EMBEDDING_DEPLOYMENT` | `text-embedding-3-small` |
-   | `VECTOR_ALGORITHM` | Optional. `diskann` or `quantizedflat` |
-   | `AZURE_COSMOSDB_CREATE_INDEX_EMBEDDED_FIELD` | `embedding` |
-   | `DATA_FILE_WITH_VECTORS_AND_REGIONS` | `..\data\HotelsData_toCosmosDB_Vector_byRegion.json` |
-   | `AZURE_SUBSCRIPTION_ID` | Your Azure subscription ID |
-   | `AZURE_RESOURCE_GROUP` | Resource group for the Cosmos DB account |
-   | `AZURE_COSMOSDB_ACCOUNT_NAME` | Cosmos DB account name |
-   | `AZURE_LOCATION` | Azure region for the database and containers |
-
-   Leave both `AZURE_COSMOSDB_CONTAINER_NAME` and `VECTOR_ALGORITHM` empty to run both containers. If you set both, they must match:
-
-   - `diskann` → `hotels_diskann_go`
-   - `quantizedflat` → `hotels_quantizedflat_go`
-
-4. Download dependencies:
+3. Download dependencies:
 
    ```powershell
    go mod download
    ```
 
-## Run
+## Load environment variables and run the sample
 
-**Load environment variables from `.env`:**
+**⚠️ Important:** Go does NOT automatically load `.env` files. Environment variables MUST be exported in your current session BEFORE running the sample.
+
+**Load environment variables from `.env` into your session:**
+
+| Action | PowerShell | Bash |
+|--------|-----------|------|
+| Load from `.env` file | `Get-Content .env \| ForEach-Object { if ($_ -match "^([^=]+)=(.*)$") { [Environment]::SetEnvironmentVariable($matches[1], $matches[2]) } }` | `export $(grep -v "^#" .env \| xargs)` |
+| Set single variable | `[Environment]::SetEnvironmentVariable("AZURE_COSMOSDB_ENDPOINT", "https://your-account.documents.azure.com:443/")` | `export AZURE_COSMOSDB_ENDPOINT="https://your-account.documents.azure.com:443/"` |
+
+**Required environment variables:**
+- `AZURE_COSMOSDB_ENDPOINT` — Cosmos DB endpoint URL
+- `AZURE_COSMOSDB_CREATE_INDEX_DATABASENAME` — Database name (e.g., "HotelsCreateIndex")
+- `AZURE_SUBSCRIPTION_ID` — Your Azure subscription ID
+- `AZURE_RESOURCE_GROUP` — Your Azure resource group name
+- `AZURE_COSMOSDB_ACCOUNT_NAME` — Your Cosmos DB account name
+- `AZURE_OPENAI_EMBEDDING_ENDPOINT` — Azure OpenAI endpoint URL
+- `AZURE_OPENAI_EMBEDDING_DEPLOYMENT` — Deployment name (e.g., "text-embedding-3-small")
+
+**Optional environment variables:**
+- `VECTOR_ALGORITHM` — "diskann" or "quantizedflat"; leave empty to run **both** containers
+- `AZURE_COSMOSDB_CONTAINER_NAME` — Target container by name; leave empty to process all
+- `AZURE_COSMOSDB_CREATE_INDEX_DISKANN_CONTAINER_NAME` — Custom diskANN container name (default: "hotels_diskann")
+- `AZURE_COSMOSDB_CREATE_INDEX_QUANTIZEDFLAT_CONTAINER_NAME` — Custom quantizedFlat container name (default: "hotels_quantizedflat")
+
+**Run the sample:**
 
 ```bash
 # Bash/Linux/Mac
@@ -96,7 +98,7 @@ export $(grep -v '^#' .env | xargs) && go run .
 
 ```powershell
 # PowerShell
-Get-Content .env | Where-Object { $_ -match '^[^#].*=' } | ForEach-Object { $k,$v = $_ -split '=',2; [Environment]::SetEnvironmentVariable($k.Trim(), $v.Trim()) }; go run .
+Get-Content .env | ForEach-Object { if ($_ -match "^([^=]+)=(.*)$") { [Environment]::SetEnvironmentVariable($matches[1], $matches[2]) } }; go run .
 ```
 
 The sample creates the database and containers, loads the shared dataset, writes documents to both containers, queries both vector indexes with the same embedding, and deletes both containers during cleanup.
@@ -112,12 +114,7 @@ go build -o create-index-go .
 Then run the binary:
 
 ```bash
-# Bash/Linux/Mac
-export $(grep -v '^#' .env | xargs) && ./create-index-go
-```
-
-```powershell
-# PowerShell (load env then run)
+# Bash/Linux/Mac (load env then run)
 Get-Content .env | Where-Object { $_ -match '^[^#].*=' } | ForEach-Object { $k,$v = $_ -split '=',2; [Environment]::SetEnvironmentVariable($k.Trim(), $v.Trim()) }; .\create-index-go.exe
 ```
 

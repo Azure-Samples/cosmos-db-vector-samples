@@ -412,7 +412,7 @@ func DeleteContainers(ctx context.Context, credential azcore.TokenCredential, cf
 		return fmt.Errorf("failed to create SQL resources client: %w", err)
 	}
 
-	for _, containerName := range []string{"hotels_diskann_go", "hotels_quantizedflat_go"} {
+	for _, containerName := range []string{cfg.DiskANNContainerName, cfg.QuantizedFlatContainerName} {
 		// Delete container via ARM SDK
 		poller, err := sqlResourcesClient.BeginDeleteSQLContainer(ctx, cfg.ResourceGroup, cfg.AccountName, cfg.DatabaseName, containerName, nil)
 		if err != nil {

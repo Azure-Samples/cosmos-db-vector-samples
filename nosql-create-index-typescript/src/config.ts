@@ -9,6 +9,8 @@ export interface SampleConfig {
     endpoint?: string;
     databaseName: string;
     containerName: string;
+    diskannContainerName: string;
+    quantizedflatContainerName: string;
   };
   openai: {
     endpoint?: string;
@@ -35,7 +37,9 @@ export function loadConfigFromEnv(
       accountName: env.AZURE_COSMOSDB_ACCOUNT_NAME,
       endpoint: env.AZURE_COSMOSDB_ENDPOINT,
       databaseName: env.AZURE_COSMOSDB_CREATE_INDEX_DATABASENAME || "HotelsCreateIndex",
-      containerName: env.AZURE_COSMOSDB_CONTAINER_NAME || "hotels_diskann_ts",
+      containerName: env.AZURE_COSMOSDB_CONTAINER_NAME || "hotels_diskann",
+      diskannContainerName: env.AZURE_COSMOSDB_CREATE_INDEX_DISKANN_CONTAINER_NAME || "hotels_diskann",
+      quantizedflatContainerName: env.AZURE_COSMOSDB_CREATE_INDEX_QUANTIZEDFLAT_CONTAINER_NAME || "hotels_quantizedflat",
     },
     openai: {
       endpoint: env.AZURE_OPENAI_ENDPOINT,

@@ -9,6 +9,8 @@ public sealed record SampleConfig(
     string AccountName,
     string CosmosEndpoint,
     string DatabaseName,
+    string DiskANNContainerName,
+    string QuantizedFlatContainerName,
     string? ContainerName,
     string OpenAIEmbeddingEndpoint,
     string OpenAIEmbeddingDeployment,
@@ -21,11 +23,11 @@ public sealed record SampleConfig(
     int ExpectedDimensions,
     int TopCount)
 {
-    public static readonly IReadOnlyDictionary<string, string> KnownContainers =
+    public IReadOnlyDictionary<string, string> KnownContainers =>
         new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
-            ["diskann"] = "hotels_diskann_dotnet",
-            ["quantizedflat"] = "hotels_quantizedflat_dotnet"
+            ["diskann"] = DiskANNContainerName,
+            ["quantizedflat"] = QuantizedFlatContainerName
         };
 }
 
@@ -37,6 +39,8 @@ public static class Config
     private const string DefaultEmbeddingFieldName = "embedding";
     private const string DefaultPartitionKeyValue = "Northeast";
     private const string DefaultOpenAIEmbeddingApiVersion = "2024-08-01-preview";
+    private const string DefaultDiskANNContainerName = "hotels_diskann";
+    private const string DefaultQuantizedFlatContainerName = "hotels_quantizedflat";
 
     public static SampleConfig Load()
     {
@@ -65,6 +69,8 @@ public static class Config
             AccountName: GetValue("AZURE_COSMOSDB_ACCOUNT_NAME", "CosmosDbSettings:AccountName") ?? string.Empty,
             CosmosEndpoint: GetValue("AZURE_COSMOSDB_ENDPOINT", "CosmosDbSettings:Endpoint") ?? string.Empty,
             DatabaseName: GetValue("AZURE_COSMOSDB_CREATE_INDEX_DATABASENAME", "CosmosDbSettings:DatabaseName") ?? "HotelsCreateIndex",
+            DiskANNContainerName: GetValue("AZURE_COSMOSDB_CREATE_INDEX_DISKANN_CONTAINER_NAME") ?? DefaultDiskANNContainerName,
+            QuantizedFlatContainerName: GetValue("AZURE_COSMOSDB_CREATE_INDEX_QUANTIZEDFLAT_CONTAINER_NAME") ?? DefaultQuantizedFlatContainerName,
             ContainerName: GetValue("AZURE_COSMOSDB_CONTAINER_NAME", "CosmosDbSettings:ContainerName"),
             OpenAIEmbeddingEndpoint: GetValue("AZURE_OPENAI_EMBEDDING_ENDPOINT", "OpenAiSettings:Endpoint")
                                     ?? GetValue("AZURE_OPENAI_ENDPOINT")
@@ -95,19 +101,19 @@ public static class Config
                 "Set values in appsettings.json or as environment variables.");
         }
 
-        if (config.VectorAlgorithm is not null && !SampleConfig.KnownContainers.ContainsKey(config.VectorAlgorithm))
+        if (config.VectorAlgorithm is not null && !config.KnownContainers.ContainsKey(config.VectorAlgorithm))
         {
             throw new InvalidOperationException("VECTOR_ALGORITHM must be one of: diskann, quantizedflat.");
         }
 
-        if (config.ContainerName is not null && !SampleConfig.KnownContainers.Values.Contains(config.ContainerName, StringComparer.OrdinalIgnoreCase))
+        if (config.ContainerName is not null && !config.KnownContainers.Values.Contains(config.ContainerName, StringComparer.OrdinalIgnoreCase))
         {
-            throw new InvalidOperationException("AZURE_COSMOSDB_CONTAINER_NAME must be one of: hotels_diskann_dotnet, hotels_quantizedflat_dotnet.");
+            throw new InvalidOperationException($"AZURE_COSMOSDB_CONTAINER_NAME must be one of: {string.Join(", ", config.KnownContainers.Values)}.");
         }
 
         if (config.ContainerName is not null && config.VectorAlgorithm is not null)
         {
-            var expectedContainer = SampleConfig.KnownContainers[config.VectorAlgorithm];
+            var expectedContainer = config.KnownContainers[config.VectorAlgorithm];
             if (!string.Equals(config.ContainerName, expectedContainer, StringComparison.OrdinalIgnoreCase))
             {
                 throw new InvalidOperationException("AZURE_COSMOSDB_CONTAINER_NAME and VECTOR_ALGORITHM refer to different containers.");
@@ -134,18 +140,18 @@ public static class Config
 
         if (!string.IsNullOrWhiteSpace(config.VectorAlgorithm))
         {
-            return new[] { SampleConfig.KnownContainers[config.VectorAlgorithm] };
+            return new[] { config.KnownContainers[config.VectorAlgorithm] };
         }
 
-        return SampleConfig.KnownContainers.Values.ToArray();
+        return config.KnownContainers.Values.ToArray();
     }
 
     public static string AlgorithmLabel(string containerName)
     {
         return containerName switch
         {
-            "hotels_diskann_dotnet" => "DiskANN",
-            "hotels_quantizedflat_dotnet" => "QuantizedFlat",
+            _ when containerName.Contains("diskann") => "DiskANN",
+            _ when containerName.Contains("quantizedflat") => "QuantizedFlat",
             _ => containerName
         };
     }

@@ -10,8 +10,8 @@ import (
 )
 
 const (
-	diskANNContainer                = "hotels_diskann_go"
-	quantizedFlatContainer          = "hotels_quantizedflat_go"
+	defaultDiskANNContainer         = "hotels_diskann"
+	defaultQuantizedFlatContainer   = "hotels_quantizedflat"
 	embeddingFieldName              = "embedding"
 	embeddingDimensions             = 1536
 	partitionKeyFieldName           = "Region"
@@ -19,6 +19,11 @@ const (
 	defaultQueryText                = "hotel near the ocean"
 	azureOpenAIEmbeddingsAPIVersion = "2024-02-01"
 	defaultEmbeddingFieldName       = "embedding" // fallback; read from AZURE_COSMOSDB_CREATE_INDEX_EMBEDDED_FIELD if available
+)
+
+var (
+	diskANNContainer      = defaultDiskANNContainer
+	quantizedFlatContainer = defaultQuantizedFlatContainer
 )
 
 var algorithmToContainer = map[string]string{
@@ -39,24 +44,26 @@ func trimEnvValue(s string) string {
 }
 
 type Config struct {
-	CosmosEndpoint            string
-	DatabaseName              string
-	PrimaryContainerName      string
-	ContainerNames            []string
-	OpenAIEmbeddingEndpoint   string
-	OpenAIEmbeddingDeployment string
-	VectorAlgorithm           string
-	DataFileWithVectors       string
-	EmbeddingFieldName        string
-	EmbeddingDimensions       int
-	PartitionKeyFieldName     string
-	PartitionKeyFieldValue    string
-	QueryText                 string
-	OpenAIAPIVersion          string
-	SubscriptionID            string
-	ResourceGroup             string
-	AccountName               string
-	Location                  string
+	CosmosEndpoint                string
+	DatabaseName                  string
+	DiskANNContainerName          string
+	QuantizedFlatContainerName    string
+	PrimaryContainerName          string
+	ContainerNames                []string
+	OpenAIEmbeddingEndpoint       string
+	OpenAIEmbeddingDeployment     string
+	VectorAlgorithm               string
+	DataFileWithVectors           string
+	EmbeddingFieldName            string
+	EmbeddingDimensions           int
+	PartitionKeyFieldName         string
+	PartitionKeyFieldValue        string
+	QueryText                     string
+	OpenAIAPIVersion              string
+	SubscriptionID                string
+	ResourceGroup                 string
+	AccountName                   string
+	Location                      string
 }
 
 func LoadConfig() (*Config, error) {
@@ -66,6 +73,16 @@ func LoadConfig() (*Config, error) {
 }
 
 func LoadConfigFromEnv(getenv func(string) string) (*Config, error) {
+	// Read container names from env vars or use defaults
+	diskANNContainer = trimEnvValue(getenv("AZURE_COSMOSDB_CREATE_INDEX_DISKANN_CONTAINER_NAME"))
+	if diskANNContainer == "" {
+		diskANNContainer = defaultDiskANNContainer
+	}
+	quantizedFlatContainer = trimEnvValue(getenv("AZURE_COSMOSDB_CREATE_INDEX_QUANTIZEDFLAT_CONTAINER_NAME"))
+	if quantizedFlatContainer == "" {
+		quantizedFlatContainer = defaultQuantizedFlatContainer
+	}
+
 	algorithm := strings.ToLower(trimEnvValue(getenv("VECTOR_ALGORITHM")))
 	containerName := trimEnvValue(getenv("AZURE_COSMOSDB_CONTAINER_NAME"))
 	dataFile := trimEnvValue(getenv("DATA_FILE_WITH_VECTORS_AND_REGIONS"))
@@ -84,6 +101,8 @@ func LoadConfigFromEnv(getenv func(string) string) (*Config, error) {
 	cfg := &Config{
 		CosmosEndpoint:            trimEnvValue(getenv("AZURE_COSMOSDB_ENDPOINT")),
 		DatabaseName:              trimEnvValue(getenv("AZURE_COSMOSDB_CREATE_INDEX_DATABASENAME")),
+		DiskANNContainerName:      diskANNContainer,
+		QuantizedFlatContainerName: quantizedFlatContainer,
 		PrimaryContainerName:      containerName,
 		OpenAIEmbeddingEndpoint:   trimEnvValue(getenv("AZURE_OPENAI_EMBEDDING_ENDPOINT")),
 		OpenAIEmbeddingDeployment: trimEnvValue(getenv("AZURE_OPENAI_EMBEDDING_DEPLOYMENT")),
