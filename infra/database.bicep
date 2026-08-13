@@ -106,7 +106,8 @@ module cosmosDbAccount './cosmos-db/nosql/account.bicep' = {
   }
 }
 
-module cosmosDbDatabase './cosmos-db/nosql/database.bicep' = {
+// Vector-search database (only if createIndexDatabaseName is NOT provided)
+module cosmosDbDatabase './cosmos-db/nosql/database.bicep' = if (empty(createIndexDatabaseName)) {
   name: 'cosmos-db-database'
   params: {
     name: database.name
@@ -116,14 +117,14 @@ module cosmosDbDatabase './cosmos-db/nosql/database.bicep' = {
   }
 }
 
-// Vector-search containers (always created)
+// Vector-search containers (only if createIndexDatabaseName is NOT provided)
 module vectorSearchContainers './cosmos-db/nosql/container.bicep' = [
-  for (container, index) in vectorSearchContainerDefinitions: {
+  for (container, index) in vectorSearchContainerDefinitions: if (empty(createIndexDatabaseName)) {
     name: 'cosmos-db-vector-search-container-${index}'
     params: {
       name: container.name
       parentAccountName: cosmosDbAccount.outputs.name
-      parentDatabaseName: cosmosDbDatabase.outputs.name
+      parentDatabaseName: cosmosDbDatabase!.outputs.name
       tags: tags
       setThroughput: false
       partitionKeyPaths: container.partitionKeyPaths
@@ -228,18 +229,22 @@ module nosqlManagedIdentityAssignment './cosmos-db/nosql/role/assignment.bicep' 
 output endpoint string = cosmosDbAccount.outputs.endpoint
 output accountName string = cosmosDbAccount.outputs.name
 
-output database object = {
-  name: cosmosDbDatabase.outputs.name
-}
+output database object = !empty(createIndexDatabaseName)
+  ? {}
+  : {
+      name: cosmosDbDatabase!.outputs.name
+    }
 
-output containers array = [
-  {
-    name: vectorSearchContainers[0].outputs.name
-  }
-  {
-    name: vectorSearchContainers[1].outputs.name
-  }
-]
+output containers array = !empty(createIndexDatabaseName)
+  ? []
+  : [
+      {
+        name: vectorSearchContainers[0].outputs.name
+      }
+      {
+        name: vectorSearchContainers[1].outputs.name
+      }
+    ]
 
 output createIndexDatabase object = !empty(createIndexDatabaseName)
   ? {
