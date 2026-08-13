@@ -145,52 +145,6 @@ module createIndexDatabase './cosmos-db/nosql/database.bicep' = if (!empty(creat
   }
 }
 
-module createIndexContainers './cosmos-db/nosql/container.bicep' = [
-  for i in range(0, !empty(createIndexDatabaseName) ? 2 : 0): {
-    name: 'cosmos-db-create-index-container-${i}'
-    params: {
-      name: i == 0 ? 'hotels_diskann' : 'hotels_quantizedflat'
-      parentAccountName: cosmosDbAccount.outputs.name
-      parentDatabaseName: createIndexDatabase!.outputs.name
-      tags: tags
-      setThroughput: false
-      partitionKeyPaths: [
-        '/PartitionKey'
-      ]
-      indexingPolicy: {
-        indexingMode: 'consistent'
-        automatic: true
-        includedPaths: [
-          {
-            path: '/*'
-          }
-        ]
-        excludedPaths: [
-          {
-            path: '/_etag/?'
-          }
-        ]
-        vectorIndexes: [
-          {
-            path: '/DescriptionVector'
-            type: i == 0 ? 'diskANN' : 'quantizedFlat'
-          }
-        ]
-      }
-      vectorEmbeddingPolicy: {
-        vectorEmbeddings: [
-          {
-            path: '/DescriptionVector'
-            dataType: 'float32'
-            dimensions: 1536
-            distanceFunction: 'cosine'
-          }
-        ]
-      }
-    }
-  }
-]
-
 // Access to data plane only
 // no access to control plane (e.g. creating databases, containers, etc.)
 module nosqlDefinition './cosmos-db/nosql/role/definition.bicep' = {
@@ -251,17 +205,6 @@ output createIndexDatabase object = !empty(createIndexDatabaseName)
       name: createIndexDatabase!.outputs.name
     }
   : {}
-
-output createIndexContainers array = !empty(createIndexDatabaseName)
-  ? [
-      {
-        name: createIndexContainers[0].outputs.name
-      }
-      {
-        name: createIndexContainers[1].outputs.name
-      }
-    ]
-  : []
 
 output embeddedFieldNameForVectorSearch string = 'DescriptionVector'
 output embeddedFieldNameForCreateIndex string = 'embedding'
