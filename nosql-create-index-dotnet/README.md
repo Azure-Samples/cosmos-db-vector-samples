@@ -71,7 +71,8 @@ DiskANN is graph-based. QuantizedFlat uses vector quantization techniques.
        "PartitionKeyValue": "Northeast",
        "SubscriptionId": "<your-subscription-id>",
        "ResourceGroup": "<your-resource-group>",
-       "AccountName": "<your-account-name>"
+       "AccountName": "<your-account-name>",
+       "Location": "<azure-region>"
      },
      "OpenAiSettings": {
        "Endpoint": "https://<your-openai>.openai.azure.com/",
@@ -83,6 +84,12 @@ DiskANN is graph-based. QuantizedFlat uses vector quantization techniques.
      "DataFilePath": "./data/HotelsData_toCosmosDB_Vector_byRegion.json"
    }
    ```
+
+   **⚠️ Control Plane Requirement:** This sample uses the Azure Resource Manager (ARM) SDK to create and delete containers at runtime. The following `appsettings.json` fields are required for ARM SDK control plane operations and have NO defaults:
+   - `CosmosDbSettings:SubscriptionId` — Your Azure subscription ID
+   - `CosmosDbSettings:ResourceGroup` — Your Azure resource group name
+   - `CosmosDbSettings:AccountName` — Your Cosmos DB account name
+   - `CosmosDbSettings:Location` — Azure region where resources are deployed
 
 3. Environment variable overrides (optional).
 

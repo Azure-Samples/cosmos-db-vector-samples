@@ -66,14 +66,19 @@ The sample:
 
 4. Verify your configuration.
 
-   These environment variables are required:
+   These environment variables are **required for control plane operations** (creating and deleting containers with ARM SDK):
+   - `AZURE_SUBSCRIPTION_ID` — Your Azure subscription ID (required for ARM SDK)
+   - `AZURE_RESOURCE_GROUP` — Your Azure resource group name (required for ARM SDK)
+   - `AZURE_COSMOSDB_ACCOUNT_NAME` — Your Cosmos DB account name (required for ARM SDK)
+   - `AZURE_LOCATION` — Azure region where resources are deployed (required for ARM SDK)
+
+   These environment variables are **required for data plane operations** (querying and inserting data):
    - `AZURE_COSMOSDB_ENDPOINT` — Cosmos DB endpoint URL
    - `AZURE_COSMOSDB_CREATE_INDEX_DATABASENAME` — Database name (e.g., "HotelsCreateIndex")
-   - `AZURE_SUBSCRIPTION_ID` — Your Azure subscription ID
-   - `AZURE_RESOURCE_GROUP` — Your Azure resource group name
-   - `AZURE_COSMOSDB_ACCOUNT_NAME` — Your Cosmos DB account name
    - `AZURE_OPENAI_EMBEDDING_ENDPOINT` — Azure OpenAI endpoint URL
    - `AZURE_OPENAI_EMBEDDING_DEPLOYMENT` — Deployment name (e.g., "text-embedding-3-small")
+
+   ⚠️ **Control Plane Requirement:** The sample uses Azure SDK ARM APIs to create and delete containers at runtime. All ARM SDK environment variables above (subscription ID, resource group, account name, location) MUST be set before running the sample. No defaults are provided for these values.
 
    Optional environment variables:
    - `VECTOR_ALGORITHM` — "diskann" or "quantizedflat"; leave empty to run **both** containers

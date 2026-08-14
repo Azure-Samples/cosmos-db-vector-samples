@@ -109,14 +109,19 @@ After completion, the script writes a `.env` file with all values the TypeScript
 | Load from `.env` file | `Get-Content .env \| ForEach-Object { if ($_ -match "^([^=]+)=(.*)$") { [Environment]::SetEnvironmentVariable($matches[1], $matches[2]) } }` | `export $(grep -v "^#" .env \| xargs)` |
 | Set single variable | `[Environment]::SetEnvironmentVariable("AZURE_COSMOSDB_ENDPOINT", "https://your-account.documents.azure.com:443/")` | `export AZURE_COSMOSDB_ENDPOINT="https://your-account.documents.azure.com:443/"` |
 
-**Required environment variables:**
-- `AZURE_COSMOSDB_ENDPOINT` — Cosmos DB endpoint URL
-- `AZURE_COSMOSDB_DATABASENAME` — Database name (e.g., "HotelsCreateIndex")
+**Required environment variables for control plane operations** (creating and deleting containers with ARM SDK):
 - `AZURE_SUBSCRIPTION_ID` — Your Azure subscription ID
 - `AZURE_RESOURCE_GROUP` — Your Azure resource group name
 - `AZURE_COSMOSDB_ACCOUNT_NAME` — Your Cosmos DB account name
+- `AZURE_LOCATION` — Azure region where resources are deployed
+
+**Required environment variables for data plane operations** (querying and inserting data):
+- `AZURE_COSMOSDB_ENDPOINT` — Cosmos DB endpoint URL
+- `AZURE_COSMOSDB_DATABASENAME` — Database name (e.g., "HotelsCreateIndex")
 - `AZURE_OPENAI_ENDPOINT` — Azure OpenAI endpoint URL
 - `AZURE_OPENAI_EMBEDDING_DEPLOYMENT` — Deployment name (e.g., "text-embedding-3-small")
+
+**⚠️ Control Plane Requirement:** This sample uses the Azure Resource Manager (ARM) SDK to create and delete containers at runtime. All ARM SDK environment variables above (subscription ID, resource group, account name, location) MUST be set before running the sample. No defaults are provided for these values.
 
 **Optional environment variables:**
 - `VECTOR_ALGORITHM` — "diskann" or "quantizedflat"; leave empty to run **both** containers
