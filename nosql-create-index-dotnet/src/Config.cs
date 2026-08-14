@@ -7,6 +7,7 @@ public sealed record SampleConfig(
     string SubscriptionId,
     string ResourceGroup,
     string AccountName,
+    string Location,
     string CosmosEndpoint,
     string DatabaseName,
     string DiskANNContainerName,
@@ -67,6 +68,7 @@ public static class Config
             SubscriptionId: GetValue("AZURE_SUBSCRIPTION_ID", "CosmosDbSettings:SubscriptionId") ?? string.Empty,
             ResourceGroup: GetValue("AZURE_RESOURCE_GROUP", "CosmosDbSettings:ResourceGroup") ?? string.Empty,
             AccountName: GetValue("AZURE_COSMOSDB_ACCOUNT_NAME", "CosmosDbSettings:AccountName") ?? string.Empty,
+            Location: GetValue("AZURE_LOCATION", "CosmosDbSettings:Location") ?? string.Empty,
             CosmosEndpoint: GetValue("AZURE_COSMOSDB_ENDPOINT", "CosmosDbSettings:Endpoint") ?? string.Empty,
             DatabaseName: GetValue("AZURE_COSMOSDB_CREATE_INDEX_DATABASENAME", "CosmosDbSettings:DatabaseName") ?? "HotelsCreateIndex",
             DiskANNContainerName: GetValue("AZURE_COSMOSDB_CREATE_INDEX_DISKANN_CONTAINER_NAME") ?? DefaultDiskANNContainerName,
@@ -93,11 +95,16 @@ public static class Config
         if (string.IsNullOrWhiteSpace(config.DatabaseName)) missing.Add("AZURE_COSMOSDB_CREATE_INDEX_DATABASENAME");
         if (string.IsNullOrWhiteSpace(config.OpenAIEmbeddingEndpoint)) missing.Add("AZURE_OPENAI_EMBEDDING_ENDPOINT");
         if (string.IsNullOrWhiteSpace(config.OpenAIEmbeddingDeployment)) missing.Add("AZURE_OPENAI_EMBEDDING_DEPLOYMENT");
+        // ARM SDK variables required for control plane operations
+        if (string.IsNullOrWhiteSpace(config.SubscriptionId)) missing.Add("AZURE_SUBSCRIPTION_ID");
+        if (string.IsNullOrWhiteSpace(config.ResourceGroup)) missing.Add("AZURE_RESOURCE_GROUP");
+        if (string.IsNullOrWhiteSpace(config.AccountName)) missing.Add("AZURE_COSMOSDB_ACCOUNT_NAME");
+        if (string.IsNullOrWhiteSpace(config.Location)) missing.Add("AZURE_LOCATION");
 
         if (missing.Count > 0)
         {
             throw new InvalidOperationException(
-                $"Missing required configuration: {string.Join(", ", missing)}. " +
+                $"Missing required environment variables for control plane operations: {string.Join(", ", missing)}. " +
                 "Set values in appsettings.json or as environment variables.");
         }
 

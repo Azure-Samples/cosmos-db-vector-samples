@@ -130,10 +130,12 @@ def load_config(env: Optional[Mapping[str, str]] = None) -> SampleConfig:
 
 
 def validate_config(config: SampleConfig) -> None:
-    missing = [name for name in REQUIRED_ENV_VARS if not getattr(config, _env_to_field(name))]
+    # Validate all required variables, including ARM SDK variables needed for control plane operations
+    all_required = REQUIRED_ENV_VARS + CONTROL_PLANE_ENV_VARS
+    missing = [name for name in all_required if not getattr(config, _env_to_field(name))]
     if missing:
         raise ConfigError(
-            "Missing required environment variables: {0}".format(", ".join(missing))
+            "Missing required environment variables for control plane operations: {0}".format(", ".join(missing))
         )
 
     if config.vector_algorithm and config.vector_algorithm not in KNOWN_CONTAINERS:
