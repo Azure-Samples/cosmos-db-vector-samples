@@ -41,9 +41,14 @@ REQUIRED_ENV_VARS = [
 
 ## II. Control Plane (ARM SDK) Variable Requirements
 
-### 2.1 ARM SDK Variables Are Mandatory
+### 2.1 ARM SDK Variables Are Mandatory — Managed Identity Is the Default
 
 **Rule:** Control plane operations require the Azure Resource Manager SDK and the following 4 environment variables. These variables MUST be validated before any control plane operations are attempted.
+
+**Authentication Model:** 
+- **Default & Production Scenario:** Managed identity (enabled by infrastructure/deployment platform)
+- **Local Development:** Azure CLI cached credentials or explicit service principal environment variables
+- **All samples must support managed identity** as the primary authentication path, enforced by the hosting infrastructure
 
 **Mandatory ARM SDK Variables:**
 - `AZURE_SUBSCRIPTION_ID` — Azure subscription ID (e.g., `12345678-1234-1234-1234-123456789abc`)
@@ -53,11 +58,12 @@ REQUIRED_ENV_VARS = [
 
 **Rationale:** The ARM SDK uses these variables to:
 1. Construct the Cosmos DB account resource URI in Azure Resource Manager
-2. Authenticate requests using managed identity (in production environments)
-3. Create, delete, and update containers and indexes using the control plane API
-4. Provide clear diagnostics if managed identity credentials are missing
+2. Authenticate requests using managed identity (default in Azure—AKS, App Service, Functions, VMs with managed identities)
+3. Fall back to local development credentials (Azure CLI, service principal env vars) when managed identity is not available
+4. Create, delete, and update containers and indexes using the control plane API
+5. Provide clear diagnostics if authentication credentials or required variables are missing
 
-Missing any one of these variables prevents control plane operations and should cause immediate, clear validation failure.
+Missing any one of these variables prevents control plane operations and should cause immediate, clear validation failure. Managed identity is the assumed default; samples do NOT require explicit credential configuration when running in Azure infrastructure.
 
 ### 2.2 Validation Model: Go Reference Implementation
 
@@ -106,13 +112,14 @@ var required = []string{
 
 ## III. Documentation Requirements
 
-### 3.1 README Must Document Control Plane Requirements
+### 3.1 README Must Document Control Plane Requirements and Managed Identity
 
 **Rule:** Every CREATE-INDEX sample's README MUST include a clearly labeled "⚠️ **Control Plane Requirement**" section that:
 1. Explains that the sample uses ARM SDK for control plane operations
 2. Lists all 4 mandatory ARM SDK variables (`AZURE_SUBSCRIPTION_ID`, `AZURE_RESOURCE_GROUP`, `AZURE_COSMOSDB_ACCOUNT_NAME`, `AZURE_LOCATION`)
-3. Explains that managed identity (when running in Azure) or credentials must be provided for ARM SDK to authenticate
-4. Shows the language-specific configuration pattern (how to set these variables for that language)
+3. Clearly states that **managed identity is the default authentication method** when running in Azure infrastructure (AKS, App Service, Functions, VMs with managed identities)
+4. Explains authentication fallback for local development (Azure CLI, service principal credentials)
+5. Shows the language-specific configuration pattern (how to set these variables for that language)
 
 **Example README Section:**
 
@@ -128,9 +135,9 @@ This sample uses the Azure Resource Manager (ARM) SDK to create containers and i
 
 Without these variables, control plane operations will fail immediately with a clear error listing which variables are missing.
 
-**In Azure (production):** Managed identity will automatically authenticate using these variables.
+**In Azure (production):** Managed identity will automatically authenticate using these variables — no credential configuration required.
 
-**Locally (development):** Set these in your `.env` file (or language-specific config file).
+**Locally (development):** Set these in your `.env` file (or language-specific config file). You'll also need Azure CLI logged in (`az login`) or service principal credentials.
 ```
 
 ### 3.2 README Must Document Data Plane vs Control Plane
