@@ -12,7 +12,7 @@ For each selected sample this script:
   2. Verifies the required data file exists in the sample's ./data/ directory.
   3. Builds the sample.
   4. Runs the sample program, tee-ing combined stdout+stderr to both the
-     console and  <sample>/output/run-<language>-<yyyyMMdd-HHmmss>.txt.
+    console and <sample>/output/create-index-run-<yyyyMMdd-HHmmss>/run-<language>.txt.
   5. Prints a per-language summary table (built, ran, exit code, output path).
 
 Exits non-zero if any selected sample fails to build or run.
@@ -127,7 +127,7 @@ $Results = [System.Collections.Generic.List[PSCustomObject]]::new()
 if ($Language -in @('All', 'Python')) {
     Write-Header 'Python'
     $dir     = Join-Path $RepoRoot 'nosql-create-index-python'
-    $outFile = Join-Path $dir "output\run-python-$Timestamp.txt"
+    $outFile = Join-Path $dir "output\create-index-run-$Timestamp\run-python.txt"
 
     if (-not (Test-Path $dir)) {
         Write-Warning "Sample directory not found: $dir"
@@ -182,7 +182,7 @@ if ($Language -in @('All', 'Python')) {
 if ($Language -in @('All', 'TypeScript')) {
     Write-Header 'TypeScript'
     $dir     = Join-Path $RepoRoot 'nosql-create-index-typescript'
-    $outFile = Join-Path $dir "output\run-typescript-$Timestamp.txt"
+    $outFile = Join-Path $dir "output\create-index-run-$Timestamp\run-typescript.txt"
 
     if (-not (Test-Path $dir)) {
         Write-Warning "Sample directory not found: $dir"
@@ -234,7 +234,7 @@ if ($Language -in @('All', 'TypeScript')) {
 if ($Language -in @('All', 'DotNet')) {
     Write-Header '.NET'
     $dir     = Join-Path $RepoRoot 'nosql-create-index-dotnet'
-    $outFile = Join-Path $dir "output\run-dotnet-$Timestamp.txt"
+    $outFile = Join-Path $dir "output\create-index-run-$Timestamp\run-dotnet.txt"
     $csproj  = 'nosql-create-index-dotnet.csproj'
 
     if (-not (Test-Path $dir)) {
@@ -287,7 +287,7 @@ if ($Language -in @('All', 'DotNet')) {
 if ($Language -in @('All', 'Go')) {
     Write-Header 'Go'
     $dir     = Join-Path $RepoRoot 'nosql-create-index-go'
-    $outFile = Join-Path $dir "output\run-go-$Timestamp.txt"
+    $outFile = Join-Path $dir "output\create-index-run-$Timestamp\run-go.txt"
     $binary  = 'create-index-go.exe'
 
     if (-not (Test-Path $dir)) {
@@ -340,7 +340,7 @@ if ($Language -in @('All', 'Go')) {
 if ($Language -in @('All', 'Java')) {
     Write-Header 'Java'
     $dir     = Join-Path $RepoRoot 'nosql-create-index-java'
-    $outFile = Join-Path $dir "output\run-java-$Timestamp.txt"
+    $outFile = Join-Path $dir "output\create-index-run-$Timestamp\run-java.txt"
 
     if (-not (Test-Path $dir)) {
         Write-Warning "Sample directory not found: $dir"
@@ -396,9 +396,10 @@ foreach ($r in $Results) {
     if ($r.Skipped) {
         $builtS = 'SKIP'
         $ranS   = 'SKIP'
-        $exitS  = 'SKIP'
-        $fileS  = "(skipped: $($r.SkipReason))"
-        $color  = 'Yellow'
+        $exitS  = 'FAIL'
+        $fileS  = "(FAILED: skipped because $($r.SkipReason))"
+        $color  = 'Red'
+        $anyFailed = $true
     }
     else {
         $builtS = if ($r.Built) { 'yes' } else { 'FAIL' }

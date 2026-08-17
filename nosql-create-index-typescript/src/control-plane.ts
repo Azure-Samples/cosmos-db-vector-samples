@@ -13,6 +13,7 @@
 import { CosmosDBManagementClient } from "@azure/arm-cosmosdb";
 import type { TokenCredential } from "@azure/identity";
 import type { SampleConfig } from "./config.js";
+import { validateContainerDeletionTargets } from "./config.js";
 
 /** Create an ARM management client for Cosmos DB. */
 export function createArmClient(
@@ -57,9 +58,10 @@ export async function createContainer(
   armClient: CosmosDBManagementClient,
   config: SampleConfig
 ) {
+  validateContainerDeletionTargets(config);
   const indexTypes = [
-    { type: "diskANN", containerName: "hotels_diskann_ts" },
-    { type: "quantizedFlat", containerName: "hotels_quantizedflat_ts" },
+    { type: "diskANN", containerName: config.cosmos.diskannContainerName },
+    { type: "quantizedFlat", containerName: config.cosmos.quantizedflatContainerName },
   ];
 
   const embeddingPath = `/${config.embeddingField}`;
@@ -130,7 +132,11 @@ export async function cleanupSampleContainers(
   armClient: CosmosDBManagementClient,
   config: SampleConfig
 ) {
-  const containerNames = ["hotels_diskann_ts", "hotels_quantizedflat_ts"];
+  validateContainerDeletionTargets(config);
+  const containerNames = [
+    config.cosmos.diskannContainerName,
+    config.cosmos.quantizedflatContainerName,
+  ];
 
   console.log("\n=== Cleanup: Remove Sample Containers ===");
   for (const containerName of containerNames) {
@@ -156,4 +162,3 @@ export async function cleanupSampleContainers(
 // Exports for testing
 // ---------------------------------------------------------------------------
 export { CosmosDBManagementClient } from "@azure/arm-cosmosdb";
-

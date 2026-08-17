@@ -54,7 +54,7 @@ try
         foreach (var distanceFunction in distanceFunctions)
         {
             var summary = await DataPlane.QueryTopMatchesAsync(container, containerName, config, queryEmbedding, distanceFunction, cancellationToken);
-            var label = Config.AlgorithmLabel(containerName);
+            var label = Config.AlgorithmLabel(containerName, config);
             Console.WriteLine($"  ✓ {containerName} queried ({summary.RequestCharge:F2} RUs)");
             allResults.Add((label, distanceFunction, summary));
         }

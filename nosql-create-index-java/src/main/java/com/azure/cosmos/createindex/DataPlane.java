@@ -218,9 +218,9 @@ public final class DataPlane {
         return new QuerySummary(containerName, requestCharge, results);
     }
 
-    public static void printQuerySummary(QuerySummary summary) {
+    public static void printQuerySummary(QuerySummary summary, SampleConfig config) {
         System.out.println("\n=== Query results: " + summary.containerName() + " ("
-                + Config.algorithmLabel(summary.containerName()) + ") ===");
+                + Config.algorithmLabel(summary.containerName(), config) + ") ===");
         System.out.printf("Request charge: %.2f RUs%n", summary.requestCharge());
 
         int rank = 1;

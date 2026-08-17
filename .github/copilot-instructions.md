@@ -1,8 +1,25 @@
 # GitHub Copilot Instructions for Azure Cosmos DB Vector Samples
 
+## Create-index samples
+
+For any file under `nosql-create-index-*/**`, the sole authority is the
+[create-index samples constitution](docs/CREATE-INDEX-CONSTITUTION.md).
+
+The constitution governs configuration, resource names, control-plane
+operations, authentication, Azure Developer CLI lifecycle commands, hooks,
+validation, output, cleanup, documentation, and tests. Do not duplicate or
+override create-index rules in this file or in another instruction file.
+
+For all other `nosql-*` samples, the general data-plane-only rules below apply.
+
+## General NoSQL sample rules
+
+The following rules apply only to `nosql-*` samples other than
+`nosql-create-index-*`.
+
 ## Authentication and Authorization
 
-This repository uses **Microsoft Entra ID (formerly Azure AD)** authentication with data plane RBAC only.
+This repository uses **Microsoft Entra ID** authentication with data-plane RBAC only.
 
 ### Key Principles
 
@@ -137,12 +154,11 @@ try {
 
 ### Best Practices for Vector Data
 
-- **Batch before sending:** Pre-batch operations into manageable chunks (50-100) before calling `executeBulkOperations()` to avoid rate limiting.
-- **Pause between batches:** Add 500ms delays between batch requests to allow the container to recover RU budget.
+- Pass the full operation list to `executeBulkOperations()` unless input-memory constraints require application-level batches.
 - Use well-distributed partition keys (e.g., `HotelId`) to maximize parallelism across partition ranges.
 - Consider enabling autoscale to handle variable throughput demands.
 - Set `contentResponseOnWriteEnabled: false` to reduce response payload size when you don't need the inserted document back.
-- Monitor RU/s usage during bulk operations and adjust batch size if hitting rate limits.
+- Let the SDK handle throttling and retries; monitor RU/s usage to size provisioned throughput or autoscale appropriately.
 
 ---
 

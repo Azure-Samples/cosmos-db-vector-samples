@@ -3,7 +3,20 @@ applyTo: "nosql-*/**"
 ---
 # Running Samples — CLI Invocation (Cosmos DB NoSQL Vector Search)
 
-Environment variables are loaded from a `.env` file in each sample directory. Run `azd up` first to provision infrastructure — the CLI commands below only run data-plane application code.
+> [!IMPORTANT]
+> For `nosql-create-index-*/**`, stop using the guidance in this file and
+> follow [CREATE-INDEX-CONSTITUTION.md](../docs/CREATE-INDEX-CONSTITUTION.md)
+> exclusively. This includes provisioning, authentication, execution,
+> validation, cleanup, and deprovisioning.
+
+For create-index samples, use the canonical lifecycle skills:
+
+- `sample-provision-nosql-create-index`
+- `sample-validate-nosql-create-index`
+- `samples-cleanup-nosql-create-index`
+- `sample-deprovision-nosql-create-index`
+
+The remaining guidance in this file applies to vector-search samples only.
 
 ## Prerequisites
 

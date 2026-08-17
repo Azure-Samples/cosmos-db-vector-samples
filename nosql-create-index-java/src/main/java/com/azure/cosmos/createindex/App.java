@@ -49,7 +49,9 @@ public final class App {
                     config.accountName(),
                     config.location(),
                     config.databaseName(),
-                    config.embeddingFieldName());
+                    config.embeddingFieldName(),
+                    config.diskannContainerName(),
+                    config.quantizedflatContainerName());
 
             // --- Step 2: Ingest documents ---
             System.out.println("\nProcessing in batches of " + documents.size() + "...");
@@ -71,7 +73,7 @@ public final class App {
                 var container = database.getContainer(containerName);
                 for (String distanceFunction : distanceFunctions) {
                     QuerySummary summary = DataPlane.queryTopMatches(container, containerName, config, queryEmbedding, distanceFunction);
-                    String label = Config.algorithmLabel(containerName);
+                    String label = Config.algorithmLabel(containerName, config);
                     System.out.printf("  \u2713 %s queried (%.2f RUs)%n", containerName, summary.requestCharge());
                     allResults.add(new Object[]{label, distanceFunction, summary});
                 }
@@ -99,7 +101,9 @@ public final class App {
                     config.subscriptionId(),
                     config.resourceGroup(),
                     config.accountName(),
-                    config.databaseName());
+                    config.databaseName(),
+                    config.diskannContainerName(),
+                    config.quantizedflatContainerName());
 
             System.out.println("\nComplete");
         }

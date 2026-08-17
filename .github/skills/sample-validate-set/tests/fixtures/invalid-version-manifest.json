@@ -1,0 +1,5 @@
+{
+  "$schema": "../../schema/sample-set-manifest.schema.json",
+  "schemaVersion": 2,
+  "name": "invalid"
+}

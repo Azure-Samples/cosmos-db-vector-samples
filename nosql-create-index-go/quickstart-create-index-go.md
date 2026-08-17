@@ -12,7 +12,7 @@ ms.date: 2026-06-22
 
 In this quickstart, you run the Go create-index sample for Azure Cosmos DB for NoSQL to demonstrate two key goals:
 
-- **Goal 1 (Control Plane):** Use the ARM SDK (armcosmos/v3) to create the `HotelsCreateIndex` database and two vector-indexed containers: `hotels_diskann_go` (DiskANN approximate search) and `hotels_quantizedflat_go` (QuantizedFlat uses vector quantization techniques).
+- **Goal 1 (Control Plane):** Use the ARM SDK (armcosmos/v3) to create two vector-indexed containers in the Bicep-created `HotelsCreateIndex` database: `hotels_diskann` (DiskANN approximate search) and `hotels_quantizedflat` (QuantizedFlat uses vector quantization techniques).
 - **Goal 2 (Distance Functions):** Compare how the same query embedding produces different scores and rankings when using different vector distance functions: Cosine, DotProduct, and Euclidean.
 
 ## Prerequisites
@@ -22,17 +22,18 @@ In this quickstart, you run the Go create-index sample for Azure Cosmos DB for N
 - [Go 1.23 or later](https://go.dev/dl/) installed.
 - An Azure Cosmos DB for NoSQL account with vector search enabled.
 - Microsoft Entra ID roles for your identity:
-  - Management-plane permission to create and delete SQL databases and containers in the Azure Cosmos DB account
+  - Management-plane permission to create and delete the configured SQL containers in the Azure Cosmos DB account
   - **Cosmos DB Built-in Data Contributor** on the Azure Cosmos DB account
   - **Cognitive Services OpenAI User** on the Azure OpenAI resource
 - An Azure OpenAI resource with a `text-embedding-3-small` deployment.
+- To enable infrastructure provisioning for the create-index scenario, set `AZURE_COSMOSDB_CREATE_INDEX_DATABASENAME=HotelsCreateIndex` before running `azd up`. The infrastructure creates the database selected by the deployment scenario. For the create-index scenario, it creates `HotelsCreateIndex`.
 
 > [!IMPORTANT]
 > **Two Phases:**
 >
 > 1. **Control Plane (Goal 1):** The sample uses the ARM SDK (armcosmos/v3) with `DefaultAzureCredential` to create:
->    - Database: `HotelsCreateIndex`
->    - Containers: `hotels_diskann_go` (DiskANN index) and `hotels_quantizedflat_go` (QuantizedFlat index)
+>    - Containers in the existing `HotelsCreateIndex` database
+>    - Containers: `hotels_diskann` (DiskANN index) and `hotels_quantizedflat` (QuantizedFlat index)
 >    - Partition key path: `/Region` (valid values: `Northeast`, `Midwest`, `South`, `West`)
 >    - Vector field path: `/embedding` (1536 dimensions, float32)
 >
@@ -87,9 +88,10 @@ AZURE_SUBSCRIPTION_ID=YOUR-SUBSCRIPTION-ID
 AZURE_RESOURCE_GROUP=YOUR-RESOURCE-GROUP
 AZURE_COSMOSDB_ACCOUNT_NAME=YOUR-COSMOS-ACCOUNT-NAME
 AZURE_LOCATION=YOUR-AZURE-REGION
+AZURE_COSMOSDB_CREATE_INDEX_ALLOW_DESTRUCTIVE_OPERATIONS=false
 ```
 
-Set `VECTOR_ALGORITHM` to `diskann`, `quantizedflat`, or leave it empty to run against both containers. When `AZURE_COSMOSDB_CONTAINER_NAME` and `VECTOR_ALGORITHM` are both empty, the sample iterates over both known containers (`hotels_diskann_go` and `hotels_quantizedflat_go`).
+Set `VECTOR_ALGORITHM` to `diskann`, `quantizedflat`, or leave it empty to run against both containers. When `AZURE_COSMOSDB_CONTAINER_NAME` and `VECTOR_ALGORITHM` are both empty, the sample iterates over both known containers (`hotels_diskann` and `hotels_quantizedflat`).
 
 ## Install dependencies and run
 
@@ -120,9 +122,9 @@ The sample demonstrates both goals in sequence:
 **Goal 1 - Control Plane (create containers with vector indexes):**
 1. Authenticates with `DefaultAzureCredential`
 2. Creates a management client for Azure Resource Manager
-3. Creates the `HotelsCreateIndex` database (if needed)
-4. Creates the `hotels_diskann_go` container with DiskANN vector index on `/embedding`
-5. Creates the `hotels_quantizedflat_go` container with QuantizedFlat vector index on `/embedding`
+3. Uses the Bicep-created `HotelsCreateIndex` database
+4. Creates the `hotels_diskann` container with DiskANN vector index on `/embedding`
+5. Creates the `hotels_quantizedflat` container with QuantizedFlat vector index on `/embedding`
 
 **Goal 2 - Data Plane (load and query with distance functions):**
 1. Loads configuration from environment variables
@@ -165,7 +167,7 @@ nosql-create-index-go/
 | File | Purpose |
 |------|---------|
 | `config.go` | Loads and validates environment variables. |
-| `controlplane.go` | Creates the database and vector-indexed containers, verifies index settings, and deletes containers during cleanup. |
+| `controlplane.go` | Creates and verifies vector-indexed containers in the configured database, then deletes the containers during cleanup. |
 | `dataplane.go` | Implements document ingestion, embedding generation, and vector queries. |
 | `main.go` | Entry point; orchestrates configuration, ingestion, and queries. |
 | `go.mod` | Module definition; declares Azure identity, data plane, and ARM SDK dependencies. |
@@ -308,11 +310,11 @@ Using Azure OpenAI Embedding Deployment/Model: text-embedding-3-small
 Reading JSON file from C:\project-dina-data-ai\repos\cosmos-db-vector-samples-2\nosql-create-index-go\data\HotelsData_toCosmosDB_Vector_byRegion.json
 Loaded 50 documents
 
-=== Phase 1: Create Database ===
+=== Phase 1: Use Configured Database ===
   Database: HotelsCreateIndex
-  ✓ Database created or already exists
+  ✓ Using existing database
 
-=== Creating Container: hotels_diskann_go ===
+=== Creating Container: hotels_diskann ===
   Index type:     diskANN
   Embedding path: /embedding
   Dimensions:     1536
@@ -322,7 +324,7 @@ Loaded 50 documents
   Creating container with vector index...
   ✓ Container created in 6.61s
 
-=== Creating Container: hotels_quantizedflat_go ===
+=== Creating Container: hotels_quantizedflat ===
   Index type:     quantizedFlat
   Embedding path: /embedding
   Dimensions:     1536
@@ -334,9 +336,9 @@ Loaded 50 documents
 
 ✓ All containers created successfully
 Processing in batches of 50...
-  ✓ hotels_diskann_go: 50 inserted (5243.74 RUs)
+  ✓ hotels_diskann: 50 inserted (5243.74 RUs)
   ✓ Verified: 10 documents in partition 'Northeast'
-  ✓ hotels_quantizedflat_go: 50 inserted (2621.83 RUs)
+  ✓ hotels_quantizedflat: 50 inserted (2621.83 RUs)
   ✓ Verified: 10 documents in partition 'Northeast'
 
 ⏳ Waiting 5 seconds for index stabilization...
@@ -345,25 +347,25 @@ Query: "hotel near the ocean"
 Embedding generated (1536 dimensions)
 
 Running search (top 5 results for each distance function)...
-  ✓ hotels_diskann_go queried (3.65 RUs)
-  ✓ hotels_diskann_go queried (3.65 RUs)
-  ✓ hotels_diskann_go queried (3.65 RUs)
-  ✓ hotels_quantizedflat_go queried (3.65 RUs)
-  ✓ hotels_quantizedflat_go queried (3.65 RUs)
-  ✓ hotels_quantizedflat_go queried (3.65 RUs)
+  ✓ hotels_diskann queried (3.65 RUs)
+  ✓ hotels_diskann queried (3.65 RUs)
+  ✓ hotels_diskann queried (3.65 RUs)
+  ✓ hotels_quantizedflat queried (3.65 RUs)
+  ✓ hotels_quantizedflat queried (3.65 RUs)
+  ✓ hotels_quantizedflat queried (3.65 RUs)
 
 | Container            | Metric     | Top 1 Result               | Score  | Top 2 Result               | Score  | Diff   |
 |----------------------|------------|----------------------------|--------|----------------------------|--------|--------|
-| hotels_diskann_go    | Cosine     | City Center Summer Wind... | 0.4025 | Red Tide Hotel             | 0.4000 | 0.0025 |
-| hotels_diskann_go    | DotProduct | City Center Summer Wind... | 0.4027 | Red Tide Hotel             | 0.4001 | 0.0025 |
-| hotels_diskann_go    | Euclidean  | City Center Summer Wind... | 1.0934 | Red Tide Hotel             | 1.0957 | -0.0023 |
+| hotels_diskann    | Cosine     | City Center Summer Wind... | 0.4025 | Red Tide Hotel             | 0.4000 | 0.0025 |
+| hotels_diskann    | DotProduct | City Center Summer Wind... | 0.4027 | Red Tide Hotel             | 0.4001 | 0.0025 |
+| hotels_diskann    | Euclidean  | City Center Summer Wind... | 1.0934 | Red Tide Hotel             | 1.0957 | -0.0023 |
 | hotels_quantizedf... | Cosine     | City Center Summer Wind... | 0.4025 | Red Tide Hotel             | 0.4000 | 0.0025 |
 | hotels_quantizedf... | DotProduct | City Center Summer Wind... | 0.4027 | Red Tide Hotel             | 0.4001 | 0.0025 |
 | hotels_quantizedf... | Euclidean  | City Center Summer Wind... | 1.0934 | Red Tide Hotel             | 1.0957 | -0.0023 |
 
 === Phase 4: Cleanup ===
-  ✓ Deleted hotels_diskann_go
-  ✓ Deleted hotels_quantizedflat_go
+  ✓ Deleted hotels_diskann
+  ✓ Deleted hotels_quantizedflat
 
 Complete
 ```
@@ -379,6 +381,25 @@ A full recorded run is saved in `output/sample-output.txt`.
 | `failed to insert N documents` | One or more concurrent inserts failed. Check container throughput settings and confirm each document is under 2 MB. |
 | `embedding dimensions mismatch: got X, expected 1536` | The deployment returns a different vector size than expected. Verify you're using `text-embedding-3-small` without dimension truncation. |
 | `get Azure OpenAI bearer token: ... 401` | Confirm your identity has the **Cognitive Services OpenAI User** role on the Azure OpenAI resource. |
+
+## Authentication and permissions
+
+All Azure clients use `DefaultAzureCredential`. For local runs, sign in with `az login` or `azd auth login`. Hosted execution can use managed identity. The selected identity needs management-plane permission to create and delete the two configured containers, Cosmos DB data-plane access to insert and query documents, and the Cognitive Services OpenAI User role. Keys and connection strings aren't supported.
+
+## Validate and clean generated artifacts
+
+From the repository root, validate this sample with the shared validator:
+
+```powershell
+pwsh -NoProfile -File .github\skills\sample-validate-nosql-create-index\scripts\validate-create-index-samples.ps1 -Language Go
+```
+
+Preview and then remove generated local artifacts:
+
+```powershell
+pwsh -NoProfile -File .github\scripts\clean-all-create-index.ps1 -Language Go -WhatIf
+pwsh -NoProfile -File .github\scripts\clean-all-create-index.ps1 -Language Go
+```
 
 ## Next steps
 

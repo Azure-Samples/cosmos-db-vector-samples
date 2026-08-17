@@ -1,0 +1,31 @@
+name: sample-validate-set-eval
+description: Evaluate routing and guidance for the manifest-driven sample-set validator.
+skill: sample-validate-set
+version: "1.0"
+
+config:
+  trials_per_task: 1
+  timeout_seconds: 120
+  parallel: false
+  executor: mock
+  model: gpt-5.4-mini
+
+metrics:
+  - name: task_completion
+    weight: 0.5
+    threshold: 0.8
+    description: The response gives the correct validation workflow.
+  - name: trigger_accuracy
+    weight: 0.5
+    threshold: 0.8
+    description: The skill routes manifest validation and excludes canonical create-index validation.
+
+graders:
+  - type: text
+    name: no_fatal_errors
+    config:
+      regex_not_match:
+        - "(?i)fatal error|unhandled exception|stack trace"
+
+tasks:
+  - "eval-tasks/*.yaml"

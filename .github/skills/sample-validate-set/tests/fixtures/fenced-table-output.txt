@@ -1,0 +1,16 @@
+Generated output
+
+| Container | Metric | Result |
+|---|---|---|
+| hotels_diskann | Cosine | A |
+| hotels_diskann | DotProduct | B |
+| hotels_diskann | Euclidean | C |
+| hotels_quantizedflat | Cosine | D |
+| hotels_quantizedflat | DotProduct | E |
+| hotels_quantizedflat | Euclidean | F |
+
+```text
+| Not | A | Result |
+|---|---|---|
+| Ignore | This | Table |
+```

@@ -1,0 +1,130 @@
+{
+  "$schema": "../schema/sample-set-manifest.schema.json",
+  "schemaVersion": 1,
+  "name": "nosql-create-index",
+  "runner": {
+    "path": ".github/scripts/run-all-create-index.ps1",
+    "arguments": [
+      "-Language",
+      "{selection}"
+    ],
+    "allSelection": "All"
+  },
+  "evidence": {
+    "root": ".github/scripts/output",
+    "directoryPrefix": "sample-validation-",
+    "runnerLog": "run-all-create-index.txt",
+    "summary": "validation-summary.txt"
+  },
+  "samples": [
+    {
+      "name": "Python",
+      "selection": "Python",
+      "directory": "nosql-create-index-python",
+      "outputDirectory": "output",
+      "runDirectoryPattern": "create-index-run-*",
+      "runFile": "run-python.txt",
+      "reference": "output/sample-output.txt"
+    },
+    {
+      "name": "TypeScript",
+      "selection": "TypeScript",
+      "directory": "nosql-create-index-typescript",
+      "outputDirectory": "output",
+      "runDirectoryPattern": "create-index-run-*",
+      "runFile": "run-typescript.txt",
+      "reference": "output/sample-output.txt"
+    },
+    {
+      "name": "DotNet",
+      "selection": "DotNet",
+      "directory": "nosql-create-index-dotnet",
+      "outputDirectory": "output",
+      "runDirectoryPattern": "create-index-run-*",
+      "runFile": "run-dotnet.txt",
+      "reference": "output/sample-output.txt"
+    },
+    {
+      "name": "Go",
+      "selection": "Go",
+      "directory": "nosql-create-index-go",
+      "outputDirectory": "output",
+      "runDirectoryPattern": "create-index-run-*",
+      "runFile": "run-go.txt",
+      "reference": "output/sample-output.txt"
+    },
+    {
+      "name": "Java",
+      "selection": "Java",
+      "directory": "nosql-create-index-java",
+      "outputDirectory": "output",
+      "runDirectoryPattern": "create-index-run-*",
+      "runFile": "run-java.txt",
+      "reference": "output/sample-output.txt"
+    }
+  ],
+  "validation": {
+    "table": {
+      "headerAliases": {
+        "indextype": [
+          "container",
+          "index",
+          "indextype"
+        ],
+        "distancefunction": [
+          "distancefunction",
+          "distancemetric",
+          "metric"
+        ]
+      },
+      "keyColumns": [
+        "indextype",
+        "distancefunction"
+      ],
+      "valueAliases": {
+        "indextype": {
+          "diskann": "DiskANN",
+          "hotelsdiskann": "DiskANN",
+          "hotelsdiskanngo": "DiskANN",
+          "hotelsdiskannts": "DiskANN",
+          "quantizedflat": "QuantizedFlat",
+          "hotelsquantizedf": "QuantizedFlat",
+          "hotelsquantizedflat": "QuantizedFlat",
+          "hotelsquantizedflatts": "QuantizedFlat"
+        },
+        "distancefunction": {
+          "cosine": "Cosine",
+          "dotproduct": "DotProduct",
+          "euclidean": "Euclidean"
+        }
+      },
+      "expectedKeys": [
+        [
+          "DiskANN",
+          "Cosine"
+        ],
+        [
+          "DiskANN",
+          "DotProduct"
+        ],
+        [
+          "DiskANN",
+          "Euclidean"
+        ],
+        [
+          "QuantizedFlat",
+          "Cosine"
+        ],
+        [
+          "QuantizedFlat",
+          "DotProduct"
+        ],
+        [
+          "QuantizedFlat",
+          "Euclidean"
+        ]
+      ],
+      "exactRowCount": 6
+    }
+  }
+}

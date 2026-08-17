@@ -2,27 +2,26 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"os/exec"
 	"strings"
 	"time"
 
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/runtime"
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/cosmos/armcosmos/v3"
 )
 
+const (
+	armPollFrequency = 5 * time.Second
+	armDeleteTimeout = 2 * time.Minute
+	armCreateTimeout = 10 * time.Minute
+	armReadTimeout   = 1 * time.Minute
+)
+
 // ptr is a helper to return a pointer to a value
 func ptr[T any](v T) *T { return &v }
-
-// getSubscriptionID resolves the subscription at runtime via the Azure CLI
-func getSubscriptionID() (string, error) {
-	out, err := exec.Command("az", "account", "show", "--query", "id", "-o", "tsv").Output()
-	if err != nil {
-		return "", fmt.Errorf("az account show failed: %w", err)
-	}
-	return strings.TrimSpace(string(out)), nil
-}
 
 // CreateContainersWithVectorIndexes creates SQL containers with vector indexes using the ARM SDK
 func CreateContainersWithVectorIndexes(
@@ -30,55 +29,23 @@ func CreateContainersWithVectorIndexes(
 	credential *azidentity.DefaultAzureCredential,
 	config *Config,
 ) error {
-	// Get subscription ID
-	subscriptionID, err := getSubscriptionID()
-	if err != nil {
-		return fmt.Errorf("failed to get subscription ID: %w", err)
+	if err := validateContainerDeletionSafety(config); err != nil {
+		return fmt.Errorf("unsafe container deletion configuration: %w", err)
 	}
 
 	// Create ARM client
-	client, err := armcosmos.NewSQLResourcesClient(subscriptionID, credential, nil)
+	client, err := armcosmos.NewSQLResourcesClient(config.SubscriptionID, credential, nil)
 	if err != nil {
 		return fmt.Errorf("failed to create ARM client: %w", err)
 	}
-
-	// Ensure database exists first
-	fmt.Printf("\n=== Phase 1: Create Database ===\n")
-	fmt.Printf("  Database: %s\n", config.DatabaseName)
-
-	dbPoller, err := client.BeginCreateUpdateSQLDatabase(
-		ctx,
-		config.ResourceGroup,
-		config.AccountName,
-		config.DatabaseName,
-		armcosmos.SQLDatabaseCreateUpdateParameters{
-			Location: ptr(config.Location),
-			Properties: &armcosmos.SQLDatabaseCreateUpdateProperties{
-				Resource: &armcosmos.SQLDatabaseResource{
-					ID: ptr(config.DatabaseName),
-				},
-				Options: &armcosmos.CreateUpdateOptions{},
-			},
-		},
-		nil,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to begin creating database: %w", err)
-	}
-
-	if _, err := dbPoller.PollUntilDone(ctx, &runtime.PollUntilDoneOptions{Frequency: 5 * time.Second}); err != nil {
-		return fmt.Errorf("failed to create database: %w", err)
-	}
-
-	fmt.Printf("  ✓ Database created or already exists\n")
 
 	// Create containers with vector indexes
 	indexConfigs := []struct {
 		indexType     armcosmos.VectorIndexType
 		containerName string
 	}{
-		{armcosmos.VectorIndexTypeDiskANN, diskANNContainer},
-		{armcosmos.VectorIndexTypeQuantizedFlat, quantizedFlatContainer},
+		{armcosmos.VectorIndexTypeDiskANN, config.DiskANNContainerName},
+		{armcosmos.VectorIndexTypeQuantizedFlat, config.QuantizedFlatContainerName},
 	}
 
 	embeddingPath := "/" + strings.TrimPrefix(config.EmbeddingFieldName, "/")
@@ -128,30 +95,51 @@ func CreateContainersWithVectorIndexes(
 		}
 
 		// Delete existing container for idempotent re-runs
-		fmt.Printf("  Cleaning up existing container...\n")
+		fmt.Printf("  Pre-creation delete target: %s/%s/%s/%s\n", config.ResourceGroup, config.AccountName, config.DatabaseName, indexConfig.containerName)
+		deleteStart := time.Now()
+		deleteCtx, deleteCancel := context.WithTimeout(ctx, armDeleteTimeout)
 		deletePoller, err := client.BeginDeleteSQLContainer(
-			ctx,
+			deleteCtx,
 			config.ResourceGroup,
 			config.AccountName,
 			config.DatabaseName,
 			indexConfig.containerName,
 			nil,
 		)
-		if err == nil {
-			// If delete operation started, wait for it
-			if _, err = deletePoller.PollUntilDone(ctx, &runtime.PollUntilDoneOptions{Frequency: 5 * time.Second}); err == nil {
-				fmt.Printf("  Deleted existing container\n")
+		if err != nil {
+			deleteCancel()
+			if isNotFound(err) {
+				fmt.Printf("  ✓ Pre-creation deletion completed in %.1fs; container did not exist\n", time.Since(deleteStart).Seconds())
+			} else {
+				return fmt.Errorf("failed to begin pre-creation deletion for container %q: %w", indexConfig.containerName, err)
+			}
+		} else {
+			fmt.Printf("  Waiting for pre-creation deletion to complete (polling every %s)...\n", armPollFrequency)
+			_, err = deletePoller.PollUntilDone(
+				deleteCtx,
+				&runtime.PollUntilDoneOptions{Frequency: armPollFrequency},
+			)
+			deleteCancel()
+			if err != nil {
+				if isNotFound(err) {
+					fmt.Printf("  ✓ Pre-creation deletion completed in %.1fs; container no longer exists\n", time.Since(deleteStart).Seconds())
+				} else {
+					return fmt.Errorf("failed to wait for pre-creation deletion of container %q: %w", indexConfig.containerName, err)
+				}
+			} else {
+				fmt.Printf("  ✓ Pre-creation deletion completed in %.1fs\n", time.Since(deleteStart).Seconds())
 			}
 		}
 
 		// Create the container
 		fmt.Printf("  Creating container with vector index...\n")
 		start := time.Now()
+		createCtx, createCancel := context.WithTimeout(ctx, armCreateTimeout)
 
 		// Note: Options is nil to support serverless accounts (which don't allow explicit throughput).
 		// For provisioned accounts, you could set Options.Throughput or Options.AutoscaleSettings.
 		containerPoller, err := client.BeginCreateUpdateSQLContainer(
-			ctx,
+			createCtx,
 			config.ResourceGroup,
 			config.AccountName,
 			config.DatabaseName,
@@ -166,25 +154,31 @@ func CreateContainersWithVectorIndexes(
 			nil,
 		)
 		if err != nil {
+			createCancel()
 			return fmt.Errorf("failed to begin creating container %s: %w", indexConfig.containerName, err)
 		}
 
-		if _, err := containerPoller.PollUntilDone(ctx, &runtime.PollUntilDoneOptions{Frequency: 5 * time.Second}); err != nil {
+		fmt.Printf("  Waiting for container creation to complete (polling every %s)...\n", armPollFrequency)
+		if _, err := containerPoller.PollUntilDone(createCtx, &runtime.PollUntilDoneOptions{Frequency: armPollFrequency}); err != nil {
+			createCancel()
 			return fmt.Errorf("failed to create container %s: %w", indexConfig.containerName, err)
 		}
+		createCancel()
 
 		elapsed := time.Since(start)
 		fmt.Printf("  ✓ Container created in %.2fs\n", elapsed.Seconds())
 
 		// Verify the container exists and has the correct configuration
+		readCtx, readCancel := context.WithTimeout(ctx, armReadTimeout)
 		got, err := client.GetSQLContainer(
-			ctx,
+			readCtx,
 			config.ResourceGroup,
 			config.AccountName,
 			config.DatabaseName,
 			indexConfig.containerName,
 			nil,
 		)
+		readCancel()
 		if err != nil {
 			return fmt.Errorf("failed to verify container %s: %w", indexConfig.containerName, err)
 		}
@@ -216,3 +210,59 @@ func CreateContainersWithVectorIndexes(
 	return nil
 }
 
+func DeleteContainers(ctx context.Context, credential *azidentity.DefaultAzureCredential, cfg *Config) error {
+	if err := validateContainerDeletionSafety(cfg); err != nil {
+		return fmt.Errorf("unsafe container deletion configuration: %w", err)
+	}
+
+	client, err := armcosmos.NewSQLResourcesClient(cfg.SubscriptionID, credential, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create SQL resources client: %w", err)
+	}
+
+	for _, containerName := range []string{cfg.DiskANNContainerName, cfg.QuantizedFlatContainerName} {
+		fmt.Printf("  Delete target: %s/%s/%s/%s\n", cfg.ResourceGroup, cfg.AccountName, cfg.DatabaseName, containerName)
+		start := time.Now()
+		deleteCtx, cancel := context.WithTimeout(ctx, armDeleteTimeout)
+
+		poller, err := client.BeginDeleteSQLContainer(
+			deleteCtx,
+			cfg.ResourceGroup,
+			cfg.AccountName,
+			cfg.DatabaseName,
+			containerName,
+			nil,
+		)
+		if err != nil {
+			cancel()
+			if isNotFound(err) {
+				fmt.Printf("  ✓ Deletion completed in %.1fs; container does not exist: %s\n", time.Since(start).Seconds(), containerName)
+				continue
+			}
+			return fmt.Errorf("failed to delete container %q: %w", containerName, err)
+		}
+
+		fmt.Printf("  Waiting for deletion to complete (polling every %s)...\n", armPollFrequency)
+		_, err = poller.PollUntilDone(
+			deleteCtx,
+			&runtime.PollUntilDoneOptions{Frequency: armPollFrequency},
+		)
+		cancel()
+		if err != nil {
+			if isNotFound(err) {
+				fmt.Printf("  ✓ Deletion completed in %.1fs; container does not exist: %s\n", time.Since(start).Seconds(), containerName)
+				continue
+			}
+			return fmt.Errorf("failed to wait for container deletion %q: %w", containerName, err)
+		}
+
+		fmt.Printf("  ✓ Deleted %s in %.1fs\n", containerName, time.Since(start).Seconds())
+	}
+
+	return nil
+}
+
+func isNotFound(err error) bool {
+	var responseError *azcore.ResponseError
+	return errors.As(err, &responseError) && responseError.StatusCode == 404
+}

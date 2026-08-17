@@ -80,8 +80,11 @@ describe("nosql-create-index-typescript live integration tests", () => {
       ...baseConfig,
       cosmos: {
         ...baseConfig.cosmos,
-        containerName: `${baseConfig.cosmos.containerName}-vitest-${suffix}`,
+        containerName: `hotels_diskann-vitest-${suffix}`,
+        diskannContainerName: `hotels_diskann-vitest-${suffix}`,
+        quantizedflatContainerName: `hotels_quantizedflat-vitest-${suffix}`,
       },
+      allowDestructiveOperations: true,
     };
 
     credential = new DefaultAzureCredential();
@@ -102,12 +105,17 @@ describe("nosql-create-index-typescript live integration tests", () => {
       return;
     }
 
-    await armClient.sqlResources.beginDeleteSqlContainerAndWait(
-      config.azure.resourceGroup!,
-      config.cosmos.accountName!,
-      config.cosmos.databaseName,
-      config.cosmos.containerName
-    );
+    for (const containerName of [
+      config.cosmos.diskannContainerName,
+      config.cosmos.quantizedflatContainerName,
+    ]) {
+      await armClient.sqlResources.beginDeleteSqlContainerAndWait(
+        config.azure.resourceGroup!,
+        config.cosmos.accountName!,
+        config.cosmos.databaseName,
+        containerName
+      );
+    }
   });
 
   it("loads config from env vars", () => {
@@ -117,7 +125,10 @@ describe("nosql-create-index-typescript live integration tests", () => {
       process.env.AZURE_COSMOSDB_ACCOUNT_NAME
     );
     expect(config.cosmos.endpoint).toBe(process.env.AZURE_COSMOSDB_ENDPOINT);
-    expect(config.openai.endpoint).toBe(process.env.AZURE_OPENAI_ENDPOINT);
+    expect(config.openai.endpoint).toBe(
+      process.env.AZURE_OPENAI_EMBEDDING_ENDPOINT ||
+        process.env.AZURE_OPENAI_ENDPOINT
+    );
     expect(config.expectedDimensions).toBe(
       Number(process.env.EMBEDDING_DIMENSIONS || 1536)
     );

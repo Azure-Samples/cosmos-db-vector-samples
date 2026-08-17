@@ -3,4 +3,32 @@
 name: cosmos-vector-search-quickstart
 metadata:
   template: cosmos-vector-search-quickstart
-services:
+
+hooks:
+  preprovision:
+    windows:
+      run: ./infra/pre-provision.ps1
+      shell: pwsh
+      continueOnError: false
+    posix:
+      run: ./infra/pre-provision.sh
+      shell: sh
+      continueOnError: false
+  postprovision:
+    windows:
+      run: ./infra/post-provision.ps1
+      shell: pwsh
+      continueOnError: false
+    posix:
+      run: ./infra/post-provision.sh
+      shell: sh
+      continueOnError: false
+  predown:
+    windows:
+      run: ./infra/pre-down.ps1
+      shell: pwsh
+      continueOnError: true
+    posix:
+      run: ./infra/pre-down.sh
+      shell: sh
+      continueOnError: true

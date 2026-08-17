@@ -50,10 +50,13 @@ echo ""
 
 # Extract specific values with fallbacks
 cosmos_db_endpoint="${env_values[AZURE_COSMOSDB_ENDPOINT]:-}"
-database_name="${env_values[AZURE_COSMOSDB_DATABASENAME]:-HotelsCreateIndex}"
+database_name="${env_values[AZURE_COSMOSDB_CREATE_INDEX_DATABASENAME]:-HotelsCreateIndex}"
 container_name="${env_values[AZURE_COSMOSDB_CONTAINER_NAME]:-}"
+diskann_container_name="${env_values[AZURE_COSMOSDB_CREATE_INDEX_DISKANN_CONTAINER_NAME]:-hotels_diskann}"
+quantizedflat_container_name="${env_values[AZURE_COSMOSDB_CREATE_INDEX_QUANTIZEDFLAT_CONTAINER_NAME]:-hotels_quantizedflat}"
+allow_custom_container_deletion="${env_values[AZURE_COSMOSDB_CREATE_INDEX_ALLOW_CUSTOM_CONTAINER_DELETION]:-false}"
 embedded_field="${env_values[AZURE_COSMOSDB_CREATE_INDEX_EMBEDDED_FIELD]:-embedding}"
-open_ai_endpoint="${env_values[AZURE_OPENAI_ENDPOINT]:-}"
+open_ai_endpoint="${env_values[AZURE_OPENAI_EMBEDDING_ENDPOINT]:-${env_values[AZURE_OPENAI_ENDPOINT]:-}}"
 open_ai_deployment="${env_values[AZURE_OPENAI_EMBEDDING_DEPLOYMENT]:-text-embedding-3-small}"
 open_ai_api_version="${env_values[AZURE_OPENAI_EMBEDDING_API_VERSION]:-2024-08-01-preview}"
 vector_algorithm="${env_values[VECTOR_ALGORITHM]:-}"
@@ -62,11 +65,35 @@ data_file="${env_values[DATA_FILE_WITH_VECTORS_AND_REGIONS]:-./data/HotelsData_t
 subscription_id="${env_values[AZURE_SUBSCRIPTION_ID]:-}"
 resource_group="${env_values[AZURE_RESOURCE_GROUP]:-}"
 account_name="${env_values[AZURE_COSMOSDB_ACCOUNT_NAME]:-}"
+location="${env_values[AZURE_LOCATION]:-}"
 
 # Validate required fields
 missing_fields=()
 [[ -z "$cosmos_db_endpoint" ]] && missing_fields+=("AZURE_COSMOSDB_ENDPOINT")
-[[ -z "$open_ai_endpoint" ]] && missing_fields+=("AZURE_OPENAI_ENDPOINT")
+[[ -z "$database_name" ]] && missing_fields+=("AZURE_COSMOSDB_CREATE_INDEX_DATABASENAME")
+[[ -z "$open_ai_endpoint" ]] && missing_fields+=("AZURE_OPENAI_EMBEDDING_ENDPOINT")
+[[ -z "$open_ai_deployment" ]] && missing_fields+=("AZURE_OPENAI_EMBEDDING_DEPLOYMENT")
+[[ -z "$subscription_id" ]] && missing_fields+=("AZURE_SUBSCRIPTION_ID")
+[[ -z "$resource_group" ]] && missing_fields+=("AZURE_RESOURCE_GROUP")
+[[ -z "$account_name" ]] && missing_fields+=("AZURE_COSMOSDB_ACCOUNT_NAME")
+[[ -z "$location" ]] && missing_fields+=("AZURE_LOCATION")
+[[ -z "$data_file" ]] && missing_fields+=("DATA_FILE_WITH_VECTORS_AND_REGIONS")
+
+if [[ ! "$allow_custom_container_deletion" =~ ^([Tt][Rr][Uu][Ee]|[Ff][Aa][Ll][Ss][Ee])$ ]]; then
+    echo "ERROR: AZURE_COSMOSDB_CREATE_INDEX_ALLOW_CUSTOM_CONTAINER_DELETION must be true or false."
+    exit 1
+fi
+allow_custom_container_deletion="${allow_custom_container_deletion,,}"
+if [[ "${diskann_container_name,,}" == "${quantizedflat_container_name,,}" ]]; then
+    echo "ERROR: DiskANN and QuantizedFlat container names must be different (case-insensitive)."
+    exit 1
+fi
+if [[ "$diskann_container_name" != "hotels_diskann" ||
+      "$quantizedflat_container_name" != "hotels_quantizedflat" ]] &&
+   [[ "$allow_custom_container_deletion" != "true" ]]; then
+    echo "ERROR: Custom container names require AZURE_COSMOSDB_CREATE_INDEX_ALLOW_CUSTOM_CONTAINER_DELETION=true."
+    exit 1
+fi
 
 if [[ ${#missing_fields[@]} -gt 0 ]] && [[ -z "$SKIP_VALIDATION" ]]; then
     echo "ERROR: Missing required environment variables from azd:"
@@ -92,7 +119,11 @@ cat > "$OUTPUT_PATH" <<EOF
     "PartitionKeyValue": "$partition_key_value",
     "SubscriptionId": "$subscription_id",
     "ResourceGroup": "$resource_group",
-    "AccountName": "$account_name"
+    "AccountName": "$account_name",
+    "Location": "$location",
+    "DiskANNContainerName": "$diskann_container_name",
+    "QuantizedFlatContainerName": "$quantizedflat_container_name",
+    "AllowCustomContainerDeletion": $allow_custom_container_deletion
   },
   "OpenAiSettings": {
     "Endpoint": "$open_ai_endpoint",
@@ -104,6 +135,14 @@ cat > "$OUTPUT_PATH" <<EOF
   "DataFilePath": "$data_file"
 }
 EOF
+
+if ! grep -Fq "\"DatabaseName\": \"$database_name\"" "$OUTPUT_PATH" ||
+   ! grep -Fq "\"Location\": \"$location\"" "$OUTPUT_PATH" ||
+   ! grep -Fq "\"DiskANNContainerName\": \"$diskann_container_name\"" "$OUTPUT_PATH" ||
+   ! grep -Fq "\"QuantizedFlatContainerName\": \"$quantizedflat_container_name\"" "$OUTPUT_PATH"; then
+    echo "ERROR: Generated settings validation failed."
+    exit 1
+fi
 
 echo "✓ Generated: $OUTPUT_PATH"
 echo ""

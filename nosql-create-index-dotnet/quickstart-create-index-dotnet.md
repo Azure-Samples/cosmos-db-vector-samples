@@ -26,7 +26,7 @@ The sample uses a hotel dataset in a JSON file with pre-calculated vectors from 
     - Data plane: **Cosmos DB Built-in Data Contributor**
 - An Azure OpenAI resource with a `text-embedding-3-small` deployment and the following RBAC role assigned to your signed-in identity:
     - Data plane: **Cognitive Services OpenAI User**
-- A `HotelsCreateIndex` database already provisioned on your Azure Cosmos DB account. The sample creates and deletes only the containers; it does not create the database or account.
+- To enable infrastructure provisioning for the create-index scenario, set `AZURE_COSMOSDB_CREATE_INDEX_DATABASENAME=HotelsCreateIndex` before running `azd up`. The infrastructure creates the database selected by the deployment scenario. For the create-index scenario, it creates `HotelsCreateIndex`. The sample creates and deletes only the containers; it does not create the database or account.
 - (Optional) [Visual Studio Code](https://code.visualstudio.com/) with the **Azure Databases** extension installed, to browse the containers after ingestion.
 
 > [!TIP]
@@ -120,7 +120,7 @@ Connect-AzAccount
     Otherwise, copy `appsettings.example.json` to `appsettings.json` and fill in your values manually.
 
 > [!NOTE]
-> The sample creates and deletes only the `hotels_diskann_dotnet` and `hotels_quantizedflat_dotnet` containers via ARM. The `HotelsCreateIndex` database and your Azure Cosmos DB account must already exist before you run the sample.
+> The sample creates and deletes only the `hotels_diskann` and `hotels_quantizedflat` containers via ARM. The `HotelsCreateIndex` database and your Azure Cosmos DB account must already exist before you run the sample.
 
 ### Configure the app
 
@@ -174,7 +174,7 @@ dotnet run --project .\nosql-create-index-dotnet.csproj
 
 1. Connects to the Azure Cosmos DB data plane and Azure OpenAI using `DefaultAzureCredential`
 2. Reads `./data/HotelsData_toCosmosDB_Vector_byRegion.json` using `System.Text.Json`
-3. Recreates `hotels_diskann_dotnet` and `hotels_quantizedflat_dotnet` containers with vector indexes via the ARM SDK
+3. Recreates `hotels_diskann` and `hotels_quantizedflat` containers with vector indexes via the ARM SDK
 4. Groups documents by `Region` and upserts one transactional batch per region
 5. Generates a query embedding with the Azure OpenAI client
 6. Runs **three separate** `VectorDistance()` SQL queries with different distance functions, scoping each to one partition via `QueryRequestOptions.PartitionKey`:
@@ -197,7 +197,7 @@ Reading JSON file from C:\...\nosql-create-index-dotnet\data\HotelsData_toCosmos
 Loaded 50 documents
 
 === Step 1: Create Container with Vector Index ===
-  Container:      hotels_diskann_dotnet
+  Container:      hotels_diskann
   Index type:     diskANN
   Dimensions:     1536
   Distance func:  cosine (queried with all 3 metrics)
@@ -206,8 +206,8 @@ Loaded 50 documents
   Created in 6.7s
   Vector index is IMMUTABLE — cannot be changed after creation
 
-# ... hotels_quantizedflat_dotnet container creation output (same format as above) ...
-# ... document ingestion output for hotels_diskann_dotnet and hotels_quantizedflat_dotnet omitted for brevity ...
+# ... hotels_quantizedflat container creation output (same format as above) ...
+# ... document ingestion output for hotels_diskann and hotels_quantizedflat omitted for brevity ...
 # ... At runtime: documents are grouped by Region and upserted via TransactionalBatch ...
 # ... (Northeast: 10, Midwest: 10, South: 14, West: 16 documents per container) ...
 
@@ -215,12 +215,12 @@ Query: "hotel near the ocean"
 Embedding generated (1536 dimensions)
 
 Running searches (top 5 results for each distance function)...
-  ✓ hotels_diskann_dotnet queried (3.54 RUs)
-  ✓ hotels_diskann_dotnet queried (3.54 RUs)
-  ✓ hotels_diskann_dotnet queried (3.54 RUs)
-  ✓ hotels_quantizedflat_dotnet queried (3.54 RUs)
-  ✓ hotels_quantizedflat_dotnet queried (3.54 RUs)
-  ✓ hotels_quantizedflat_dotnet queried (3.54 RUs)
+  ✓ hotels_diskann queried (3.54 RUs)
+  ✓ hotels_diskann queried (3.54 RUs)
+  ✓ hotels_diskann queried (3.54 RUs)
+  ✓ hotels_quantizedflat queried (3.54 RUs)
+  ✓ hotels_quantizedflat queried (3.54 RUs)
+  ✓ hotels_quantizedflat queried (3.54 RUs)
 
 | Index Type     | Distance Function | Top 1 Result               | Score  | Top 2 Result               | Score  | Diff   |
 |----------------|-------------------|----------------------------|--------|----------------------------|--------|--------|
@@ -232,8 +232,8 @@ Running searches (top 5 results for each distance function)...
 | QuantizedFlat  | Euclidean         | City Center Summer Wind... | 1.0934 | Red Tide Hotel             | 1.0957 | -0.0023 |
 
 === Cleanup: Remove Sample Containers ===
-  ✓ Deleted container: hotels_diskann_dotnet
-  ✓ Deleted container: hotels_quantizedflat_dotnet
+  ✓ Deleted container: hotels_diskann
+  ✓ Deleted container: hotels_quantizedflat
 
 Complete
 ```
@@ -320,8 +320,8 @@ var containers = database.Value.GetCosmosDBSqlContainers();
 
 var indexConfigs = new[]
 {
-    (Name: "hotels_diskann_dotnet", IndexType: CosmosDBVectorIndexType.DiskAnn),
-    (Name: "hotels_quantizedflat_dotnet", IndexType: CosmosDBVectorIndexType.QuantizedFlat)
+    (Name: "hotels_diskann", IndexType: CosmosDBVectorIndexType.DiskAnn),
+    (Name: "hotels_quantizedflat", IndexType: CosmosDBVectorIndexType.QuantizedFlat)
 };
 
 foreach (var indexConfig in indexConfigs)
@@ -341,8 +341,8 @@ The preceding code:
 
 - Authenticates to the ARM layer using the same `DefaultAzureCredential`
 - Deletes any pre-existing sample containers to ensure a clean state
-- Creates `hotels_diskann_dotnet` with a DiskANN vector index
-- Creates `hotels_quantizedflat_dotnet` with a QuantizedFlat vector index
+- Creates `hotels_diskann` with a DiskANN vector index
+- Creates `hotels_quantizedflat` with a QuantizedFlat vector index
 - Sets `cosine` as the stored distance function; all three metrics are supported at query time
 
 > [!NOTE]
@@ -469,11 +469,11 @@ Override the default `"Northeast"` partition key value (read from `config.Partit
 
 ## View and manage data in Visual Studio Code
 
-Use the **Azure Databases** extension for Visual Studio Code to connect to your Azure Cosmos DB account and browse the `hotels_diskann_dotnet` and `hotels_quantizedflat_dotnet` containers.
+Use the **Azure Databases** extension for Visual Studio Code to connect to your Azure Cosmos DB account and browse the `hotels_diskann` and `hotels_quantizedflat` containers.
 
 1. In Visual Studio Code, select the **Azure** icon in the Activity Bar.
 2. Under **Resources**, expand **Azure Cosmos DB** and locate your account.
-3. Expand your account > **HotelsCreateIndex** > **hotels_diskann_dotnet** or **hotels_quantizedflat_dotnet**.
+3. Expand your account > **HotelsCreateIndex** > **hotels_diskann** or **hotels_quantizedflat**.
 4. Select a document to view its hotel fields and the `embedding` vector array.
 
 > [!NOTE]
@@ -481,7 +481,7 @@ Use the **Azure Databases** extension for Visual Studio Code to connect to your 
 
 ## Clean up resources
 
-The sample automatically deletes both `hotels_diskann_dotnet` and `hotels_quantizedflat_dotnet` containers during its cleanup step at the end of each run. To remove the remaining Azure resources provisioned for this sample, choose one of the following options.
+The sample automatically deletes both `hotels_diskann` and `hotels_quantizedflat` containers during its cleanup step at the end of each run. To remove the remaining Azure resources provisioned for this sample, choose one of the following options.
 
 # [Azure portal](#tab/azure-portal)
 
@@ -505,8 +505,30 @@ Remove-AzResourceGroup -Name <your-resource-group> -Force -AsJob
 > [!TIP]
 > Review the full sample output in `output/sample-output.txt`. Try setting `VectorAlgorithm` to `diskann` or `quantizedflat` in `appsettings.json` to focus ingestion and queries on one container after both sample containers are recreated.
 
+## Authentication and permissions
+
+All Azure clients use `DefaultAzureCredential`. For local runs, sign in with `az login` or `azd auth login`. Hosted execution can use managed identity. The selected identity needs management-plane permission to create and delete the two configured containers, Cosmos DB data-plane access to insert and query documents, and the Cognitive Services OpenAI User role. Keys and connection strings aren't supported.
+
+## Validate and clean generated artifacts
+
+From the repository root, validate this sample with the shared validator:
+
+```powershell
+pwsh -NoProfile -File .github\skills\sample-validate-nosql-create-index\scripts\validate-create-index-samples.ps1 -Language DotNet
+```
+
+Preview and then remove generated local artifacts:
+
+```powershell
+pwsh -NoProfile -File .github\scripts\clean-all-create-index.ps1 -Language DotNet -WhatIf
+pwsh -NoProfile -File .github\scripts\clean-all-create-index.ps1 -Language DotNet
+```
+
 ## Related content
 
 - [Vector search in Azure Cosmos DB for NoSQL](/azure/cosmos-db/nosql/vector-search)
 - [VectorDistance function reference](/azure/cosmos-db/nosql/query/vectordistance)
 - [Vector indexes in Azure Cosmos DB for NoSQL](/azure/cosmos-db/nosql/vector-index)
+
+> [!WARNING]
+> The sample deletes `hotels_diskann` and `hotels_quantizedflat` before creation and during cleanup. Custom container names require `AZURE_COSMOSDB_CREATE_INDEX_ALLOW_CUSTOM_CONTAINER_DELETION=true`.

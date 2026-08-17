@@ -42,18 +42,114 @@ This project demonstrates:
 
 ## 🎯 Getting Started
 
-1. **Choose a sample** from the repository structure above
-2. **Navigate to the sample directory** and follow its README
-3. **Configure environment variables** with your Azure resource information
-4. **Run the sample** to see vector search in action
+### Deployment Scenarios
 
-### Quick Example (TypeScript + NoSQL API)
+This repository supports **two distinct deployment scenarios** based on what you want to demonstrate:
+
+| Scenario | Database | Env Variable | Use Case |
+|----------|----------|---|----------|
+| **Vector Search** | Standard Cosmos DB NoSQL with vector search | Not set (default) | Query existing vectors with similarity search |
+| **Create Index** | Cosmos DB NoSQL with custom vector indexing | `AZURE_COSMOSDB_CREATE_INDEX_DATABASENAME='HotelsCreateIndex'` | Demonstrate building and configuring vector indexes |
+
+### How to Set Environment Variables
+
+> [!IMPORTANT]
+> Set `AZURE_COSMOSDB_CREATE_INDEX_DATABASENAME` before `azd up`, preferably
+> with `azd env set`. Bicep creates the configured create-index database. The
+> language samples create and delete only `hotels_diskann` and
+> `hotels_quantizedflat`.
+
+#### Vector Search Scenario (Default - No Env Variable Needed)
+```powershell
+# PowerShell - Just run without env variable
+azd up
+```
+
+```bash
+# Bash - Just run without env variable
+azd up
+```
+
+#### Create Index Scenario (Requires Env Variable)
+
+You have two options to set the environment variable:
+
+**Option 1: Session Environment Variable (Quickest)**
+
+**Windows (PowerShell):**
+```powershell
+# Set for current session (variable persists until you close PowerShell)
+$env:AZURE_COSMOSDB_CREATE_INDEX_DATABASENAME='HotelsCreateIndex'
+
+# Verify it's set
+$env:AZURE_COSMOSDB_CREATE_INDEX_DATABASENAME
+
+# Provision the create-index database and shared resources
+azd up
+```
+
+**Bash/Linux/macOS/WSL:**
+```bash
+# Set for current session (variable persists in this terminal)
+export AZURE_COSMOSDB_CREATE_INDEX_DATABASENAME='HotelsCreateIndex'
+
+# Verify it's set
+echo $AZURE_COSMOSDB_CREATE_INDEX_DATABASENAME
+
+# Provision the create-index database and shared resources
+azd up
+```
+
+**Option 2: AZD Environment (Recommended for Repeated Deployments)**
+
+Store the variable in your azd environment so it persists across sessions:
+
+```powershell
+# PowerShell
+azd env set AZURE_COSMOSDB_CREATE_INDEX_DATABASENAME "HotelsCreateIndex"
+
+# Verify it's set
+azd env get-values | findstr /i "CREATE_INDEX"
+
+# Now you can run deployments in new PowerShell sessions
+azd up
+```
+
+```bash
+# Bash
+azd env set AZURE_COSMOSDB_CREATE_INDEX_DATABASENAME "HotelsCreateIndex"
+
+# Verify it's set
+azd env get-values | grep CREATE_INDEX
+
+# Now you can run deployments in new terminal sessions
+azd up
+```
+
+**Option 3: Permanent System Environment (Persists Across All Sessions)**
+
+**Windows (PowerShell):**
+```powershell
+[Environment]::SetEnvironmentVariable('AZURE_COSMOSDB_CREATE_INDEX_DATABASENAME', 'HotelsCreateIndex', 'User')
+# Restart PowerShell to see the permanent setting
+azd up
+```
+
+**Bash/Linux/macOS:**
+```bash
+# Add to your shell configuration (~/.bashrc, ~/.zshrc, etc.)
+echo "export AZURE_COSMOSDB_CREATE_INDEX_DATABASENAME='HotelsCreateIndex'" >> ~/.bashrc
+source ~/.bashrc
+azd up
+```
+
+### Quick Example (TypeScript + Vector Search)
 
 ```bash
 # Clone the repository
 git clone https://github.com/Azure-Samples/cosmos-db-vector-samples.git
 
-# Provision Azure resources with Azure Developer CLI
+# Provision Azure resources with Azure Developer CLI (default: vector-search scenario)
 azd auth login
 azd up
 
@@ -63,13 +159,19 @@ cd cosmos-db-vector-samples/nosql-vector-search-typescript
 # Install dependencies
 npm install
 
-# Set environment variables from provisioned infrstructure
+# Set environment variables from provisioned infrastructure
 azd env get-values > .env
 
 # Build and run
 npm run build
 npm run start:diskann
 ```
+
+**Why the environment variable matters:**
+- Bicep uses it to select and name the create-index database.
+- The lifecycle hooks use the resulting `azd` environment output to select the
+  create-index data files.
+- The samples read the same variable for data-plane database access.
 
 ## 📖 Key Concepts
 
@@ -80,9 +182,9 @@ Vector embeddings are numerical representations of text, images, or other data i
 
 | Algorithm      | Accuracy | Speed    | Scale   | Best For                        |
 |---------------|----------|----------|---------|----------------------------------|
-| **Flat**      | 100%     | Slow     | Small   | Dev/test, maximum accuracy      |
-| **QuantizedFlat** | ~100% | Fast     | Large   | Balanced performance            |
-| **DiskANN**   | High     | Very Fast| Massive | Enterprise scale, RAG, AI apps  |
+| **Flat** | High | Slow | Very small | Testing or isolated-partition searches with up to about 50,000 vectors |
+| **QuantizedFlat** | High | Fast | Large | Low-latency workloads with efficient RU consumption at scale |
+| **DiskANN** | High | Very fast | Massive | Highly scalable RAG and AI workloads |
 
 ### Distance Metrics
 
@@ -118,9 +220,21 @@ This project has adopted the [Microsoft Open Source Code of Conduct](https://ope
 For more information see the [Code of Conduct FAQ](https://opensource.microsoft.com/codeofconduct/faq/) or
 contact [opencode@microsoft.com](mailto:opencode@microsoft.com) with any additional questions or comments.
 
+### CREATE-INDEX Samples Requirements
+
+If you're working on the CREATE-INDEX samples (Python, TypeScript, Java, Go, .NET), please review the
+[**CREATE-INDEX Samples Constitution**](./.github/docs/CREATE-INDEX-CONSTITUTION.md) which documents:
+- Parameterization requirements (all container/index names from environment variables)
+- Control plane (ARM SDK) validation standards
+- Language-specific configuration patterns
+- Documentation and testing requirements
+- Reference implementation (Go sample) for validation behavior
+
+All CREATE-INDEX samples must conform to these standards.
+
 ## 📄 License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE.md) file for details.
 
 ## 🔒 Trademarks
 

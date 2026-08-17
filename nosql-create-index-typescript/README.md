@@ -6,7 +6,7 @@ This quickstart uses three layers:
 
 | Layer | Tool | What it does |
 |---|---|---|
-| **Azure CLI script** | `scripts/create-resources.sh` | Creates the resource group, Azure OpenAI resource, Cosmos DB account, and database |
+| **Bicep deployment** | `azd up` | Creates the resource group, Azure OpenAI resource, Cosmos DB account, database, and role assignments |
 | **Control plane** | `src/control-plane.ts` (`@azure/arm-cosmosdb`) | Deletes existing sample containers, creates both containers with vector indexes, and cleans them up |
 | **Data plane** | `src/data-plane.ts` (`@azure/cosmos` + `openai`) | Inserts documents and runs vector queries |
 
@@ -35,7 +35,7 @@ cd cosmos-db-vector-samples/nosql-create-index-typescript
 The setup script and TypeScript code split responsibilities across three layers:
 
 ```
-scripts/create-resources.sh (Azure CLI)
+Bicep deployment (azd up)
 ────────────────────────────────
 1. Resource group
 2. Contributor role (control plane)
@@ -61,44 +61,52 @@ Calls control-plane, then
   data-plane functions
 ```
 
-## Run the Azure CLI setup script
+## Provision shared infrastructure
 
-The setup script creates the Azure resource group, Azure OpenAI resource, Cosmos DB account, and database, then writes a `.env` file with all configuration values needed by `src/index.ts`.
+From the repository root, configure the create-index scenario and deploy the
+shared resources. Bicep creates the database; the TypeScript sample creates and
+deletes only the two configured containers.
 
-**Option A — If you deployed with `azd up`:**
+```powershell
+azd env set AZURE_COSMOSDB_CREATE_INDEX_DATABASENAME "HotelsCreateIndex"
+azd up
+```
+
+Then create the sample `.env` file:
 
 ```powershell
 npm run create-env
 ```
 
-**Option B — Otherwise**, use the standalone setup script:
+The deployment assigns the management-plane permissions needed to manage the
+sample containers and the data-plane roles needed to insert, query, and
+generate embeddings.
 
-```bash
-chmod +x scripts/create-resources.sh
+## Set up environment variables
 
-./scripts/create-resources.sh my-vector-rg eastus2
-```
+`npm start` uses Node.js `--env-file .env`, so the sample loads `.env`
+automatically. Process environment variables can still override values when
+needed.
 
-### What the setup script does
+**Required environment variables for control plane operations** (creating and deleting containers with ARM SDK):
+- `AZURE_SUBSCRIPTION_ID` — Your Azure subscription ID
+- `AZURE_RESOURCE_GROUP` — Your Azure resource group name
+- `AZURE_COSMOSDB_ACCOUNT_NAME` — Your Cosmos DB account name
+- `AZURE_LOCATION` — Azure region where resources are deployed
 
-The following table summarizes the operations the script performs. Steps 1–7 run in both modes. Step 8 runs only in `full` mode.
+**Required environment variables for data plane operations** (querying and inserting data):
+- `AZURE_COSMOSDB_ENDPOINT` — Cosmos DB endpoint URL
+- `AZURE_COSMOSDB_CREATE_INDEX_DATABASENAME` — Database name (e.g., "HotelsCreateIndex")
+- `AZURE_OPENAI_EMBEDDING_ENDPOINT` — Azure OpenAI endpoint URL
+- `AZURE_OPENAI_EMBEDDING_DEPLOYMENT` — Deployment name (e.g., "text-embedding-3-small")
 
-| Step | Operation | Plane | Mode | CLI command |
-|---|---|---|---|---|
-| 1 | Create resource group | — | Both | `az group create` |
-| 2 | Assign Contributor role to your identity | Control | Both | `az role assignment create --role "Contributor"` |
-| 3 | Create Azure OpenAI account | Control | Both | `az cognitiveservices account create` |
-| 4 | Deploy embedding model | Control | Both | `az cognitiveservices account deployment create` |
-| 5 | Assign Cognitive Services OpenAI User role | Data | Both | `az role assignment create --role "Cognitive Services OpenAI User"` |
-| 6 | Create Cosmos DB account | Control | Both | `az cosmosdb create` |
-| 7 | Create Cosmos DB database | Control | Both | `az cosmosdb sql database create` |
-| 8 | Assign Cosmos DB Built-in Data Contributor role | Data | Full only | `az cosmosdb sql role assignment create` |
+**⚠️ Control Plane Requirement:** This sample uses the Azure Resource Manager (ARM) SDK to create and delete containers at runtime. All ARM SDK environment variables above (subscription ID, resource group, account name, location) MUST be set before running the sample. No defaults are provided for these values.
 
-The **Contributor** role (step 2) gives your signed-in identity control-plane access to create resources within the resource group — including the container that `src/index.ts` creates via the ARM SDK.
-
-The **Cosmos DB Built-in Data Contributor** role (step 8 in `full` mode) grants data-plane access to read and write documents in the Cosmos DB account. In `control` mode, data-plane roles are expected to be assigned separately (for example, by `azd` or a Bicep deployment).
-
-After completion, the script writes a `.env` file with all values the TypeScript code needs.
+**Optional environment variables:**
+- `VECTOR_ALGORITHM` — "diskann" or "quantizedflat"; leave empty to run **both** containers
+- `AZURE_COSMOSDB_CREATE_INDEX_DISKANN_CONTAINER_NAME` — Custom diskANN container name (default: "hotels_diskann")
+- `AZURE_COSMOSDB_CREATE_INDEX_QUANTIZEDFLAT_CONTAINER_NAME` — Custom quantizedFlat container name (default: "hotels_quantizedflat")
+- `AZURE_COSMOSDB_CREATE_INDEX_ALLOW_DESTRUCTIVE_OPERATIONS` — Set to `true` only when custom container names are intentional and safe to delete
 
 ## Install dependencies
 
@@ -189,7 +197,7 @@ export function createOpenAIClient(credential: TokenCredential, config) {
 
 ### Step 1: Create both containers with vector indexes (control-plane.ts)
 
-This is the critical step. The sample always creates both `hotels_diskann_ts` and `hotels_quantizedflat_ts` in the existing database. The container's `vectorEmbeddingPolicy` and `vectorIndexes` are **immutable after creation** — they cannot be changed afterward, regardless of whether the container was created via ARM SDK, Bicep, Portal, or CLI.
+This is the critical step. The sample always creates both `hotels_diskann` and `hotels_quantizedflat` in the existing database. The container's `vectorEmbeddingPolicy` and `vectorIndexes` are **immutable after creation** — they cannot be changed afterward, regardless of whether the container was created via ARM SDK, Bicep, Portal, or CLI.
 
 ```typescript
 export async function createContainer(
@@ -197,8 +205,8 @@ export async function createContainer(
   config: SampleConfig
 ) {
   const indexTypes = [
-    { type: "diskANN", containerName: "hotels_diskann_ts" },
-    { type: "quantizedFlat", containerName: "hotels_quantizedflat_ts" },
+    { type: "diskANN", containerName: "hotels_diskann" },
+    { type: "quantizedFlat", containerName: "hotels_quantizedflat" },
   ];
 
   const embeddingPath = `/${config.embeddingField}`;
@@ -378,16 +386,16 @@ CONSOLIDATED RESULTS — Vector Query with All Metrics & Index Types
 
 | Container          | Metric     | Top 1 Result               | Score  | Top 2 Result               | Score  | Diff   |
 |--------------------|------------|----------------------------|--------|----------------------------|--------|--------|
-| hotels_diskann_ts  | Cosine     | City Center Summer Wind Re | 0.4025 | Red Tide Hotel             | 0.4000 | 0.0025 |
-| hotels_diskann_ts  | DotProduct | City Center Summer Wind Re | 0.4025 | Red Tide Hotel             | 0.4001 | 0.0025 |
-| hotels_diskann_ts  | Euclidean  | City Center Summer Wind Re | 1.0933 | Red Tide Hotel             | 1.0956 | 0.0023 |
-| hotels_quantizedflat_ts | Cosine     | City Center Summer Wind Re | 0.4025 | Red Tide Hotel             | 0.4000 | 0.0025 |
-| hotels_quantizedflat_ts | DotProduct | City Center Summer Wind Re | 0.4027 | Red Tide Hotel             | 0.4001 | 0.0025 |
-| hotels_quantizedflat_ts | Euclidean  | City Center Summer Wind Re | 1.0934 | Red Tide Hotel             | 1.0957 | 0.0023 |
+| hotels_diskann  | Cosine     | City Center Summer Wind Re | 0.4025 | Red Tide Hotel             | 0.4000 | 0.0025 |
+| hotels_diskann  | DotProduct | City Center Summer Wind Re | 0.4025 | Red Tide Hotel             | 0.4001 | 0.0025 |
+| hotels_diskann  | Euclidean  | City Center Summer Wind Re | 1.0933 | Red Tide Hotel             | 1.0956 | 0.0023 |
+| hotels_quantizedflat | Cosine     | City Center Summer Wind Re | 0.4025 | Red Tide Hotel             | 0.4000 | 0.0025 |
+| hotels_quantizedflat | DotProduct | City Center Summer Wind Re | 0.4027 | Red Tide Hotel             | 0.4001 | 0.0025 |
+| hotels_quantizedflat | Euclidean  | City Center Summer Wind Re | 1.0934 | Red Tide Hotel             | 1.0957 | 0.0023 |
 
 === Cleanup: Remove Sample Containers ===
-  ✓ Deleted container: hotels_diskann_ts
-  ✓ Deleted container: hotels_quantizedflat_ts
+  ✓ Deleted container: hotels_diskann
+  ✓ Deleted container: hotels_quantizedflat
 
 Complete
 ```
@@ -407,12 +415,12 @@ az cosmosdb sql container show \
   --account-name $AZURE_COSMOSDB_ACCOUNT_NAME \
   --resource-group $AZURE_RESOURCE_GROUP \
   --database-name $AZURE_COSMOSDB_CREATE_INDEX_DATABASENAME \
-  --name hotels_diskann_ts \
+  --name hotels_diskann \
   --query "{vectorIndexes: resource.indexingPolicy.vectorIndexes, vectorEmbeddingPolicy: resource.vectorEmbeddingPolicy}" \
   --output json
 ```
 
-The output should show the `vectorIndexes` array with your path and index type, and a `vectorEmbeddingPolicy` with matching dimensions, data type, and distance function. Repeat the check for `hotels_quantizedflat_ts`. If either is `null` or empty, the container was not created with vector support.
+The output should show the `vectorIndexes` array with your path and index type, and a `vectorEmbeddingPolicy` with matching dimensions, data type, and distance function. Repeat the check for `hotels_quantizedflat`. If either is `null` or empty, the container was not created with vector support.
 
 You can also verify in the Azure Portal: navigate to your Cosmos DB account → **Data Explorer** → select your database and container → **Settings** → **Indexing Policy** to see the `vectorIndexes` and `vectorEmbeddingPolicy` configuration.
 
@@ -474,13 +482,15 @@ This quickstart uses both planes:
 
 | Operation | Plane | Tool | Role required |
 |---|---|---|---|
-| Create account | Control | `scripts/create-resources.sh` (Azure CLI) | Contributor (on resource group) |
-| Create database | Control | `scripts/create-resources.sh` (Azure CLI) | Contributor |
+| Create account | Control | Bicep through `azd up` | Contributor (on resource group) |
+| Create database | Control | Bicep through `azd up` | Contributor |
 | Create container + vector index | Control | `src/control-plane.ts` (`@azure/arm-cosmosdb`) | Contributor |
 | Read/write documents | Data | `src/data-plane.ts` (`@azure/cosmos`) | Custom data-plane role |
 | Run vector queries | Data | `src/data-plane.ts` (`@azure/cosmos`) | Custom data-plane role |
 
-The **Contributor** role (assigned by deployment or `scripts/create-resources.sh`) grants control-plane access to create and manage resources. Data-plane RBAC is also assigned by deployment or setup tooling; `src/control-plane.ts` does not create SQL role definitions or assignments.
+The **Contributor** role assigned by deployment grants control-plane access to
+manage the sample containers. Bicep also assigns data-plane RBAC;
+`src/control-plane.ts` doesn't create role definitions or assignments.
 
 ## Environment variables
 
@@ -494,9 +504,9 @@ The code reads these values from `.env`:
 | `AZURE_COSMOSDB_ACCOUNT_NAME` | Cosmos DB account name |
 | `AZURE_COSMOSDB_ENDPOINT` | Cosmos DB document endpoint URL |
 | `AZURE_COSMOSDB_CREATE_INDEX_DATABASENAME` | Existing database name (default: `HotelsCreateIndex`) |
-| `AZURE_COSMOSDB_CONTAINER_NAME` | Loaded for compatibility, but this sample uses the fixed containers `hotels_diskann_ts` and `hotels_quantizedflat_ts` |
+| `AZURE_COSMOSDB_CONTAINER_NAME` | Loaded for compatibility, but this sample uses the fixed containers `hotels_diskann` and `hotels_quantizedflat` |
 | `VECTOR_INDEX_TYPE` | Loaded for compatibility, but this sample creates both `diskANN` and `quantizedFlat` containers |
-| `AZURE_OPENAI_ENDPOINT` | Azure OpenAI endpoint URL |
+| `AZURE_OPENAI_EMBEDDING_ENDPOINT` | Azure OpenAI endpoint URL |
 | `AZURE_OPENAI_EMBEDDING_DEPLOYMENT` | Embedding model deployment name |
 | `AZURE_OPENAI_EMBEDDING_API_VERSION` | Embedding API version (default: `2024-08-01-preview`) |
 | `AZURE_COSMOSDB_CREATE_INDEX_EMBEDDED_FIELD` | Document field for embedding vectors (default: `embedding`) |
@@ -534,6 +544,25 @@ The script performs two steps:
 
 1. **Deletes the resource group** — removes all Azure resources (Cosmos DB, OpenAI, etc.)
 2. **Purges the Azure OpenAI resource** — Cognitive Services resources enter a **soft-deleted** state for 48 days after deletion. The name remains reserved and counts against subscription quotas until purged. The script waits for the resource group deletion to complete, then runs `az cognitiveservices account purge`.
+
+## Authentication and permissions
+
+All Azure clients use `DefaultAzureCredential`. For local runs, sign in with `az login` or `azd auth login`. Hosted execution can use managed identity. The selected identity needs management-plane permission to create and delete the two configured containers, Cosmos DB data-plane access to insert and query documents, and the Cognitive Services OpenAI User role. Keys and connection strings aren't supported.
+
+## Validate and clean generated artifacts
+
+From the repository root, validate this sample with the shared validator:
+
+```powershell
+pwsh -NoProfile -File .github\skills\sample-validate-nosql-create-index\scripts\validate-create-index-samples.ps1 -Language TypeScript
+```
+
+Preview and then remove generated local artifacts:
+
+```powershell
+pwsh -NoProfile -File .github\scripts\clean-all-create-index.ps1 -Language TypeScript -WhatIf
+pwsh -NoProfile -File .github\scripts\clean-all-create-index.ps1 -Language TypeScript
+```
 
 ## Next steps
 

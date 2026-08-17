@@ -77,10 +77,13 @@ Write-Host ""
 
 # Extract specific values with fallbacks
 $cosmosDbEndpoint = $envValues['AZURE_COSMOSDB_ENDPOINT'] ?? ""
-$databaseName = $envValues['AZURE_COSMOSDB_DATABASENAME'] ?? "HotelsCreateIndex"
+$databaseName = $envValues['AZURE_COSMOSDB_CREATE_INDEX_DATABASENAME'] ?? "HotelsCreateIndex"
 $containerName = $envValues['AZURE_COSMOSDB_CONTAINER_NAME'] ?? ""
+$diskannContainerName = $envValues['AZURE_COSMOSDB_CREATE_INDEX_DISKANN_CONTAINER_NAME'] ?? "hotels_diskann"
+$quantizedFlatContainerName = $envValues['AZURE_COSMOSDB_CREATE_INDEX_QUANTIZEDFLAT_CONTAINER_NAME'] ?? "hotels_quantizedflat"
+$allowCustomContainerDeletion = ($envValues['AZURE_COSMOSDB_CREATE_INDEX_ALLOW_CUSTOM_CONTAINER_DELETION'] ?? "false")
 $embeddedField = $envValues['AZURE_COSMOSDB_CREATE_INDEX_EMBEDDED_FIELD'] ?? "embedding"
-$openAiEndpoint = $envValues['AZURE_OPENAI_ENDPOINT'] ?? ""
+$openAiEndpoint = $envValues['AZURE_OPENAI_EMBEDDING_ENDPOINT'] ?? ($envValues['AZURE_OPENAI_ENDPOINT'] ?? "")
 $openAiDeployment = $envValues['AZURE_OPENAI_EMBEDDING_DEPLOYMENT'] ?? "text-embedding-3-small"
 $openAiApiVersion = $envValues['AZURE_OPENAI_EMBEDDING_API_VERSION'] ?? "2024-08-01-preview"
 $vectorAlgorithm = $envValues['VECTOR_ALGORITHM'] ?? ""
@@ -89,11 +92,34 @@ $dataFile = $envValues['DATA_FILE_WITH_VECTORS_AND_REGIONS'] ?? "./data/HotelsDa
 $subscriptionId = $envValues['AZURE_SUBSCRIPTION_ID'] ?? ""
 $resourceGroup = $envValues['AZURE_RESOURCE_GROUP'] ?? ""
 $accountName = $envValues['AZURE_COSMOSDB_ACCOUNT_NAME'] ?? ""
+$location = $envValues['AZURE_LOCATION'] ?? ""
 
 # Validate required fields
 $missingFields = @()
 if ([string]::IsNullOrWhiteSpace($cosmosDbEndpoint)) { $missingFields += "AZURE_COSMOSDB_ENDPOINT" }
-if ([string]::IsNullOrWhiteSpace($openAiEndpoint)) { $missingFields += "AZURE_OPENAI_ENDPOINT" }
+if ([string]::IsNullOrWhiteSpace($databaseName)) { $missingFields += "AZURE_COSMOSDB_CREATE_INDEX_DATABASENAME" }
+if ([string]::IsNullOrWhiteSpace($openAiEndpoint)) { $missingFields += "AZURE_OPENAI_EMBEDDING_ENDPOINT" }
+if ([string]::IsNullOrWhiteSpace($openAiDeployment)) { $missingFields += "AZURE_OPENAI_EMBEDDING_DEPLOYMENT" }
+if ([string]::IsNullOrWhiteSpace($subscriptionId)) { $missingFields += "AZURE_SUBSCRIPTION_ID" }
+if ([string]::IsNullOrWhiteSpace($resourceGroup)) { $missingFields += "AZURE_RESOURCE_GROUP" }
+if ([string]::IsNullOrWhiteSpace($accountName)) { $missingFields += "AZURE_COSMOSDB_ACCOUNT_NAME" }
+if ([string]::IsNullOrWhiteSpace($location)) { $missingFields += "AZURE_LOCATION" }
+if ([string]::IsNullOrWhiteSpace($dataFile)) { $missingFields += "DATA_FILE_WITH_VECTORS_AND_REGIONS" }
+if ($allowCustomContainerDeletion -notmatch '^(?i:true|false)$') {
+    Write-Host "ERROR: AZURE_COSMOSDB_CREATE_INDEX_ALLOW_CUSTOM_CONTAINER_DELETION must be true or false." -ForegroundColor Red
+    exit 1
+}
+if ($diskannContainerName -ieq $quantizedFlatContainerName) {
+    Write-Host "ERROR: DiskANN and QuantizedFlat container names must be different (case-insensitive)." -ForegroundColor Red
+    exit 1
+}
+$usesDefaultContainerNames =
+    $diskannContainerName -ceq "hotels_diskann" -and
+    $quantizedFlatContainerName -ceq "hotels_quantizedflat"
+if (-not $usesDefaultContainerNames -and $allowCustomContainerDeletion -ine "true") {
+    Write-Host "ERROR: Custom container names require AZURE_COSMOSDB_CREATE_INDEX_ALLOW_CUSTOM_CONTAINER_DELETION=true." -ForegroundColor Red
+    exit 1
+}
 
 if ($missingFields.Count -gt 0 -and -not $SkipValidation) {
     Write-Host "ERROR: Missing required environment variables from azd:" -ForegroundColor Red
@@ -113,6 +139,10 @@ $appsettings = @{
         "SubscriptionId"  = $subscriptionId
         "ResourceGroup"   = $resourceGroup
         "AccountName"     = $accountName
+        "Location"        = $location
+        "DiskANNContainerName" = $diskannContainerName
+        "QuantizedFlatContainerName" = $quantizedFlatContainerName
+        "AllowCustomContainerDeletion" = [bool]::Parse($allowCustomContainerDeletion)
     }
     "OpenAiSettings" = @{
         "Endpoint"   = $openAiEndpoint
@@ -135,6 +165,13 @@ if (-not (Test-Path $outputDir)) {
 try {
     $jsonContent = $appsettings | ConvertTo-Json -Depth 10
     Out-File -FilePath $OutputPath -InputObject $jsonContent -Encoding utf8NoBOM -Force
+    $generated = Get-Content -Raw -Path $OutputPath | ConvertFrom-Json
+    if ($generated.CosmosDbSettings.DatabaseName -ne $databaseName -or
+        $generated.CosmosDbSettings.Location -ne $location -or
+        $generated.CosmosDbSettings.DiskANNContainerName -ne $diskannContainerName -or
+        $generated.CosmosDbSettings.QuantizedFlatContainerName -ne $quantizedFlatContainerName) {
+        throw "Generated settings validation failed."
+    }
     Write-Host "✓ Generated: $OutputPath" -ForegroundColor Green
     Write-Host ""
 } catch {

@@ -1,0 +1,15 @@
+id: route-create-index-001
+name: Route live create-index validation
+description: Verify that canonical create-index validation is not replaced.
+tags:
+  - negative-trigger
+  - routing
+inputs:
+  prompt: "Run live validation for all five Azure Cosmos DB create-index samples."
+expected:
+  output_contains:
+    - "sample-validate-nosql-create-index"
+  outcomes:
+    - type: task_completed
+  behavior:
+    max_tool_calls: 10

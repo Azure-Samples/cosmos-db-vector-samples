@@ -1,0 +1,16 @@
+id: validate-saved-output-001
+name: Validate saved output
+description: Verify that file-only structural validation is selected.
+tags:
+  - positive-trigger
+  - file-only
+inputs:
+  prompt: "Compare this sample's saved output with its reference using the sample-set manifest, without running the samples."
+expected:
+  output_contains:
+    - "ActualPath"
+    - "ReferencePath"
+  outcomes:
+    - type: task_completed
+  behavior:
+    max_tool_calls: 10
