@@ -1,4 +1,4 @@
-# Create-index samples constitution
+# Create-index scenario constitution
 
 **Effective:** August 2026
 
@@ -6,8 +6,7 @@
 `nosql-create-index-java`, `nosql-create-index-go`, and
 `nosql-create-index-dotnet`
 
-**Authority:** This file is the source of truth for create-index sample
-governance.
+**Authority & Extension:** This document is the scenario constitution for all `nosql-create-index-*` quickstarts. It **extends and augments** the shared [Quickstart Base Constitution](../QUICKSTART-CONSTITUTION.md). It does not replace the Base Constitution.
 
 ---
 
@@ -21,6 +20,8 @@ and run vector queries.
 These samples are the explicit exception to the repository's general
 data-plane-only rule. All other `nosql-*` samples must assume infrastructure
 already exists and must not perform management-plane operations.
+
+All shared quickstart requirements — including passwordless authentication (`DefaultAzureCredential`), upfront environment variable validation, NoSQL injection safety via regex field name validation, SQL `VectorDistance()` query syntax, terminology rules, SDK version pinning, and cross-language authority — are governed by the [Quickstart Base Constitution](../QUICKSTART-CONSTITUTION.md).
 
 ## I. Resource and configuration contract
 
@@ -57,7 +58,7 @@ AZURE_COSMOSDB_ACCOUNT_NAME
 DATA_FILE_WITH_VECTORS_AND_REGIONS
 ```
 
-`DATA_FILE_WITH_VECTORS` may be accepted as a documented legacy fallback.
+Do not accept `DATA_FILE_WITH_VECTORS` as a fallback for create-index samples because it lacks the region data required by the create-index scenario (`HotelsData_toCosmosDB_Vector_byRegion.json`).
 
 The container-name variables, embedding field, API version, dimensions,
 partition key, query text, and algorithm selector may have documented defaults.
@@ -71,7 +72,7 @@ using custom container names and after confirming that both configured
 containers are safe to delete. The DiskANN and QuantizedFlat container names
 must be distinct using a case-insensitive comparison.
 
-### 1.3 Validation requirements
+### 1.3 Environment variable and input validation requirements
 
 - Trim whitespace and surrounding quotes before validation.
 - Treat null, missing, empty, and whitespace-only required values as missing.
@@ -195,9 +196,12 @@ installed SDK version.
 
 ### 4.1 One SDK generation per surface
 
-A sample must not import multiple major generations of the same management SDK
-surface. For example, Go must not use both `armcosmos` and `armcosmos/v3`.
-Creation, verification, and deletion must use the same major SDK generation.
+A sample must not import multiple major generations of the same SDK surface for either control-plane or data-plane operations. This rule applies independently per surface:
+
+- **Control plane**: Control-plane operations (container creation, verification, and deletion) must use a single major management SDK generation (for example, Go must not mix `armcosmos` and `armcosmos/v3`).
+- **Data plane**: Data-plane operations (document insertion, querying, and embeddings) must use a single major generation of the Cosmos DB data-plane SDK and Azure OpenAI SDK.
+
+This rule governs each surface independently; control-plane and data-plane operations maintain distinct SDK surfaces and are not required to share a single SDK generation across different service planes.
 
 Use the latest stable version compatible with the sample runtime. Preview or
 beta dependencies are allowed only when required for a demonstrated feature
@@ -443,7 +447,7 @@ validation outcomes must remain consistent.
 - [ ] Container names are `hotels_diskann` and `hotels_quantizedflat`, unless
       explicitly configured otherwise
 - [ ] Custom container names have explicit deletion opt-in
-- [ ] Only one management SDK major generation is imported per language
+- [ ] Only one SDK major generation is imported per service surface (control-plane and data-plane)
 - [ ] ARM operations have progress output, explicit polling, and timeouts
 - [ ] Both containers are created and verified
 - [ ] Both containers return all three distance-function results

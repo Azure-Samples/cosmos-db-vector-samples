@@ -83,9 +83,6 @@ func LoadConfigFromEnv(getenv func(string) string) (*Config, error) {
 		return nil, err
 	}
 	dataFile := trimEnvValue(getenv("DATA_FILE_WITH_VECTORS_AND_REGIONS"))
-	if dataFile == "" {
-		dataFile = trimEnvValue(getenv("DATA_FILE_WITH_VECTORS"))
-	}
 	embeddingField := trimEnvValue(getenv("AZURE_COSMOSDB_CREATE_INDEX_EMBEDDED_FIELD"))
 	if embeddingField == "" {
 		embeddingField = defaultEmbeddingFieldName
@@ -241,7 +238,7 @@ func orderedContainers(cfg *Config) []string {
 func resolveDataFilePath(value string) (string, error) {
 	if filepath.IsAbs(value) {
 		if _, err := os.Stat(value); err != nil {
-			return "", fmt.Errorf("DATA_FILE_WITH_VECTORS_AND_REGIONS (or DATA_FILE_WITH_VECTORS) not found: %s", value)
+			return "", fmt.Errorf("DATA_FILE_WITH_VECTORS_AND_REGIONS not found: %s", value)
 		}
 		return value, nil
 	}
@@ -278,5 +275,5 @@ func resolveDataFilePath(value string) (string, error) {
 		}
 	}
 
-	return "", fmt.Errorf("DATA_FILE_WITH_VECTORS_AND_REGIONS (or DATA_FILE_WITH_VECTORS) not found: %s", value)
+	return "", fmt.Errorf("DATA_FILE_WITH_VECTORS_AND_REGIONS not found: %s", value)
 }

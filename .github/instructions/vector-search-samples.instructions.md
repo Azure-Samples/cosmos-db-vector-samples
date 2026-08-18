@@ -4,11 +4,15 @@ applyTo: "nosql-*/**"
 # Execution patterns — Cosmos DB NoSQL vector-search samples
 
 > [!IMPORTANT]
-> This file governs `nosql-vector-search-*` samples.
+> This file governs `nosql-vector-search-*` samples, which are subject to
+> [QUICKSTART-CONSTITUTION.md](../QUICKSTART-CONSTITUTION.md) (Base) and
+> [VECTOR-SEARCH-CONSTITUTION.md](../docs/VECTOR-SEARCH-CONSTITUTION.md) (Scenario).
+>
 > For `nosql-create-index-*` samples, follow
-> [CREATE-INDEX-CONSTITUTION.md](../docs/CREATE-INDEX-CONSTITUTION.md)
-> exclusively. Create-index samples have a separate lifecycle and
-> intentionally create and delete containers through control-plane SDKs.
+> [QUICKSTART-CONSTITUTION.md](../QUICKSTART-CONSTITUTION.md) (Base) and
+> [CREATE-INDEX-CONSTITUTION.md](../docs/CREATE-INDEX-CONSTITUTION.md) (Scenario).
+> Create-index samples have a separate lifecycle and intentionally create and
+> delete containers through control-plane SDKs.
 
 The execution model, container rules, and failure guidance below apply only to
 vector-search samples.

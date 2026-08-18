@@ -4,11 +4,15 @@ applyTo: "nosql-*/**"
 # Terminology and PR review standards — Cosmos DB NoSQL vector-search samples
 
 > [!IMPORTANT]
-> This file applies to `nosql-vector-search-*` samples only.
+> This file applies to `nosql-vector-search-*` samples only, which are governed by
+> [QUICKSTART-CONSTITUTION.md](../QUICKSTART-CONSTITUTION.md) (Base) and
+> [VECTOR-SEARCH-CONSTITUTION.md](../docs/VECTOR-SEARCH-CONSTITUTION.md) (Scenario).
+>
 > For `nosql-create-index-*` samples, follow
-> [CREATE-INDEX-CONSTITUTION.md](../docs/CREATE-INDEX-CONSTITUTION.md)
-> exclusively. Do not apply the container-creation, container-deletion, or
-> management-SDK prohibitions in this file to create-index samples.
+> [QUICKSTART-CONSTITUTION.md](../QUICKSTART-CONSTITUTION.md) (Base) and
+> [CREATE-INDEX-CONSTITUTION.md](../docs/CREATE-INDEX-CONSTITUTION.md) (Scenario).
+> Do not apply the container-creation, container-deletion, or management-SDK
+> prohibitions in this file to create-index samples.
 
 This file captures correct terminology and common review feedback patterns for
 `nosql-vector-search-*` samples. Apply these rules when writing, reviewing, or

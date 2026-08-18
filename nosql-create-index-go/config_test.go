@@ -124,7 +124,7 @@ func loadTestConfig(t *testing.T, overrides map[string]string) (*Config, error) 
 	return LoadConfigFromEnv(func(key string) string { return values[key] })
 }
 
-func TestLoadConfigFromEnv_SupportsLegacyDataFileVariable(t *testing.T) {
+func TestLoadConfigFromEnv_IgnoresLegacyDataFileVariable(t *testing.T) {
 	wd, err := os.Getwd()
 	if err != nil {
 		t.Fatalf("get working directory: %v", err)
@@ -148,11 +148,11 @@ func TestLoadConfigFromEnv_SupportsLegacyDataFileVariable(t *testing.T) {
 		t.Fatalf("LoadConfigFromEnv returned error: %v", err)
 	}
 
-	expectedDataFile, err := filepath.Abs(filepath.Join(wd, "..", "data", "HotelsData_toCosmosDB_Vector.json"))
+	expectedDataFile, err := filepath.Abs(filepath.Join(wd, "..", "data", "HotelsData_toCosmosDB_Vector_byRegion.json"))
 	if err != nil {
 		t.Fatalf("resolve expected path: %v", err)
 	}
 	if cfg.DataFileWithVectors != expectedDataFile {
-		t.Fatalf("expected data file %q, got %q", expectedDataFile, cfg.DataFileWithVectors)
+		t.Fatalf("expected default region data file %q, got %q", expectedDataFile, cfg.DataFileWithVectors)
 	}
 }

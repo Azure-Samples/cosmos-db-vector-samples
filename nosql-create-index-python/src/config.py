@@ -113,8 +113,6 @@ def load_config(env: Optional[Mapping[str, str]] = None) -> SampleConfig:
 
     data_file_value = _clean(environment.get("DATA_FILE_WITH_VECTORS_AND_REGIONS"))
     if not data_file_value:
-        data_file_value = _clean(environment.get("DATA_FILE_WITH_VECTORS"))
-    if not data_file_value:
         data_file_value = "./data/HotelsData_toCosmosDB_Vector_byRegion.json"
 
     partition_key_value = _clean(environment.get("PARTITION_KEY_VALUE")) or DEFAULT_PARTITION_KEY_VALUE
@@ -199,7 +197,7 @@ def validate_config(config: SampleConfig) -> None:
 
     if not config.data_file_with_vectors.exists():
         raise ConfigError(
-            "DATA_FILE_WITH_VECTORS_AND_REGIONS (or DATA_FILE_WITH_VECTORS) does not exist: {0}".format(
+            "DATA_FILE_WITH_VECTORS_AND_REGIONS does not exist: {0}".format(
                 config.data_file_with_vectors
             )
         )

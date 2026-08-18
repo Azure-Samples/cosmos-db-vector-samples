@@ -220,17 +220,16 @@ This project has adopted the [Microsoft Open Source Code of Conduct](https://ope
 For more information see the [Code of Conduct FAQ](https://opensource.microsoft.com/codeofconduct/faq/) or
 contact [opencode@microsoft.com](mailto:opencode@microsoft.com) with any additional questions or comments.
 
-### CREATE-INDEX Samples Requirements
+### NoSQL Quickstart Sample Governance
 
-If you're working on the CREATE-INDEX samples (Python, TypeScript, Java, Go, .NET), please review the
-[**CREATE-INDEX Samples Constitution**](./.github/docs/CREATE-INDEX-CONSTITUTION.md) which documents:
-- Parameterization requirements (all container/index names from environment variables)
-- Control plane (ARM SDK) validation standards
-- Language-specific configuration patterns
-- Documentation and testing requirements
-- Reference implementation (Go sample) for validation behavior
+All Azure Cosmos DB NoSQL quickstarts in this repository are governed by:
+- [**Quickstart Base Constitution**](./.github/QUICKSTART-CONSTITUTION.md) — Shared contract applying to all NoSQL quickstarts (authentication, environment variable handling, SQL injection safety, terminology, and SDK pinning).
 
-All CREATE-INDEX samples must conform to these standards.
+Additionally, each sample scenario extends the base with scenario-specific requirements:
+- [**Vector Search Scenario Constitution**](./.github/docs/VECTOR-SEARCH-CONSTITUTION.md) — Requirements for `nosql-vector-search-*` data-plane quickstarts.
+- [**Create Index Scenario Constitution**](./.github/docs/CREATE-INDEX-CONSTITUTION.md) — Requirements for `nosql-create-index-*` control-plane and data-plane quickstarts.
+
+All quickstart samples must conform to the base contract and their scenario constitution.
 
 ## 📄 License
 

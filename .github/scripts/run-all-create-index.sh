@@ -81,10 +81,7 @@ check_data_file() {
     local sample_dir="$1"
     local rel="${DATA_FILE_WITH_VECTORS_AND_REGIONS:-}"
     if [[ -z "$rel" ]]; then
-        rel="${DATA_FILE_WITH_VECTORS:-}"
-    fi
-    if [[ -z "$rel" ]]; then
-        echo "WARNING: Neither DATA_FILE_WITH_VECTORS_AND_REGIONS nor DATA_FILE_WITH_VECTORS is set." >&2
+        echo "WARNING: DATA_FILE_WITH_VECTORS_AND_REGIONS is not set." >&2
         return 1
     fi
     local abs_path

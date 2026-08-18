@@ -99,10 +99,7 @@ function Get-AzdEnvVars {
 function Resolve-DataFile([string]$SampleDir, [hashtable]$Vars) {
     $rel = if ($Vars.ContainsKey('DATA_FILE_WITH_VECTORS_AND_REGIONS')) { $Vars['DATA_FILE_WITH_VECTORS_AND_REGIONS'] } else { $null }
     if (-not $rel) {
-        $rel = if ($Vars.ContainsKey('DATA_FILE_WITH_VECTORS')) { $Vars['DATA_FILE_WITH_VECTORS'] } else { $null }
-    }
-    if (-not $rel) {
-        Write-Warning 'Neither DATA_FILE_WITH_VECTORS_AND_REGIONS nor DATA_FILE_WITH_VECTORS is set in the azd env.'
+        Write-Warning 'DATA_FILE_WITH_VECTORS_AND_REGIONS is not set in the azd env.'
         return $null
     }
     $abs = [IO.Path]::GetFullPath($rel, $SampleDir)

@@ -1,16 +1,25 @@
 # GitHub Copilot Instructions for Azure Cosmos DB Vector Samples
 
-## Create-index samples
+## Quickstart Governance & Scenario Selection
 
-For any file under `nosql-create-index-*/**`, the sole authority is the
-[create-index samples constitution](docs/CREATE-INDEX-CONSTITUTION.md).
+All NoSQL quickstarts in this repository are governed by the
+[Quickstart Base Constitution](QUICKSTART-CONSTITUTION.md).
 
-The constitution governs configuration, resource names, control-plane
-operations, authentication, Azure Developer CLI lifecycle commands, hooks,
-validation, output, cleanup, documentation, and tests. Do not duplicate or
-override create-index rules in this file or in another instruction file.
+The repository supports two distinct quickstart scenarios:
 
-For all other `nosql-*` samples, the general data-plane-only rules below apply.
+1. **Create-index samples (`nosql-create-index-*/**`):** Governed by
+   [QUICKSTART-CONSTITUTION.md](QUICKSTART-CONSTITUTION.md) (Base) +
+   [CREATE-INDEX-CONSTITUTION.md](docs/CREATE-INDEX-CONSTITUTION.md) (Scenario).
+   These samples manage control-plane container creation, vector policies, and cleanup.
+
+2. **Vector-search samples (`nosql-vector-search-*/**`):** Governed by
+   [QUICKSTART-CONSTITUTION.md](QUICKSTART-CONSTITUTION.md) (Base) +
+   [VECTOR-SEARCH-CONSTITUTION.md](docs/VECTOR-SEARCH-CONSTITUTION.md) (Scenario).
+   These samples perform data-plane operations on pre-provisioned infrastructure.
+
+Do not duplicate or override scenario rules in this file or in another instruction file.
+
+For vector-search samples, the general data-plane-only rules below apply.
 
 ## General NoSQL sample rules
 

@@ -1,113 +1,48 @@
-# Quickstart Samples Constitution
+# Quickstart Base Constitution
 
-## Scope
+**Effective:** August 2026
 
-This document establishes the architectural requirements, code patterns, and consistency standards for all **Vector Search (Quickstart)** samples in the cosmos-db-vector-samples repository. 
+**Scope:** All Azure Cosmos DB for NoSQL quickstart samples in `cosmos-db-vector-samples` across all 5 supported languages (Python, TypeScript, Java, Go, .NET).
 
-**Scope:** All quickstart language samples (Python, TypeScript, Java, Go, .NET)
-
-**Related:** See `docs/CREATE-INDEX-CONSTITUTION.md` for control plane (container/index creation) samples. Quickstart samples focus on the data plane (loading data and querying with vector similarity).
+**Authority:** This file establishes the **shared base contract** for ALL NoSQL quickstart samples in this repository. It defines core requirements for authentication, upfront environment validation, NoSQL injection safety, SQL query syntax, terminology standards, version pinning, and cross-language authority.
 
 ---
 
-## I. Quickstart Sample Purpose & Scope
+## I. Scenario Selection & Handoff Architecture
 
-### 1.1 Definition
+### 1.1 Two Quickstart Scenarios
+This repository supports two distinct NoSQL quickstart scenario families:
 
-A **Quickstart sample** demonstrates end-to-end vector search workflow for developers who already have Cosmos DB containers pre-provisioned (via `CREATE-INDEX` samples or Azure Portal). The quickstart assumes:
-- ✅ Containers already exist with vector indexes configured
-- ✅ Partition keys already set (MultiHash on `/HotelId`)
-- ✅ Vector index policies (DiskANN or QuantizedFlat) already applied
-- 🚫 Sample does NOT create containers or indexes—only data plane operations
+1. **Vector Search Quickstarts (`nosql-vector-search-*`):**
+   - **Sample Families:** `nosql-vector-search-python`, `nosql-vector-search-typescript`, `nosql-vector-search-java`, `nosql-vector-search-go`, `nosql-vector-search-dotnet`
+   - **Governing Specs:** `QUICKSTART-CONSTITUTION.md` (Base) + [`docs/VECTOR-SEARCH-CONSTITUTION.md`](docs/VECTOR-SEARCH-CONSTITUTION.md) (Scenario)
+   - **Model:** Data-plane-only execution. Assumes infrastructure (database and containers with vector policies) is pre-provisioned via Bicep/`azd up`/Portal. Samples load data and execute vector search.
 
-### 1.2 Two-Step Learning Path
+2. **Create Index Quickstarts (`nosql-create-index-*`):**
+   - **Sample Families:** `nosql-create-index-python`, `nosql-create-index-typescript`, `nosql-create-index-java`, `nosql-create-index-go`, `nosql-create-index-dotnet`
+   - **Governing Specs:** `QUICKSTART-CONSTITUTION.md` (Base) + [`docs/CREATE-INDEX-CONSTITUTION.md`](docs/CREATE-INDEX-CONSTITUTION.md) (Scenario)
+   - **Model:** Control-plane + data-plane execution. Uses Azure Resource Manager (ARM) SDKs to create and manage containers with vector policies and indexes dynamically at runtime, followed by data-plane load, query, and container cleanup.
 
-1. **CREATE-INDEX samples** — Learn how to create containers and indexes with control plane APIs
-2. **QUICKSTART samples** — Learn how to load data and run vector similarity queries with data plane APIs
-
-This allows developers to:
-- Use quickstarts as standalone demonstrations (if containers are pre-provisioned)
-- Chain samples together for full end-to-end provisioning + querying
-
----
-
-## II. Data Plane Workflow Requirements
-
-### 2.1 Core Workflow
-
-Every quickstart sample MUST execute these steps in order:
-
-1. **Initialize clients** — Connect to Cosmos DB and Azure OpenAI using passwordless authentication
-2. **Validate configuration** — Ensure all required environment variables are set and non-empty
-3. **Load data** — Read pre-computed embedding vectors from JSON data file (shared across all samples)
-4. **Bulk insert** — Insert documents into the selected container (DiskANN or QuantizedFlat) with RU tracking
-5. **Query execution** — Generate a query embedding via Azure OpenAI, then execute a `VectorDistance()` SQL query
-6. **Display results** — Show ranked results with similarity scores and RU cost (request units consumed)
-
-### 2.2 Data Source — Shared JSON File
-
-**File:** `../data/HotelsData_toCosmosDB_Vector.json` (shared across all 5 quickstart samples)
-
-**Structure:**
-- Array of hotel document objects
-- Each document MUST include:
-  - `HotelId` (used as MultiHash partition key value)
-  - Text fields (description, name, etc.)
-  - `DescriptionVector` field containing pre-computed embedding (array of floats, 1536 dimensions by default)
-
-**Rationale:** Using a shared data file ensures all samples demonstrate identical results and behavior—same documents, same embeddings, same vector index structure. Avoids language-specific variations in data loading or embedding generation.
-
-### 2.3 Algorithm Selection
-
-**Rule:** Quickstart samples MUST support BOTH vector algorithms and allow runtime selection:
-
-- **DiskANN** — Large-scale datasets, high recall with low latency
-  - Default container name: `hotels_diskann` (configurable through an environment variable)
-  - Index type: DiskANN
-  - Use case: Production-grade similarity search
-
-- **QuantizedFlat** — Smaller datasets, simpler indexing
-  - Default container name: `hotels_quantizedflat` (configurable through an environment variable)
-  - Index type: QuantizedFlat
-  - Use case: Quick prototyping, small datasets
-
-**Runtime Selection:**
-- Environment variable: `VECTOR_ALGORITHM` (default: `diskann`)
-- Valid values: `diskann`, `quantizedflat` (case-insensitive, trimmed)
-- Invalid values must fail IMMEDIATELY with clear error message listing valid options
+### 1.2 Scenario Handoff & Augmentation Rule
+- The scenario constitutions **extend and augment** this Base Constitution; they do NOT replace it.
+- All quickstart implementations MUST comply with all MUST/REQUIRED rules in this Base Constitution, in addition to the rules in their respective Scenario Constitution.
+- No quickstart family may be validated against the wrong scenario constitution.
 
 ---
 
-## III. Authentication & Client Initialization
+## II. Shared Authentication & Client Initialization
 
-### 3.1 Passwordless Authentication (Primary)
+### 2.1 Passwordless Authentication (Primary)
+All quickstart samples MUST use passwordless authentication (`DefaultAzureCredential`) for both Azure Cosmos DB and Azure OpenAI.
+- Local execution uses current Azure CLI or Azure Developer CLI credentials (`az login` / `azd auth login`).
+- Hosted execution uses Managed Identity.
+- Samples MUST NOT use Cosmos DB account keys, connection strings, public OpenAI API keys, or hardcoded credentials.
 
-**Rule:** All quickstart samples MUST attempt passwordless authentication first using `DefaultAzureCredential`:
-
-**For Cosmos DB:**
-- Use SDK's credential provider with `DefaultAzureCredential` (or language equivalent)
-- Automatically tries: managed identity, Azure CLI credentials, Visual Studio credentials, etc.
-- Works in Azure (production) and local development (with `az login`)
-
-**For Azure OpenAI:**
-- Use SDK's token provider with `DefaultAzureCredential` and token provider pattern (language-specific)
-- Scope: `https://cognitiveservices.azure.com/.default`
-
-**Rationale:** Passwordless auth aligns with security best practices and avoids embedding credentials in configuration files.
-
-### 3.2 Key-based authentication
-
-**Rule:** Quickstart samples must not use account keys, connection strings, or
-Azure OpenAI API keys. Local development uses Azure CLI or Azure Developer CLI
-credentials through `DefaultAzureCredential`. Hosted execution may use managed
-identity.
-
-### 3.3 Graceful Degradation
-
-**Rule:** If EITHER Cosmos DB OR Azure OpenAI client initialization fails, the application MUST fail IMMEDIATELY with a clear error message indicating which client is missing and why.
+### 2.2 Graceful Degradation & Failure Reporting
+If client initialization fails (Cosmos DB or Azure OpenAI), the sample MUST fail IMMEDIATELY upfront with a clear, informative error message identifying which client failed and listing the required environment variables and login steps.
 
 Example:
-```
+```text
 ERROR: Azure OpenAI client is not configured.
 Please check your environment variables:
   - AZURE_OPENAI_EMBEDDING_ENDPOINT
@@ -119,322 +54,76 @@ Run 'az login' or 'azd auth login' for local passwordless authentication.
 
 ---
 
-## IV. Environment Variable Requirements & Validation
+## III. Upfront Environment Variable Validation & Configuration
 
-### 4.1 Data Plane Variables
+### 3.1 Upfront Validation Timing
+All environment variables MUST be validated upfront before any client operations or business logic execute.
+- Trim whitespace and surrounding quotes before validation.
+- Treat null, missing, empty, or whitespace-only required values as missing.
+- Collect and report ALL missing required variables together in a single error message.
+- Exit with a non-zero exit code if validation fails. Do not attempt to proceed with invalid or missing configuration.
 
-**Optional but recommended (have sensible defaults):**
+### 3.2 Language-Native Configuration Patterns
+- **Python:** Process environment through `os.environ`; no automatic `.env` loading.
+- **TypeScript:** Node.js native `--env-file .env` and process environment.
+- **Java:** Process environment through `System.getenv`.
+- **Go:** Process environment through `os.Getenv`.
+- **.NET:** `appsettings.json` through `ConfigurationBuilder`, overridden by environment variables.
 
-| Variable | Default | Purpose | Example |
-|----------|---------|---------|---------|
-| `AZURE_COSMOSDB_DATABASENAME` | `Hotels` | Database name | `Hotels` |
-| `VECTOR_ALGORITHM` | `diskann` | Algorithm: diskann or quantizedflat | `diskann` |
-| `DATA_FILE_WITH_VECTORS` | `../data/HotelsData_toCosmosDB_Vector.json` | Path to embedding data | `./data/HotelsData_toCosmosDB_Vector.json` |
-| `EMBEDDED_FIELD` | `DescriptionVector` | Field name containing vector embeddings | `DescriptionVector` |
-| `EMBEDDING_DIMENSIONS` | `1536` | Number of dimensions in vector | `1536` |
-| `VECTOR_DISTANCE_FUNCTION` | `cosine` | Distance metric: cosine, euclidean, dotproduct | `cosine` |
-| `AZURE_OPENAI_EMBEDDING_MODEL` | `text-embedding-3-small` | Embedding model deployment name | `text-embedding-3-small` |
-
-### 4.2 Validation Timing
-
-**Rule:** All configuration MUST be validated upfront before ANY client operations or business logic executes.
-
-**Validation Checks:**
-1. ✅ Cosmos DB endpoint is provided and non-empty
-2. ✅ Azure OpenAI endpoint is provided and non-empty
-3. ✅ Azure OpenAI API version is provided and non-empty
-4. ✅ Azure OpenAI embedding model deployment name is provided and non-empty
-5. ✅ Database name is provided and non-empty (or use default)
-6. ✅ Algorithm is valid (diskann or quantizedflat)
-7. ✅ Data file exists and is readable
-8. ✅ Embedded field name is provided and non-empty
-
-**Failure Behavior:** If ANY validation fails, print clear error message and exit with non-zero code. Do NOT attempt to continue or work around missing configuration.
+Each sample directory MUST maintain exactly one committed `.env.example` (or `appsettings.json` template) with placeholder values. Runtime configuration files (`.env`, `appsettings.json`) MUST remain ignored by Git.
 
 ---
 
-## V. Code Patterns & Structure
+## IV. Security & Query Injection Safety
 
-### 5.1 Configuration Module
+### 4.1 SQL Parameter Safety for Vector Distance
+In Azure Cosmos DB for NoSQL SQL queries, field names CANNOT be parameterized using SQL parameter placeholders (`@field`).
 
-**Rule:** Every quickstart sample MUST have a configuration module that:
-1. Reads all environment variables
-2. Applies defaults where appropriate
-3. Validates all configuration upfront
-4. Returns a configuration object/dict/map that is passed to the main workflow
-
-**Rationale:** Centralizes configuration logic, ensures validation happens once, makes testing easier.
-
-**Example interface (language-agnostic):**
-
+### 4.2 Field Name Validation Whitelist
+Any configurable embedding field name (e.g., from `EMBEDDED_FIELD` environment variable) interpolated into SQL query strings MUST be strictly validated against the whitelist regex:
+```regex
+^[A-Za-z_][A-Za-z0-9_]*$
 ```
-Config {
-  database_name: str
-  algorithm: str  // validated to diskann or quantizedflat
-  data_file: str  // validated for existence
-  embedded_field: str
-  embedding_dimensions: int
-  distance_function: str  // validated to cosine, euclidean, dotproduct
-  azure_openai_deployment: str
-  azure_openai_api_version: str
-  azure_cosmosdb_endpoint: str
-}
-```
-
-### 5.2 Client Initialization Module
-
-**Rule:** Every quickstart sample MUST have a separate client initialization module that:
-1. Uses `DefaultAzureCredential`
-2. Returns a client object or dict with both Cosmos DB and Azure OpenAI clients
-3. Allows the caller to identify and report which client failed
-
-**Rationale:** Separates authentication concerns from business logic, makes fallback logic reusable across samples.
-
-### 5.3 Data Loading & Bulk Insert
-
-**Rule:** Data loading MUST:
-1. Read JSON data file containing documents with pre-computed embeddings
-2. Validate that documents contain required fields (HotelId, embedding field)
-3. Use language SDK's bulk insert API when available (Java, .NET, Python) or batch operations
-4. Track and report Request Units (RU) consumed during insert
-5. Print progress/status to user (e.g., "Inserted 20 documents, 1250 RU consumed")
-
-**Rationale:** Bulk operations are more efficient than single inserts; RU tracking teaches developers about Azure Cosmos DB cost model.
-
-### 5.4 Query Execution & Results Display
-
-**Rule:** Query execution MUST:
-1. Generate an embedding for the search query via Azure OpenAI (same model used for data embeddings)
-2. Execute a `VectorDistance()` SQL query with configurable distance function
-3. Include ORDER BY and TOP clauses to get ranked results
-4. Return similarity scores and RU cost
-5. Display results in human-readable format with ranks
-
-**Example SQL pattern:**
-```sql
-SELECT 
-  TOP 3 
-  c.id, 
-  c.name, 
-  c.description, 
-  VectorDistance(c.DescriptionVector, @queryVector) AS distance
-FROM c
-ORDER BY VectorDistance(c.DescriptionVector, @queryVector)
-```
-
-**Result Display:** Show document ranking, distance/similarity score, and total RU cost for query execution.
-
-### 5.5 Field Name Validation (Injection Safety)
-
-**Rule:** Any field name that comes from configuration or user input MUST be validated against a whitelist before being interpolated into SQL queries.
-
-**Validation:**
-- Field name must match pattern: `[a-zA-Z_][a-zA-Z0-9_]*` (alphanumeric + underscore, starts with letter or underscore)
-- Reject any field name containing special characters, spaces, SQL keywords
-
-**Rationale:** Prevents SQL injection via field name interpolation.
-
-**Example:**
-```python
-def validate_field_name(field_name: str) -> bool:
-    """Ensure field name is safe for SQL interpolation."""
-    if not re.match(r"^[a-zA-Z_][a-zA-Z0-9_]*$", field_name):
-        raise ValueError(f"Invalid field name: {field_name}")
-    return True
-```
+If the field name fails regex validation, the application MUST throw an error and exit immediately before query construction to prevent NoSQL/SQL injection.
 
 ---
 
-## VI. Shared Resources
+## V. Query Syntax & Terminology Standards
 
-### 6.1 Data File Location & Format
+### 5.1 Approved Query Syntax
+Vector search queries MUST use the `VectorDistance()` SQL function with `TOP` and `ORDER BY` clauses.
+- **Forbidden:** Samples MUST NOT use `$search`, `cosmosSearch`, `createIndexes`, or any MongoDB wire protocol commands.
 
-**File:** `/data/HotelsData_toCosmosDB_Vector.json` (relative to repo root)
-
-**Shared across:** All 5 quickstart samples (Python, TypeScript, Java, Go, .NET)
-
-**Format:**
-```json
-[
-  {
-    "HotelId": "3",
-    "name": "Relaxation Hotel",
-    "description": "A serene retreat focusing on spa and wellness amenities...",
-    "DescriptionVector": [0.0123, 0.0456, ..., 0.9999]  // 1536 dimensions
-  },
-  ...
-]
-```
-
-**Rationale:** Shared data ensures all samples produce identical query results and demonstrates cross-language consistency.
-
-### 6.2 Container Names & Partition Key
-
-**Container 1 — DiskANN:**
-- Name: `hotels_diskann`
-- Partition key: `/HotelId` (MultiHash)
-- Vector index policy: DiskANN
-- Configured by: CREATE-INDEX samples OR Azure Portal
-
-**Container 2 — QuantizedFlat:**
-- Name: `hotels_quantizedflat`
-- Partition key: `/HotelId` (MultiHash)
-- Vector index policy: QuantizedFlat
-- Configured by: CREATE-INDEX samples OR Azure Portal
-
-**Rationale:** Quickstart samples assume containers pre-exist; they only perform data plane operations (insert, query).
+### 5.2 Required Terminology
+- Refer to the AI service explicitly as "Azure OpenAI" (not "OpenAI").
+- Use generic embedding field names (e.g., `DescriptionVector`, `vector`, `embedding`) instead of model-specific names (e.g., `text_embedding_ada_002`).
+- Describe `QuantizedFlat` as using "vector quantization techniques" and `DiskANN` as a "graph-based index".
+- Describe `Flat` as intended only for test or very small scenarios with small dimensional vectors.
+- Describe performance as "efficient RU consumption at scale" (RU cost) rather than memory usage, and "high recall" rather than specific percentages.
 
 ---
 
-## VII. README Documentation
+## VI. Version Pinning, Dependencies & Governance
 
-### 7.1 Required Sections
+### 6.1 Dependency Governance
+Samples MUST use one supported SDK generation per service surface and the latest stable version compatible with the runtime. Dependency manifests and lock files MUST be updated together.
 
-Every quickstart sample README MUST include:
+### 6.2 Cross-Language Authority
+No single language sample is the reference implementation. This Base Constitution and the respective scenario constitutions define observable behavior. Language-specific code may differ only where SDK APIs require it. All 5 language implementations (Python, TypeScript, Java, Go, .NET) MUST maintain parity.
 
-1. **Overview/Description** — What this quickstart demonstrates, who it's for
-2. **Features list** — Key capabilities (passwordless auth, bulk insert, vector search, etc.)
-3. **Prerequisites** — Required tools, SDK versions, Azure services, containers that must exist
-4. **Architecture diagram or narrative** — How components connect (App → Cosmos DB, App → OpenAI)
-5. **Getting Started** — Step-by-step instructions to configure and run
-6. **Vector Search Algorithms** — Explanation of DiskANN vs QuantizedFlat with table
-7. **Distance Functions** — Explanation of cosine, euclidean, dotproduct with examples
-8. **Environment Variables** — Complete list of variables, defaults, fallback behavior
-9. **Project Structure** — File/directory layout with brief explanations
-10. **Running the Sample** — Command syntax for different algorithms
-11. **Understanding Results** — How to interpret output (RU cost, distance scores, etc.)
-12. **Troubleshooting** — Common errors and solutions
-13. **Resources** — Links to Azure Cosmos DB docs, vector search overview, language SDK docs
-
-### 7.2 Configuration Documentation
-
-READMEs MUST clearly document:
-1. That containers must be pre-provisioned (reference CREATE-INDEX samples if needed)
-2. That passwordless authentication is required (managed identity in Azure)
-3. How to set environment variables (copy `sample.env` to `.env`, use language-specific setup)
-4. How local Azure CLI or Azure Developer CLI credentials are used
-5. How to select vector algorithm at runtime
-6. How to customize distance function
+### 6.3 Change Control
+Any changes to shared configuration, authentication, query rules, or validation contracts MUST update this Base Constitution, the respective scenario constitutions, and all affected language samples in the same PR.
 
 ---
 
-## VIII. Testing & Validation
+## VII. Appendix: Shared Base Checklist
 
-### 8.1 End-to-End Test Requirements
+Use this checklist when creating or reviewing any NoSQL quickstart sample:
 
-**Rule:** All 5 quickstart samples MUST be executed end-to-end and validated to:
-
-1. ✅ Successfully connect to Cosmos DB using passwordless auth (when infrastructure supports it)
-2. ✅ Successfully connect to Azure OpenAI using passwordless auth
-3. ✅ Load all documents from shared data file without errors
-4. ✅ Bulk-insert documents into the selected container
-5. ✅ Generate query embedding via Azure OpenAI API call
-6. ✅ Execute VectorDistance() query and get top-k results
-7. ✅ Display results with scores and RU cost
-8. ✅ Exit with code 0 (success)
-
-**Failure Criteria:**
-- Non-zero exit code
-- Missing or empty output
-- SQL errors
-- Network timeouts
-- Authentication failures
-
-### 8.2 Cross-Language Consistency Testing
-
-**Rule:** When running all 5 samples against the same data and query, they MUST:
-- Insert the same set of documents
-- Produce the same ranked result order
-- Report similar RU costs (accounting for language SDK overhead)
-- Display identical hotel recommendations
-
-**Rationale:** Proves implementations are equivalent and interchangeable.
-
----
-
-## IX. Version Pinning & Dependencies
-
-### 9.1 SDK Version Requirements
-
-Use one supported SDK generation per service surface and the latest stable
-version compatible with the sample runtime. Preview or beta packages are
-allowed only when a demonstrated feature requires them and the reason is
-documented. Update dependency manifests and lock files together.
-
----
-
-## X. Cross-language authority
-
-No single language sample is the reference implementation. This constitution
-defines observable behavior; language-specific code may differ where SDK APIs
-require it.
-
----
-
-## XI. Governance & Future Changes
-
-### 11.1 Change Control
-
-Any changes to quickstart samples that affect:
-- Configuration requirements (new env vars, removal of vars)
-- Algorithm support or container names
-- Authentication patterns
-- Data format or shared data file structure
-- Bulk insert or query patterns
-
-MUST update this constitution AND all 5 sample implementations in the same commit/PR.
-
-### 11.2 Addition of New Samples
-
-If a new language is added to the quickstart suite:
-1. Use this constitution as the specification
-2. Follow the Go reference implementation patterns
-3. Include all required README sections
-4. Add to the managed identity testing requirement (Section VII)
-5. Update this constitution to reference the new sample count (currently 5)
-
----
-
-## XII. Appendix: Sample Checklist
-
-Use this checklist when creating or maintaining a quickstart sample:
-
-**Configuration & Validation:**
-- [ ] Configuration module reads all environment variables
-- [ ] All configuration validated upfront before client initialization
-- [ ] Sensible defaults provided for optional variables
-- [ ] Clear error messages for missing/invalid configuration
-
-**Authentication:**
-- [ ] Passwordless authentication uses `DefaultAzureCredential`
-- [ ] No account keys, connection strings, or Azure OpenAI API keys
-- [ ] Authentication failures identify the affected client
-
-**Data Plane Workflow:**
-- [ ] Loads shared JSON data file from `../data/HotelsData_toCosmosDB_Vector.json`
-- [ ] Validates documents contain required fields (HotelId, embedding field)
-- [ ] Bulk-inserts into selected container (DiskANN or QuantizedFlat)
-- [ ] Tracks and reports RU consumed during insert
-- [ ] Generates query embedding via Azure OpenAI
-- [ ] Executes VectorDistance() SQL query with configurable distance function
-- [ ] Displays ranked results with scores and RU cost
-
-**Code Quality:**
-- [ ] Field names validated before SQL interpolation (injection safety)
-- [ ] All algorithm and distance function values validated upfront
-- [ ] Clear error messages for any failures
-- [ ] Exit with code 0 on success, non-zero on failure
-
-**Documentation:**
-- [ ] README includes all required sections
-- [ ] Environment variables documented with defaults
-- [ ] Getting Started section is clear and actionable
-- [ ] Containers described as pre-provisioned (not created by sample)
-- [ ] References to CREATE-INDEX samples for provisioning guidance
-- [ ] Links to relevant Azure SDK and Cosmos DB documentation
-
-**Testing:**
-- [ ] Sample executes end-to-end without errors
-- [ ] Produces same results as other language samples
-- [ ] Handles missing environment variables gracefully
-- [ ] Handles invalid algorithm/distance function values gracefully
+- [ ] Passwordless authentication uses `DefaultAzureCredential` (no account keys or connection strings).
+- [ ] All configuration validated upfront before client operations begin.
+- [ ] Required environment variables checked and reported together if missing.
+- [ ] Field names validated against `^[A-Za-z_][A-Za-z0-9_]*$` before SQL interpolation.
+- [ ] Vector search uses `VectorDistance()` SQL function with `TOP` and `ORDER BY`.
+- [ ] Uses exact terminology ("Azure OpenAI", generic embedding field names, RU cost, high recall).
+- [ ] Follows scenario-specific constitution (`docs/VECTOR-SEARCH-CONSTITUTION.md` or `docs/CREATE-INDEX-CONSTITUTION.md`).

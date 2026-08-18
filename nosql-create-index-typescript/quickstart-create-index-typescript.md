@@ -104,11 +104,10 @@ automatically. Process environment variables can override its values.
 | `AZURE_OPENAI_EMBEDDING_API_VERSION` | Embedding API version (default: `2024-08-01-preview`) |
 | `AZURE_COSMOSDB_CREATE_INDEX_EMBEDDED_FIELD` | Document field for embeddings (default: `embedding`) |
 | `EMBEDDING_DIMENSIONS` | Expected embedding dimensions (default: `1536`) |
-| `DATA_FILE_WITH_VECTORS_AND_REGIONS` | Pre-vectorized data file path |
-| `DATA_FILE_WITH_VECTORS` | Fallback pre-vectorized data file path |
+| `DATA_FILE_WITH_VECTORS_AND_REGIONS` | Pre-vectorized region data file path |
 | `PARTITION_KEY_VALUE` | Region partition key value for queries (default: `Northeast`) |
 
-If neither data file variable is set, the code uses `./data/HotelsData_toCosmosDB_Vector_byRegion.json`, resolved from the compiled `dist` folder as the sample directory's `data/` subdirectory.
+If `DATA_FILE_WITH_VECTORS_AND_REGIONS` is not set, the code uses `./data/HotelsData_toCosmosDB_Vector_byRegion.json`, resolved from the compiled `dist` folder as the sample directory's `data/` subdirectory.
 
 ## Install dependencies
 

@@ -4,10 +4,14 @@ applyTo: "nosql-*/**"
 # Running Samples — CLI Invocation (Cosmos DB NoSQL Vector Search)
 
 > [!IMPORTANT]
-> For `nosql-create-index-*/**`, stop using the guidance in this file and
-> follow [CREATE-INDEX-CONSTITUTION.md](../docs/CREATE-INDEX-CONSTITUTION.md)
-> exclusively. This includes provisioning, authentication, execution,
-> validation, cleanup, and deprovisioning.
+> For `nosql-create-index-*/**`, follow
+> [QUICKSTART-CONSTITUTION.md](../QUICKSTART-CONSTITUTION.md) (Base) and
+> [CREATE-INDEX-CONSTITUTION.md](../docs/CREATE-INDEX-CONSTITUTION.md) (Scenario).
+> This includes provisioning, authentication, execution, validation, cleanup, and deprovisioning.
+>
+> For `nosql-vector-search-*/**`, follow
+> [QUICKSTART-CONSTITUTION.md](../QUICKSTART-CONSTITUTION.md) (Base) and
+> [VECTOR-SEARCH-CONSTITUTION.md](../docs/VECTOR-SEARCH-CONSTITUTION.md) (Scenario).
 
 For create-index samples, use the canonical lifecycle skills:
 

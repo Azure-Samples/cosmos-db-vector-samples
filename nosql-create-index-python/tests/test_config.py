@@ -54,12 +54,12 @@ class ConfigTests(unittest.TestCase):
         ).resolve()
         self.assertEqual(config.data_file_with_vectors, expected_path)
 
-    def test_load_config_supports_legacy_data_file_variable(self) -> None:
+    def test_load_config_ignores_legacy_data_file_variable(self) -> None:
         env = dict(self.valid_env)
         env.pop("DATA_FILE_WITH_VECTORS_AND_REGIONS")
         env["DATA_FILE_WITH_VECTORS"] = "..\\data\\HotelsData_toCosmosDB_Vector.json"
         config = load_config(env)
-        expected_path = (sample_root() / "..\\data\\HotelsData_toCosmosDB_Vector.json").resolve()
+        expected_path = (sample_root() / "data\\HotelsData_toCosmosDB_Vector_byRegion.json").resolve()
         self.assertEqual(config.data_file_with_vectors, expected_path)
 
     def test_validate_config_rejects_missing_required_values(self) -> None:

@@ -81,7 +81,6 @@ export function loadConfigFromEnv(
     expectedDimensions: parseInt(clean(env.EMBEDDING_DIMENSIONS) || "1536", 10),
     dataFile:
       clean(env.DATA_FILE_WITH_VECTORS_AND_REGIONS) ||
-      clean(env.DATA_FILE_WITH_VECTORS) ||
       "",
     partitionKeyValue: clean(env.PARTITION_KEY_VALUE) || "Northeast",
     allowDestructiveOperations:
