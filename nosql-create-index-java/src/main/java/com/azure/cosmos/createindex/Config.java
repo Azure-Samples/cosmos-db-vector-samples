@@ -26,10 +26,7 @@ public final class Config {
         }
 
         Path sampleRoot = Path.of("").toAbsolutePath().normalize();
-        String dataFileSetting = read("DATA_FILE_WITH_VECTORS_AND_REGIONS", null);
-        if (dataFileSetting == null) {
-            dataFileSetting = read("DATA_FILE_WITH_VECTORS", "./data/HotelsData_toCosmosDB_Vector_byRegion.json");
-        }
+        String dataFileSetting = read("DATA_FILE_WITH_VECTORS_AND_REGIONS", "./data/HotelsData_toCosmosDB_Vector_byRegion.json");
         Path dataFile = sampleRoot.resolve(dataFileSetting).normalize();
 
         return new SampleConfig(
@@ -93,7 +90,7 @@ public final class Config {
         }
 
         if (!config.dataFileWithVectors().toFile().exists()) {
-            throw new IllegalArgumentException("DATA_FILE_WITH_VECTORS_AND_REGIONS (or DATA_FILE_WITH_VECTORS) does not exist: " + config.dataFileWithVectors());
+            throw new IllegalArgumentException("DATA_FILE_WITH_VECTORS_AND_REGIONS does not exist: " + config.dataFileWithVectors());
         }
     }
 

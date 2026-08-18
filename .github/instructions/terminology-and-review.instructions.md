@@ -1,9 +1,22 @@
 ---
 applyTo: "nosql-*/**"
 ---
-# Terminology & PR Review Standards — Cosmos DB NoSQL Vector Search
+# Terminology and PR review standards — Cosmos DB NoSQL vector-search samples
 
-This file captures correct terminology and common review feedback patterns for `nosql-vector-search-*` samples. Apply these rules when writing, reviewing, or editing sample code and documentation.
+> [!IMPORTANT]
+> This file applies to `nosql-vector-search-*` samples only, which are governed by
+> [QUICKSTART-CONSTITUTION.md](../QUICKSTART-CONSTITUTION.md) (Base) and
+> [VECTOR-SEARCH-CONSTITUTION.md](../docs/VECTOR-SEARCH-CONSTITUTION.md) (Scenario).
+>
+> For `nosql-create-index-*` samples, follow
+> [QUICKSTART-CONSTITUTION.md](../QUICKSTART-CONSTITUTION.md) (Base) and
+> [CREATE-INDEX-CONSTITUTION.md](../docs/CREATE-INDEX-CONSTITUTION.md) (Scenario).
+> Do not apply the container-creation, container-deletion, or management-SDK
+> prohibitions in this file to create-index samples.
+
+This file captures correct terminology and common review feedback patterns for
+`nosql-vector-search-*` samples. Apply these rules when writing, reviewing, or
+editing vector-search sample code and documentation.
 
 ## Terminology — Use These Exact Phrasings
 
@@ -77,7 +90,7 @@ SELECT TOP 5 VectorDistance(c.@embeddedField, @embedding) FROM c
 
 Always validate the field name against `/^[A-Za-z_][A-Za-z0-9_]*$/` before interpolation to prevent SQL injection.
 
-## Code Review Checklist
+## Vector-search code review checklist
 
 ### Authentication
 - [ ] Uses `DefaultAzureCredential` — NOT connection strings, account keys, or hardcoded credentials

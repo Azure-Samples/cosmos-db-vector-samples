@@ -6,13 +6,15 @@ import (
 	"path/filepath"
 	"runtime"
 	"sort"
+	"strconv"
 	"strings"
 )
 
 const (
 	defaultDiskANNContainer         = "hotels_diskann"
 	defaultQuantizedFlatContainer   = "hotels_quantizedflat"
-	embeddingFieldName              = "embedding"
+	diskANNContainer                = defaultDiskANNContainer
+	quantizedFlatContainer          = defaultQuantizedFlatContainer
 	embeddingDimensions             = 1536
 	partitionKeyFieldName           = "Region"
 	defaultPartitionKeyValue        = "Northeast" // Default region to query (matches .NET)
@@ -20,16 +22,6 @@ const (
 	azureOpenAIEmbeddingsAPIVersion = "2024-02-01"
 	defaultEmbeddingFieldName       = "embedding" // fallback; read from AZURE_COSMOSDB_CREATE_INDEX_EMBEDDED_FIELD if available
 )
-
-var (
-	diskANNContainer      = defaultDiskANNContainer
-	quantizedFlatContainer = defaultQuantizedFlatContainer
-)
-
-var algorithmToContainer = map[string]string{
-	"diskann":       diskANNContainer,
-	"quantizedflat": quantizedFlatContainer,
-}
 
 // trimEnvValue removes surrounding whitespace and quotes from environment variable values.
 // This handles .env files that use quoted values like: KEY="value" or KEY='value'
@@ -44,26 +36,27 @@ func trimEnvValue(s string) string {
 }
 
 type Config struct {
-	CosmosEndpoint                string
-	DatabaseName                  string
-	DiskANNContainerName          string
-	QuantizedFlatContainerName    string
-	PrimaryContainerName          string
-	ContainerNames                []string
-	OpenAIEmbeddingEndpoint       string
-	OpenAIEmbeddingDeployment     string
-	VectorAlgorithm               string
-	DataFileWithVectors           string
-	EmbeddingFieldName            string
-	EmbeddingDimensions           int
-	PartitionKeyFieldName         string
-	PartitionKeyFieldValue        string
-	QueryText                     string
-	OpenAIAPIVersion              string
-	SubscriptionID                string
-	ResourceGroup                 string
-	AccountName                   string
-	Location                      string
+	CosmosEndpoint             string
+	DatabaseName               string
+	DiskANNContainerName       string
+	QuantizedFlatContainerName string
+	PrimaryContainerName       string
+	ContainerNames             []string
+	OpenAIEmbeddingEndpoint    string
+	OpenAIEmbeddingDeployment  string
+	VectorAlgorithm            string
+	DataFileWithVectors        string
+	EmbeddingFieldName         string
+	EmbeddingDimensions        int
+	PartitionKeyFieldName      string
+	PartitionKeyFieldValue     string
+	QueryText                  string
+	OpenAIAPIVersion           string
+	SubscriptionID             string
+	ResourceGroup              string
+	AccountName                string
+	Location                   string
+	AllowDestructiveOperations bool
 }
 
 func LoadConfig() (*Config, error) {
@@ -73,22 +66,25 @@ func LoadConfig() (*Config, error) {
 }
 
 func LoadConfigFromEnv(getenv func(string) string) (*Config, error) {
-	// Read container names from env vars or use defaults
-	diskANNContainer = trimEnvValue(getenv("AZURE_COSMOSDB_CREATE_INDEX_DISKANN_CONTAINER_NAME"))
-	if diskANNContainer == "" {
-		diskANNContainer = defaultDiskANNContainer
+	diskANNContainerName := trimEnvValue(getenv("AZURE_COSMOSDB_CREATE_INDEX_DISKANN_CONTAINER_NAME"))
+	if diskANNContainerName == "" {
+		diskANNContainerName = defaultDiskANNContainer
 	}
-	quantizedFlatContainer = trimEnvValue(getenv("AZURE_COSMOSDB_CREATE_INDEX_QUANTIZEDFLAT_CONTAINER_NAME"))
-	if quantizedFlatContainer == "" {
-		quantizedFlatContainer = defaultQuantizedFlatContainer
+	quantizedFlatContainerName := trimEnvValue(getenv("AZURE_COSMOSDB_CREATE_INDEX_QUANTIZEDFLAT_CONTAINER_NAME"))
+	if quantizedFlatContainerName == "" {
+		quantizedFlatContainerName = defaultQuantizedFlatContainer
 	}
 
 	algorithm := strings.ToLower(trimEnvValue(getenv("VECTOR_ALGORITHM")))
 	containerName := trimEnvValue(getenv("AZURE_COSMOSDB_CONTAINER_NAME"))
-	dataFile := trimEnvValue(getenv("DATA_FILE_WITH_VECTORS_AND_REGIONS"))
-	if dataFile == "" {
-		dataFile = trimEnvValue(getenv("DATA_FILE_WITH_VECTORS"))
+	allowCustomDeletion, err := parseOptionalBool(
+		"AZURE_COSMOSDB_CREATE_INDEX_ALLOW_DESTRUCTIVE_OPERATIONS",
+		getenv("AZURE_COSMOSDB_CREATE_INDEX_ALLOW_DESTRUCTIVE_OPERATIONS"),
+	)
+	if err != nil {
+		return nil, err
 	}
+	dataFile := trimEnvValue(getenv("DATA_FILE_WITH_VECTORS_AND_REGIONS"))
 	embeddingField := trimEnvValue(getenv("AZURE_COSMOSDB_CREATE_INDEX_EMBEDDED_FIELD"))
 	if embeddingField == "" {
 		embeddingField = defaultEmbeddingFieldName
@@ -99,25 +95,26 @@ func LoadConfigFromEnv(getenv func(string) string) (*Config, error) {
 	}
 
 	cfg := &Config{
-		CosmosEndpoint:            trimEnvValue(getenv("AZURE_COSMOSDB_ENDPOINT")),
-		DatabaseName:              trimEnvValue(getenv("AZURE_COSMOSDB_CREATE_INDEX_DATABASENAME")),
-		DiskANNContainerName:      diskANNContainer,
-		QuantizedFlatContainerName: quantizedFlatContainer,
-		PrimaryContainerName:      containerName,
-		OpenAIEmbeddingEndpoint:   trimEnvValue(getenv("AZURE_OPENAI_EMBEDDING_ENDPOINT")),
-		OpenAIEmbeddingDeployment: trimEnvValue(getenv("AZURE_OPENAI_EMBEDDING_DEPLOYMENT")),
-		VectorAlgorithm:           algorithm,
-		DataFileWithVectors:       dataFile,
-		EmbeddingFieldName:        embeddingField,
-		EmbeddingDimensions:       embeddingDimensions,
-		PartitionKeyFieldName:     partitionKeyFieldName,
-		PartitionKeyFieldValue:    partitionKeyValue,
-		QueryText:                 defaultQueryText,
-		OpenAIAPIVersion:          azureOpenAIEmbeddingsAPIVersion,
-		SubscriptionID:            trimEnvValue(getenv("AZURE_SUBSCRIPTION_ID")),
-		ResourceGroup:             trimEnvValue(getenv("AZURE_RESOURCE_GROUP")),
-		AccountName:               trimEnvValue(getenv("AZURE_COSMOSDB_ACCOUNT_NAME")),
-		Location:                  trimEnvValue(getenv("AZURE_LOCATION")),
+		CosmosEndpoint:             trimEnvValue(getenv("AZURE_COSMOSDB_ENDPOINT")),
+		DatabaseName:               trimEnvValue(getenv("AZURE_COSMOSDB_CREATE_INDEX_DATABASENAME")),
+		DiskANNContainerName:       diskANNContainerName,
+		QuantizedFlatContainerName: quantizedFlatContainerName,
+		PrimaryContainerName:       containerName,
+		OpenAIEmbeddingEndpoint:    trimEnvValue(getenv("AZURE_OPENAI_EMBEDDING_ENDPOINT")),
+		OpenAIEmbeddingDeployment:  trimEnvValue(getenv("AZURE_OPENAI_EMBEDDING_DEPLOYMENT")),
+		VectorAlgorithm:            algorithm,
+		DataFileWithVectors:        dataFile,
+		EmbeddingFieldName:         embeddingField,
+		EmbeddingDimensions:        embeddingDimensions,
+		PartitionKeyFieldName:      partitionKeyFieldName,
+		PartitionKeyFieldValue:     partitionKeyValue,
+		QueryText:                  defaultQueryText,
+		OpenAIAPIVersion:           azureOpenAIEmbeddingsAPIVersion,
+		SubscriptionID:             trimEnvValue(getenv("AZURE_SUBSCRIPTION_ID")),
+		ResourceGroup:              trimEnvValue(getenv("AZURE_RESOURCE_GROUP")),
+		AccountName:                trimEnvValue(getenv("AZURE_COSMOSDB_ACCOUNT_NAME")),
+		Location:                   trimEnvValue(getenv("AZURE_LOCATION")),
+		AllowDestructiveOperations: allowCustomDeletion,
 	}
 
 	if cfg.DatabaseName == "" {
@@ -136,9 +133,22 @@ func LoadConfigFromEnv(getenv func(string) string) (*Config, error) {
 		return nil, err
 	}
 	cfg.DataFileWithVectors = resolvedDataFile
-	cfg.ContainerNames = orderedContainers(cfg.PrimaryContainerName)
+	cfg.ContainerNames = orderedContainers(cfg)
 
 	return cfg, nil
+}
+
+func parseOptionalBool(name, value string) (bool, error) {
+	value = trimEnvValue(value)
+	if value == "" {
+		return false, nil
+	}
+
+	parsed, err := strconv.ParseBool(value)
+	if err != nil {
+		return false, fmt.Errorf("%s must be true or false", name)
+	}
+	return parsed, nil
 }
 
 func validateConfig(cfg *Config) error {
@@ -165,9 +175,18 @@ func validateConfig(cfg *Config) error {
 		return fmt.Errorf("missing required environment variables: %s", strings.Join(missing, ", "))
 	}
 
+	if err := validateContainerDeletionSafety(cfg); err != nil {
+		return err
+	}
+
 	if cfg.VectorAlgorithm != "" {
-		expectedContainer, ok := algorithmToContainer[cfg.VectorAlgorithm]
-		if !ok {
+		expectedContainer := ""
+		switch cfg.VectorAlgorithm {
+		case "diskann":
+			expectedContainer = cfg.DiskANNContainerName
+		case "quantizedflat":
+			expectedContainer = cfg.QuantizedFlatContainerName
+		default:
 			return fmt.Errorf("invalid VECTOR_ALGORITHM %q; supported values: diskann, quantizedflat", cfg.VectorAlgorithm)
 		}
 
@@ -176,21 +195,42 @@ func validateConfig(cfg *Config) error {
 		}
 	}
 
-	if cfg.PrimaryContainerName != "" && cfg.PrimaryContainerName != diskANNContainer && cfg.PrimaryContainerName != quantizedFlatContainer {
-		return fmt.Errorf("invalid AZURE_COSMOSDB_CONTAINER_NAME %q; supported values: %s, %s", cfg.PrimaryContainerName, diskANNContainer, quantizedFlatContainer)
+	if cfg.PrimaryContainerName != "" && cfg.PrimaryContainerName != cfg.DiskANNContainerName && cfg.PrimaryContainerName != cfg.QuantizedFlatContainerName {
+		return fmt.Errorf("invalid AZURE_COSMOSDB_CONTAINER_NAME %q; supported values: %s, %s", cfg.PrimaryContainerName, cfg.DiskANNContainerName, cfg.QuantizedFlatContainerName)
 	}
 
 	return nil
 }
 
-func orderedContainers(primary string) []string {
-	if primary == "" {
-		return []string{diskANNContainer, quantizedFlatContainer}
+func validateContainerDeletionSafety(cfg *Config) error {
+	if strings.TrimSpace(cfg.DiskANNContainerName) == "" ||
+		strings.TrimSpace(cfg.QuantizedFlatContainerName) == "" {
+		return fmt.Errorf("create-index container names must not be empty")
+	}
+	if cfg.DiskANNContainerName == cfg.QuantizedFlatContainerName {
+		return fmt.Errorf(
+			"AZURE_COSMOSDB_CREATE_INDEX_DISKANN_CONTAINER_NAME and AZURE_COSMOSDB_CREATE_INDEX_QUANTIZEDFLAT_CONTAINER_NAME must be different",
+		)
 	}
 
-	containers := []string{primary}
-	for _, candidate := range []string{diskANNContainer, quantizedFlatContainer} {
-		if candidate != primary {
+	customContainerNames := cfg.DiskANNContainerName != defaultDiskANNContainer ||
+		cfg.QuantizedFlatContainerName != defaultQuantizedFlatContainer
+	if customContainerNames && !cfg.AllowDestructiveOperations {
+		return fmt.Errorf(
+			"custom create-index container names require AZURE_COSMOSDB_CREATE_INDEX_ALLOW_DESTRUCTIVE_OPERATIONS=true because the sample deletes configured containers before creation and during cleanup",
+		)
+	}
+	return nil
+}
+
+func orderedContainers(cfg *Config) []string {
+	if cfg.PrimaryContainerName == "" {
+		return []string{cfg.DiskANNContainerName, cfg.QuantizedFlatContainerName}
+	}
+
+	containers := []string{cfg.PrimaryContainerName}
+	for _, candidate := range []string{cfg.DiskANNContainerName, cfg.QuantizedFlatContainerName} {
+		if candidate != cfg.PrimaryContainerName {
 			containers = append(containers, candidate)
 		}
 	}
@@ -200,7 +240,7 @@ func orderedContainers(primary string) []string {
 func resolveDataFilePath(value string) (string, error) {
 	if filepath.IsAbs(value) {
 		if _, err := os.Stat(value); err != nil {
-			return "", fmt.Errorf("DATA_FILE_WITH_VECTORS_AND_REGIONS (or DATA_FILE_WITH_VECTORS) not found: %s", value)
+			return "", fmt.Errorf("DATA_FILE_WITH_VECTORS_AND_REGIONS not found: %s", value)
 		}
 		return value, nil
 	}
@@ -237,5 +277,5 @@ func resolveDataFilePath(value string) (string, error) {
 		}
 	}
 
-	return "", fmt.Errorf("DATA_FILE_WITH_VECTORS_AND_REGIONS (or DATA_FILE_WITH_VECTORS) not found: %s", value)
+	return "", fmt.Errorf("DATA_FILE_WITH_VECTORS_AND_REGIONS not found: %s", value)
 }

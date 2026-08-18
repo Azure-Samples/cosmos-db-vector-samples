@@ -100,7 +100,7 @@ func TestContainerAlgorithmMismatchFailsFast(t *testing.T) {
 		t.Fatalf("expected go run to fail, output: %s", string(output))
 	}
 
-	if !strings.Contains(string(output), `VECTOR_ALGORITHM="diskann" must use AZURE_COSMOSDB_CONTAINER_NAME="hotels_diskann_go"`) {
+	if !strings.Contains(string(output), `VECTOR_ALGORITHM="diskann" must use AZURE_COSMOSDB_CONTAINER_NAME="hotels_diskann"`) {
 		t.Fatalf("unexpected output: %s", string(output))
 	}
 }

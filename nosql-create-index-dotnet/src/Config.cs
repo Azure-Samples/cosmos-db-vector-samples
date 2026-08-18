@@ -60,7 +60,6 @@ public static class Config
 
         var dataFileValue =
             GetValue("DATA_FILE_WITH_VECTORS_AND_REGIONS", "DataFilePath")
-            ?? GetValue("DATA_FILE_WITH_VECTORS")
             ?? DefaultDataFile;
 
         return new SampleConfig(

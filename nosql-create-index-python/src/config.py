@@ -7,9 +7,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Mapping, Optional, Sequence
 
+
 KNOWN_CONTAINERS = {
-    "diskann": os.getenv("AZURE_COSMOSDB_CREATE_INDEX_DISKANN_CONTAINER_NAME", "hotels_diskann"),
-    "quantizedflat": os.getenv("AZURE_COSMOSDB_CREATE_INDEX_QUANTIZEDFLAT_CONTAINER_NAME", "hotels_quantizedflat"),
+    "diskann": "hotels_diskann",
+    "quantizedflat": "hotels_quantizedflat",
 }
 
 REQUIRED_ENV_VARS = (
@@ -24,6 +25,7 @@ CONTROL_PLANE_ENV_VARS = (
     "AZURE_SUBSCRIPTION_ID",
     "AZURE_RESOURCE_GROUP",
     "AZURE_COSMOSDB_ACCOUNT_NAME",
+    "AZURE_LOCATION",
 )
 
 DEFAULT_QUERY_TEXT = "hotel near the ocean"
@@ -49,6 +51,10 @@ class SampleConfig:
     subscription_id: str = ""
     resource_group: str = ""
     account_name: str = ""
+    location: str = ""
+    diskann_container_name: str = KNOWN_CONTAINERS["diskann"]
+    quantizedflat_container_name: str = KNOWN_CONTAINERS["quantizedflat"]
+    allow_destructive_operations: bool = False
     # Data plane fields
     query_text: str = DEFAULT_QUERY_TEXT
     embedding_model_name: str = DEFAULT_EMBEDDING_MODEL
@@ -78,6 +84,14 @@ def _clean(value: Optional[str]) -> Optional[str]:
     return cleaned or None
 
 
+def _container_name(
+    environment: Mapping[str, str],
+    environment_variable: str,
+    default: str,
+) -> str:
+    return _clean(environment.get(environment_variable)) or default
+
+
 def _resolve_data_file(path_value: str) -> Path:
     candidate = Path(path_value)
     if candidate.is_absolute():
@@ -98,8 +112,6 @@ def load_config(env: Optional[Mapping[str, str]] = None) -> SampleConfig:
     environment = env or os.environ
 
     data_file_value = _clean(environment.get("DATA_FILE_WITH_VECTORS_AND_REGIONS"))
-    if not data_file_value:
-        data_file_value = _clean(environment.get("DATA_FILE_WITH_VECTORS"))
     if not data_file_value:
         data_file_value = "./data/HotelsData_toCosmosDB_Vector_byRegion.json"
 
@@ -123,6 +135,21 @@ def load_config(env: Optional[Mapping[str, str]] = None) -> SampleConfig:
         subscription_id=_clean(environment.get("AZURE_SUBSCRIPTION_ID")) or "",
         resource_group=_clean(environment.get("AZURE_RESOURCE_GROUP")) or "",
         account_name=_clean(environment.get("AZURE_COSMOSDB_ACCOUNT_NAME")) or "",
+        location=_clean(environment.get("AZURE_LOCATION")) or "",
+        diskann_container_name=_container_name(
+            environment,
+            "AZURE_COSMOSDB_CREATE_INDEX_DISKANN_CONTAINER_NAME",
+            KNOWN_CONTAINERS["diskann"],
+        ),
+        quantizedflat_container_name=_container_name(
+            environment,
+            "AZURE_COSMOSDB_CREATE_INDEX_QUANTIZEDFLAT_CONTAINER_NAME",
+            KNOWN_CONTAINERS["quantizedflat"],
+        ),
+        allow_destructive_operations=(
+            (_clean(environment.get("AZURE_COSMOSDB_CREATE_INDEX_ALLOW_DESTRUCTIVE_OPERATIONS")) or "").lower()
+            == "true"
+        ),
         # Data plane fields
         partition_key_value=partition_key_value,
         embedding_field_name=_clean(environment.get("AZURE_COSMOSDB_CREATE_INDEX_EMBEDDED_FIELD")) or DEFAULT_EMBEDDING_FIELD,
@@ -143,15 +170,18 @@ def validate_config(config: SampleConfig) -> None:
             "VECTOR_ALGORITHM must be one of: diskann, quantizedflat."
         )
 
-    if config.container_name and config.container_name not in KNOWN_CONTAINERS.values():
+    validate_container_deletion_targets(config)
+    configured_containers = _configured_containers(config)
+
+    if config.container_name and config.container_name not in configured_containers.values():
         raise ConfigError(
             "AZURE_COSMOSDB_CONTAINER_NAME must be one of: {0}".format(
-                ", ".join(KNOWN_CONTAINERS.values())
+                ", ".join(configured_containers.values())
             )
         )
 
     if config.container_name and config.vector_algorithm:
-        expected_container = KNOWN_CONTAINERS[config.vector_algorithm]
+        expected_container = configured_containers[config.vector_algorithm]
         if config.container_name != expected_container:
             raise ConfigError(
                 "AZURE_COSMOSDB_CONTAINER_NAME and VECTOR_ALGORITHM refer to different containers."
@@ -167,25 +197,60 @@ def validate_config(config: SampleConfig) -> None:
 
     if not config.data_file_with_vectors.exists():
         raise ConfigError(
-            "DATA_FILE_WITH_VECTORS_AND_REGIONS (or DATA_FILE_WITH_VECTORS) does not exist: {0}".format(
+            "DATA_FILE_WITH_VECTORS_AND_REGIONS does not exist: {0}".format(
                 config.data_file_with_vectors
             )
         )
 
 
 def target_containers(config: SampleConfig) -> Sequence[str]:
+    configured_containers = _configured_containers(config)
     if config.container_name:
         return (config.container_name,)
     if config.vector_algorithm:
-        return (KNOWN_CONTAINERS[config.vector_algorithm],)
-    return tuple(KNOWN_CONTAINERS.values())
+        return (configured_containers[config.vector_algorithm],)
+    return tuple(configured_containers.values())
 
 
-def algorithm_label(container_name: str) -> str:
-    for algorithm, known_container in KNOWN_CONTAINERS.items():
+def algorithm_label(container_name: str, config: Optional[SampleConfig] = None) -> str:
+    known_containers = (
+        {
+            "diskann": config.diskann_container_name,
+            "quantizedflat": config.quantizedflat_container_name,
+        }
+        if config
+        else KNOWN_CONTAINERS
+    )
+    for algorithm, known_container in known_containers.items():
         if known_container == container_name:
             return "DiskANN" if algorithm == "diskann" else "QuantizedFlat"
     return container_name
+
+
+def _configured_containers(config: SampleConfig) -> Mapping[str, str]:
+    return {
+        "diskann": config.diskann_container_name,
+        "quantizedflat": config.quantizedflat_container_name,
+    }
+
+
+def validate_container_deletion_targets(config: SampleConfig) -> None:
+    configured_containers = _configured_containers(config)
+    if config.diskann_container_name == config.quantizedflat_container_name:
+        raise ConfigError(
+            "DiskANN and QuantizedFlat container names must be different."
+        )
+
+    uses_custom_container_names = any(
+        configured_containers[algorithm] != default_name
+        for algorithm, default_name in KNOWN_CONTAINERS.items()
+    )
+    if uses_custom_container_names and not config.allow_destructive_operations:
+        raise ConfigError(
+            "Custom container names require "
+            "AZURE_COSMOSDB_CREATE_INDEX_ALLOW_DESTRUCTIVE_OPERATIONS=true "
+            "because the sample deletes and recreates its configured containers."
+        )
 
 
 def _env_to_field(env_name: str) -> str:
@@ -194,5 +259,9 @@ def _env_to_field(env_name: str) -> str:
         "AZURE_COSMOSDB_CREATE_INDEX_DATABASENAME": "database_name",
         "AZURE_OPENAI_EMBEDDING_ENDPOINT": "openai_embedding_endpoint",
         "AZURE_OPENAI_EMBEDDING_DEPLOYMENT": "openai_embedding_deployment",
+        "AZURE_SUBSCRIPTION_ID": "subscription_id",
+        "AZURE_RESOURCE_GROUP": "resource_group",
+        "AZURE_COSMOSDB_ACCOUNT_NAME": "account_name",
+        "AZURE_LOCATION": "location",
     }
     return mapping[env_name]

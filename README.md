@@ -49,11 +49,15 @@ This repository supports **two distinct deployment scenarios** based on what you
 | Scenario | Database | Env Variable | Use Case |
 |----------|----------|---|----------|
 | **Vector Search** | Standard Cosmos DB NoSQL with vector search | Not set (default) | Query existing vectors with similarity search |
-| **Create Index** | Cosmos DB NoSQL with custom vector indexing | `AZURE_COSMOSDB_CREATE_INDEX_DATABASE_NAME='HotelsCreateIndex'` | Demonstrate building and configuring vector indexes |
+| **Create Index** | Cosmos DB NoSQL with custom vector indexing | `AZURE_COSMOSDB_CREATE_INDEX_DATABASENAME='HotelsCreateIndex'` | Demonstrate building and configuring vector indexes |
 
 ### How to Set Environment Variables
 
-**⚠️ Important:** You must **set the environment variable BEFORE running `azd up`** (not just pass it on the command line). The variable needs to persist throughout the deployment and teardown lifecycle.
+> [!IMPORTANT]
+> Set `AZURE_COSMOSDB_CREATE_INDEX_DATABASENAME` before `azd up`, preferably
+> with `azd env set`. Bicep creates the configured create-index database. The
+> language samples create and delete only `hotels_diskann` and
+> `hotels_quantizedflat`.
 
 #### Vector Search Scenario (Default - No Env Variable Needed)
 ```powershell
@@ -75,24 +79,24 @@ You have two options to set the environment variable:
 **Windows (PowerShell):**
 ```powershell
 # Set for current session (variable persists until you close PowerShell)
-$env:AZURE_COSMOSDB_CREATE_INDEX_DATABASE_NAME='HotelsCreateIndex'
+$env:AZURE_COSMOSDB_CREATE_INDEX_DATABASENAME='HotelsCreateIndex'
 
 # Verify it's set
-$env:AZURE_COSMOSDB_CREATE_INDEX_DATABASE_NAME
+$env:AZURE_COSMOSDB_CREATE_INDEX_DATABASENAME
 
-# Provision - variable persists for azd up AND azd down in same session
+# Provision the create-index database and shared resources
 azd up
 ```
 
 **Bash/Linux/macOS/WSL:**
 ```bash
 # Set for current session (variable persists in this terminal)
-export AZURE_COSMOSDB_CREATE_INDEX_DATABASE_NAME='HotelsCreateIndex'
+export AZURE_COSMOSDB_CREATE_INDEX_DATABASENAME='HotelsCreateIndex'
 
 # Verify it's set
-echo $AZURE_COSMOSDB_CREATE_INDEX_DATABASE_NAME
+echo $AZURE_COSMOSDB_CREATE_INDEX_DATABASENAME
 
-# Provision - variable persists for azd up AND azd down in same session
+# Provision the create-index database and shared resources
 azd up
 ```
 
@@ -102,7 +106,7 @@ Store the variable in your azd environment so it persists across sessions:
 
 ```powershell
 # PowerShell
-azd env set AZURE_COSMOSDB_CREATE_INDEX_DATABASE_NAME "HotelsCreateIndex"
+azd env set AZURE_COSMOSDB_CREATE_INDEX_DATABASENAME "HotelsCreateIndex"
 
 # Verify it's set
 azd env get-values | findstr /i "CREATE_INDEX"
@@ -113,7 +117,7 @@ azd up
 
 ```bash
 # Bash
-azd env set AZURE_COSMOSDB_CREATE_INDEX_DATABASE_NAME "HotelsCreateIndex"
+azd env set AZURE_COSMOSDB_CREATE_INDEX_DATABASENAME "HotelsCreateIndex"
 
 # Verify it's set
 azd env get-values | grep CREATE_INDEX
@@ -126,7 +130,7 @@ azd up
 
 **Windows (PowerShell):**
 ```powershell
-[Environment]::SetEnvironmentVariable('AZURE_COSMOSDB_CREATE_INDEX_DATABASE_NAME', 'HotelsCreateIndex', 'User')
+[Environment]::SetEnvironmentVariable('AZURE_COSMOSDB_CREATE_INDEX_DATABASENAME', 'HotelsCreateIndex', 'User')
 # Restart PowerShell to see the permanent setting
 azd up
 ```
@@ -134,7 +138,7 @@ azd up
 **Bash/Linux/macOS:**
 ```bash
 # Add to your shell configuration (~/.bashrc, ~/.zshrc, etc.)
-echo "export AZURE_COSMOSDB_CREATE_INDEX_DATABASE_NAME='HotelsCreateIndex'" >> ~/.bashrc
+echo "export AZURE_COSMOSDB_CREATE_INDEX_DATABASENAME='HotelsCreateIndex'" >> ~/.bashrc
 source ~/.bashrc
 azd up
 ```
@@ -164,10 +168,10 @@ npm run start:diskann
 ```
 
 **Why the environment variable matters:**
-- **Post-provision hook** reads this variable to determine which data files to copy
-- **Pre-down hook** reads this variable to determine which data files to clean up
-- If you only pass it inline (`$env:VAR='value'; azd up`), it's lost after that command
-- When you run `azd down` later in a new session, the variable isn't set, causing the cleanup script to look for the wrong filenames
+- Bicep uses it to select and name the create-index database.
+- The lifecycle hooks use the resulting `azd` environment output to select the
+  create-index data files.
+- The samples read the same variable for data-plane database access.
 
 ## 📖 Key Concepts
 
@@ -178,9 +182,9 @@ Vector embeddings are numerical representations of text, images, or other data i
 
 | Algorithm      | Accuracy | Speed    | Scale   | Best For                        |
 |---------------|----------|----------|---------|----------------------------------|
-| **Flat**      | 100%     | Slow     | Small   | Dev/test, maximum accuracy      |
-| **QuantizedFlat** | ~100% | Fast     | Large   | Balanced performance            |
-| **DiskANN**   | High     | Very Fast| Massive | Enterprise scale, RAG, AI apps  |
+| **Flat** | High | Slow | Very small | Testing or isolated-partition searches with up to about 50,000 vectors |
+| **QuantizedFlat** | High | Fast | Large | Low-latency workloads with efficient RU consumption at scale |
+| **DiskANN** | High | Very fast | Massive | Highly scalable RAG and AI workloads |
 
 ### Distance Metrics
 
@@ -216,21 +220,20 @@ This project has adopted the [Microsoft Open Source Code of Conduct](https://ope
 For more information see the [Code of Conduct FAQ](https://opensource.microsoft.com/codeofconduct/faq/) or
 contact [opencode@microsoft.com](mailto:opencode@microsoft.com) with any additional questions or comments.
 
-### CREATE-INDEX Samples Requirements
+### NoSQL Quickstart Sample Governance
 
-If you're working on the CREATE-INDEX samples (Python, TypeScript, Java, Go, .NET), please review the
-[**CREATE-INDEX Samples Constitution**](./.github/CREATE-INDEX-CONSTITUTION.md) which documents:
-- Parameterization requirements (all container/index names from environment variables)
-- Control plane (ARM SDK) validation standards
-- Language-specific configuration patterns
-- Documentation and testing requirements
-- Reference implementation (Go sample) for validation behavior
+All Azure Cosmos DB NoSQL quickstarts in this repository are governed by:
+- [**Quickstart Base Constitution**](./.github/QUICKSTART-CONSTITUTION.md) — Shared contract applying to all NoSQL quickstarts (authentication, environment variable handling, SQL injection safety, terminology, and SDK pinning).
 
-All CREATE-INDEX samples must conform to these standards.
+Additionally, each sample scenario extends the base with scenario-specific requirements:
+- [**Vector Search Scenario Constitution**](./.github/docs/VECTOR-SEARCH-CONSTITUTION.md) — Requirements for `nosql-vector-search-*` data-plane quickstarts.
+- [**Create Index Scenario Constitution**](./.github/docs/CREATE-INDEX-CONSTITUTION.md) — Requirements for `nosql-create-index-*` control-plane and data-plane quickstarts.
+
+All quickstart samples must conform to the base contract and their scenario constitution.
 
 ## 📄 License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE.md) file for details.
 
 ## 🔒 Trademarks
 
