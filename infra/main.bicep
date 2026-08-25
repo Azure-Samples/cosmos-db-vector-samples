@@ -22,6 +22,9 @@ param location string
 @description('Id of the principal to assign database and application roles.')
 param deploymentUserPrincipalId string = ''
 
+@description('Enable create-index database and containers. Leave empty for vector search only. Set to "HotelsCreateIndex" to enable both vector search and create-index scenarios.')
+param createIndexDatabaseName string = ''
+
 var resourceToken = toLower(uniqueString(subscription().id, environmentName, location))
 var tags = { 'azd-env-name': environmentName }
 var prefix = '${environmentName}${resourceToken}'
@@ -75,7 +78,6 @@ var dataFileWithVectors = './data/HotelsData_toCosmosDB_Vector.json'
 var dataFileWithVectorsAndRegions = './data/HotelsData_toCosmosDB_Vector_byRegion.json'
 var dataFileWithoutVectors = './data/HotelsData_toCosmosDB.JSON'
 var databaseName = 'Hotels'
-var createIndexDatabaseName = 'HotelsCreateIndex'
 var fieldToEmbed = 'Description'
 var embeddedFieldName = 'DescriptionVector'
 var embeddingDimensions = '1536'
@@ -177,14 +179,18 @@ output AZURE_OPENAI_EMBEDDING_API_VERSION string = embeddingModelApiVersion
 
 output AZURE_COSMOSDB_ACCOUNT_NAME string = database.outputs.accountName
 output AZURE_COSMOSDB_ENDPOINT string =  database.outputs.endpoint
-output AZURE_COSMOSDB_DATABASENAME string = databaseName
-output AZURE_COSMOSDB_DISKANN_CONTAINER_NAME string = database.outputs.containers[0].name
-output AZURE_COSMOSDB_QUANTIZEDFLAT_CONTAINER_NAME string = database.outputs.containers[1].name
-output AZURE_COSMOSDB_PARTITION_KEY_PATH string = database.outputs.partitionKeyPathForVectorSearch
+output AZURE_COSMOSDB_DATABASENAME string = empty(createIndexDatabaseName) ? databaseName : ''
+output AZURE_COSMOSDB_DISKANN_CONTAINER_NAME string = empty(createIndexDatabaseName) ? database.outputs.containers[0].name : ''
+output AZURE_COSMOSDB_QUANTIZEDFLAT_CONTAINER_NAME string = empty(createIndexDatabaseName) ? database.outputs.containers[1].name : ''
+output AZURE_COSMOSDB_PARTITION_KEY_PATH string = empty(createIndexDatabaseName) ? database.outputs.partitionKeyPathForVectorSearch : ''
 
 output AZURE_COSMOSDB_CREATE_INDEX_DATABASENAME string = !empty(createIndexDatabaseName) ? createIndexDatabaseName : ''
-output AZURE_COSMOSDB_CREATE_INDEX_DISKANN_CONTAINER_NAME string = !empty(createIndexDatabaseName) ? database.outputs.createIndexContainers[0].name : ''
-output AZURE_COSMOSDB_CREATE_INDEX_QUANTIZEDFLAT_CONTAINER_NAME string = !empty(createIndexDatabaseName) ? database.outputs.createIndexContainers[1].name : ''
+// NOTE: CREATE-INDEX containers are created by post-provision hook (post-provision.sh/.ps1)
+// because they are scenario-dependent (diskANN vs quantizedFlat). The hook copies data files
+// and the sample code (control-plane.ts) creates containers with vector indexes dynamically.
+// These names are runtime configuration for containers created by the samples.
+output AZURE_COSMOSDB_CREATE_INDEX_DISKANN_CONTAINER_NAME string = 'hotels_diskann'
+output AZURE_COSMOSDB_CREATE_INDEX_QUANTIZEDFLAT_CONTAINER_NAME string = 'hotels_quantizedflat'
 output AZURE_COSMOSDB_CREATE_INDEX_EMBEDDED_FIELD string = database.outputs.embeddedFieldNameForCreateIndex
 output AZURE_COSMOSDB_CREATE_INDEX_PARTITION_KEY_PATH string = database.outputs.partitionKeyPathForCreateIndex
 output AZURE_COSMOSDB_CREATE_INDEX_EMBEDDING_DIMENSIONS string = '1536'

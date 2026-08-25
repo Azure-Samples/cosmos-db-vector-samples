@@ -1,0 +1,16 @@
+id: validate-manifest-001
+name: Validate a manifest-defined sample set
+description: Verify that the skill provides the trusted runner workflow.
+tags:
+  - positive-trigger
+  - manifest
+inputs:
+  prompt: "Validate the sample set configured in .github/sample-set.json."
+expected:
+  output_contains:
+    - "ManifestPath"
+    - "AllowRunnerExecution"
+  outcomes:
+    - type: task_completed
+  behavior:
+    max_tool_calls: 10

@@ -11,7 +11,7 @@
 #   2. Verifies the required data file exists in the sample's ./data/ directory.
 #   3. Builds the sample.
 #   4. Runs the sample program, tee-ing combined stdout+stderr to both the
-#      console and  <sample>/output/run-<language>-<yyyyMMdd-HHmmss>.txt.
+#      console and <sample>/output/create-index-run-<yyyyMMdd-HHmmss>/run-<language>.txt.
 #   5. Prints a per-language summary table (built, ran, exit code, output path).
 #
 # Exits non-zero if any selected sample fails to build or run.
@@ -81,10 +81,7 @@ check_data_file() {
     local sample_dir="$1"
     local rel="${DATA_FILE_WITH_VECTORS_AND_REGIONS:-}"
     if [[ -z "$rel" ]]; then
-        rel="${DATA_FILE_WITH_VECTORS:-}"
-    fi
-    if [[ -z "$rel" ]]; then
-        echo "WARNING: Neither DATA_FILE_WITH_VECTORS_AND_REGIONS nor DATA_FILE_WITH_VECTORS is set." >&2
+        echo "WARNING: DATA_FILE_WITH_VECTORS_AND_REGIONS is not set." >&2
         return 1
     fi
     local abs_path
@@ -140,7 +137,7 @@ load_azd_env
 if [[ "$LANGUAGE" == "All" || "$LANGUAGE" == "Python" ]]; then
     print_header "Python"
     dir="$REPO_ROOT/nosql-create-index-python"
-    out_file="$dir/output/run-python-$TIMESTAMP.txt"
+    out_file="$dir/output/create-index-run-$TIMESTAMP/run-python.txt"
 
     if [[ ! -d "$dir" ]]; then
         echo "WARNING: Sample directory not found: $dir" >&2
@@ -194,7 +191,7 @@ fi
 if [[ "$LANGUAGE" == "All" || "$LANGUAGE" == "TypeScript" ]]; then
     print_header "TypeScript"
     dir="$REPO_ROOT/nosql-create-index-typescript"
-    out_file="$dir/output/run-typescript-$TIMESTAMP.txt"
+    out_file="$dir/output/create-index-run-$TIMESTAMP/run-typescript.txt"
 
     if [[ ! -d "$dir" ]]; then
         echo "WARNING: Sample directory not found: $dir" >&2
@@ -241,7 +238,7 @@ fi
 if [[ "$LANGUAGE" == "All" || "$LANGUAGE" == "DotNet" ]]; then
     print_header ".NET"
     dir="$REPO_ROOT/nosql-create-index-dotnet"
-    out_file="$dir/output/run-dotnet-$TIMESTAMP.txt"
+    out_file="$dir/output/create-index-run-$TIMESTAMP/run-dotnet.txt"
     csproj="nosql-create-index-dotnet.csproj"
 
     if [[ ! -d "$dir" ]]; then
@@ -289,7 +286,7 @@ fi
 if [[ "$LANGUAGE" == "All" || "$LANGUAGE" == "Go" ]]; then
     print_header "Go"
     dir="$REPO_ROOT/nosql-create-index-go"
-    out_file="$dir/output/run-go-$TIMESTAMP.txt"
+    out_file="$dir/output/create-index-run-$TIMESTAMP/run-go.txt"
     binary="create-index-go"
 
     if [[ ! -d "$dir" ]]; then
@@ -336,7 +333,7 @@ fi
 if [[ "$LANGUAGE" == "All" || "$LANGUAGE" == "Java" ]]; then
     print_header "Java"
     dir="$REPO_ROOT/nosql-create-index-java"
-    out_file="$dir/output/run-java-$TIMESTAMP.txt"
+    out_file="$dir/output/create-index-run-$TIMESTAMP/run-java.txt"
 
     if [[ ! -d "$dir" ]]; then
         echo "WARNING: Sample directory not found: $dir" >&2

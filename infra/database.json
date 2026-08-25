@@ -5,7 +5,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.42.1.51946",
-      "templateHash": "13451566095277367724"
+      "templateHash": "13941668973791398980"
     },
     "description": "Create database accounts."
   },
@@ -356,6 +356,7 @@
       }
     },
     {
+      "condition": "[empty(parameters('createIndexDatabaseName'))]",
       "type": "Microsoft.Resources/deployments",
       "apiVersion": "2025-04-01",
       "name": "cosmos-db-database",
@@ -459,6 +460,7 @@
         "name": "vectorSearchContainers",
         "count": "[length(variables('vectorSearchContainerDefinitions'))]"
       },
+      "condition": "[empty(parameters('createIndexDatabaseName'))]",
       "type": "Microsoft.Resources/deployments",
       "apiVersion": "2025-04-01",
       "name": "[format('cosmos-db-vector-search-container-{0}', copyIndex())]",
@@ -711,193 +713,6 @@
       },
       "dependsOn": [
         "[resourceId('Microsoft.Resources/deployments', 'cosmos-db-account')]"
-      ]
-    },
-    {
-      "copy": {
-        "name": "createIndexContainers",
-        "count": "[length(range(0, if(not(empty(parameters('createIndexDatabaseName'))), 2, 0)))]"
-      },
-      "type": "Microsoft.Resources/deployments",
-      "apiVersion": "2025-04-01",
-      "name": "[format('cosmos-db-create-index-container-{0}', copyIndex())]",
-      "properties": {
-        "expressionEvaluationOptions": {
-          "scope": "inner"
-        },
-        "mode": "Incremental",
-        "parameters": {
-          "name": "[if(equals(range(0, if(not(empty(parameters('createIndexDatabaseName'))), 2, 0))[copyIndex()], 0), createObject('value', 'hotels_diskann'), createObject('value', 'hotels_quantizedflat'))]",
-          "parentAccountName": {
-            "value": "[reference(resourceId('Microsoft.Resources/deployments', 'cosmos-db-account'), '2025-04-01').outputs.name.value]"
-          },
-          "parentDatabaseName": {
-            "value": "[reference(resourceId('Microsoft.Resources/deployments', 'cosmos-db-create-index-database'), '2025-04-01').outputs.name.value]"
-          },
-          "tags": {
-            "value": "[parameters('tags')]"
-          },
-          "setThroughput": {
-            "value": false
-          },
-          "partitionKeyPaths": {
-            "value": [
-              "/PartitionKey"
-            ]
-          },
-          "indexingPolicy": {
-            "value": {
-              "indexingMode": "consistent",
-              "automatic": true,
-              "includedPaths": [
-                {
-                  "path": "/*"
-                }
-              ],
-              "excludedPaths": [
-                {
-                  "path": "/_etag/?"
-                }
-              ],
-              "vectorIndexes": [
-                {
-                  "path": "/DescriptionVector",
-                  "type": "[if(equals(range(0, if(not(empty(parameters('createIndexDatabaseName'))), 2, 0))[copyIndex()], 0), 'diskANN', 'quantizedFlat')]"
-                }
-              ]
-            }
-          },
-          "vectorEmbeddingPolicy": {
-            "value": {
-              "vectorEmbeddings": [
-                {
-                  "path": "/DescriptionVector",
-                  "dataType": "float32",
-                  "dimensions": 1536,
-                  "distanceFunction": "cosine"
-                }
-              ]
-            }
-          }
-        },
-        "template": {
-          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
-          "languageVersion": "2.0",
-          "contentVersion": "1.0.0.0",
-          "metadata": {
-            "_generator": {
-              "name": "bicep",
-              "version": "0.42.1.51946",
-              "templateHash": "14294366414666751429"
-            },
-            "description": "Create an Azure Cosmos DB for NoSQL container."
-          },
-          "parameters": {
-            "name": {
-              "type": "string"
-            },
-            "tags": {
-              "type": "object",
-              "defaultValue": {}
-            },
-            "parentAccountName": {
-              "type": "string",
-              "metadata": {
-                "description": "Name of the parent Azure Cosmos DB account."
-              }
-            },
-            "parentDatabaseName": {
-              "type": "string",
-              "metadata": {
-                "description": "Name of the parent Azure Cosmos DB database."
-              }
-            },
-            "setThroughput": {
-              "type": "bool",
-              "defaultValue": false,
-              "metadata": {
-                "description": "Enables throughput setting at this resource level. Defaults to true."
-              }
-            },
-            "autoscale": {
-              "type": "bool",
-              "defaultValue": false,
-              "metadata": {
-                "description": "Enables autoscale. If setThroughput is enabled, defaults to false."
-              }
-            },
-            "throughput": {
-              "type": "int",
-              "defaultValue": 400,
-              "metadata": {
-                "description": "The amount of throughput set. If setThroughput is enabled, defaults to 400."
-              }
-            },
-            "partitionKeyPaths": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "defaultValue": [
-                "/id"
-              ],
-              "metadata": {
-                "description": "List of hierarhical partition key paths. Defaults to an array that only contains /id."
-              }
-            },
-            "indexingPolicy": {
-              "type": "object",
-              "defaultValue": {},
-              "metadata": {
-                "description": "Optional custom indexing policy for the container."
-              }
-            },
-            "vectorEmbeddingPolicy": {
-              "type": "object",
-              "defaultValue": {},
-              "metadata": {
-                "description": "Optional vector embedding policy for the container."
-              }
-            }
-          },
-          "variables": {
-            "options": "[if(parameters('setThroughput'), if(parameters('autoscale'), createObject('autoscaleSettings', createObject('maxThroughput', parameters('throughput'))), createObject('throughput', parameters('throughput'))), createObject())]"
-          },
-          "resources": {
-            "account": {
-              "existing": true,
-              "type": "Microsoft.DocumentDB/databaseAccounts",
-              "apiVersion": "2024-05-15",
-              "name": "[parameters('parentAccountName')]"
-            },
-            "database": {
-              "existing": true,
-              "type": "Microsoft.DocumentDB/databaseAccounts/sqlDatabases",
-              "apiVersion": "2024-05-15",
-              "name": "[format('{0}/{1}', parameters('parentAccountName'), parameters('parentDatabaseName'))]"
-            },
-            "container": {
-              "type": "Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers",
-              "apiVersion": "2024-05-15",
-              "name": "[format('{0}/{1}/{2}', parameters('parentAccountName'), parameters('parentDatabaseName'), parameters('name'))]",
-              "tags": "[parameters('tags')]",
-              "properties": {
-                "options": "[variables('options')]",
-                "resource": "[union(createObject('id', parameters('name'), 'partitionKey', createObject('paths', parameters('partitionKeyPaths'), 'kind', 'MultiHash', 'version', 2)), if(not(empty(parameters('indexingPolicy'))), createObject('indexingPolicy', parameters('indexingPolicy')), createObject()), if(not(empty(parameters('vectorEmbeddingPolicy'))), createObject('vectorEmbeddingPolicy', parameters('vectorEmbeddingPolicy')), createObject()))]"
-              }
-            }
-          },
-          "outputs": {
-            "name": {
-              "type": "string",
-              "value": "[parameters('name')]"
-            }
-          }
-        }
-      },
-      "dependsOn": [
-        "[resourceId('Microsoft.Resources/deployments', 'cosmos-db-account')]",
-        "[resourceId('Microsoft.Resources/deployments', 'cosmos-db-create-index-database')]"
       ]
     },
     {
@@ -1174,28 +989,31 @@
     },
     "database": {
       "type": "object",
-      "value": {
-        "name": "[reference(resourceId('Microsoft.Resources/deployments', 'cosmos-db-database'), '2025-04-01').outputs.name.value]"
-      }
+      "value": "[if(not(empty(parameters('createIndexDatabaseName'))), createObject(), createObject('name', reference(resourceId('Microsoft.Resources/deployments', 'cosmos-db-database'), '2025-04-01').outputs.name.value))]"
     },
     "containers": {
       "type": "array",
-      "value": [
-        {
-          "name": "[reference(resourceId('Microsoft.Resources/deployments', format('cosmos-db-vector-search-container-{0}', 0)), '2025-04-01').outputs.name.value]"
-        },
-        {
-          "name": "[reference(resourceId('Microsoft.Resources/deployments', format('cosmos-db-vector-search-container-{0}', 1)), '2025-04-01').outputs.name.value]"
-        }
-      ]
+      "value": "[if(not(empty(parameters('createIndexDatabaseName'))), createArray(), createArray(createObject('name', reference(resourceId('Microsoft.Resources/deployments', format('cosmos-db-vector-search-container-{0}', 0)), '2025-04-01').outputs.name.value), createObject('name', reference(resourceId('Microsoft.Resources/deployments', format('cosmos-db-vector-search-container-{0}', 1)), '2025-04-01').outputs.name.value)))]"
     },
     "createIndexDatabase": {
       "type": "object",
       "value": "[if(not(empty(parameters('createIndexDatabaseName'))), createObject('name', reference(resourceId('Microsoft.Resources/deployments', 'cosmos-db-create-index-database'), '2025-04-01').outputs.name.value), createObject())]"
     },
-    "createIndexContainers": {
-      "type": "array",
-      "value": "[if(not(empty(parameters('createIndexDatabaseName'))), createArray(createObject('name', reference(resourceId('Microsoft.Resources/deployments', format('cosmos-db-create-index-container-{0}', 0)), '2025-04-01').outputs.name.value), createObject('name', reference(resourceId('Microsoft.Resources/deployments', format('cosmos-db-create-index-container-{0}', 1)), '2025-04-01').outputs.name.value)), createArray())]"
+    "embeddedFieldNameForVectorSearch": {
+      "type": "string",
+      "value": "DescriptionVector"
+    },
+    "embeddedFieldNameForCreateIndex": {
+      "type": "string",
+      "value": "embedding"
+    },
+    "partitionKeyPathForVectorSearch": {
+      "type": "string",
+      "value": "/HotelId"
+    },
+    "partitionKeyPathForCreateIndex": {
+      "type": "string",
+      "value": "/Region"
     }
   }
 }

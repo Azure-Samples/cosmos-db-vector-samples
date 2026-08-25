@@ -12,7 +12,7 @@ ms.date: 2026-06-22
 
 In this quickstart, you run the Python create-index sample for Azure Cosmos DB for NoSQL to demonstrate two key goals:
 
-- **Goal 1 (Control Plane):** Use the ARM SDK to diagnose an existing `HotelsCreateIndex` database and recreate two vector-indexed containers: `hotels_diskann_py` (approximate search) and `hotels_quantizedflat_py` (QuantizedFlat uses vector quantization techniques).
+- **Goal 1 (Control Plane):** Use the ARM SDK in the Bicep-created `HotelsCreateIndex` database to recreate two vector-indexed containers: `hotels_diskann` (approximate search) and `hotels_quantizedflat` (QuantizedFlat uses vector quantization techniques).
 - **Goal 2 (Distance Functions):** Compare how the same query embedding produces different scores and rankings when using different vector distance functions: Cosine, DotProduct, and Euclidean.
 
 Find the sample code on GitHub in [`nosql-create-index-python`](https://github.com/Azure-Samples/cosmos-db-vector-samples/tree/main/nosql-create-index-python).
@@ -27,13 +27,14 @@ Find the sample code on GitHub in [`nosql-create-index-python`](https://github.c
   - **Cosmos DB Built-in Data Contributor**
   - **Cognitive Services OpenAI User**
 - An Azure OpenAI resource with a `text-embedding-3-small` deployment.
+- To enable infrastructure provisioning for the create-index scenario, set `AZURE_COSMOSDB_CREATE_INDEX_DATABASENAME=HotelsCreateIndex` before running `azd up`. The infrastructure creates the database selected by the deployment scenario. For the create-index scenario, it creates `HotelsCreateIndex`.
 
 > [!IMPORTANT]
 > **Two Phases:**
 >
-> 1. **Control Plane (Goal 1):** The sample uses the ARM SDK with `DefaultAzureCredential` to diagnose an existing database and recreate:
+> 1. **Control Plane (Goal 1):** The sample uses the ARM SDK with `DefaultAzureCredential` in the configured database to recreate:
 >    - Existing database: `HotelsCreateIndex`
->    - Containers: `hotels_diskann_py` (DiskANN index) and `hotels_quantizedflat_py` (QuantizedFlat index)
+>    - Containers: `hotels_diskann` (DiskANN index) and `hotels_quantizedflat` (QuantizedFlat index)
 >    - Partition key path: `/Region` (valid values: `Northeast`, `Midwest`, `South`, `West`)
 >    - Vector field path: `/embedding` (1536 dimensions, float32)
 >
@@ -67,6 +68,9 @@ The sample expects the data file at: `./data/HotelsData_toCosmosDB_Vector_byRegi
 
 ## Configure environment variables
 
+Python reads `os.environ` and doesn't load `.env` automatically. Export the
+file's values into the current process environment before running the sample.
+
 1. Configure environment variables.
 
    **If you deployed with `azd up`:**
@@ -97,7 +101,7 @@ The sample expects the data file at: `./data/HotelsData_toCosmosDB_Vector_byRegi
    DATA_FILE_WITH_VECTORS_AND_REGIONS="./data/HotelsData_toCosmosDB_Vector_byRegion.json"
    ```
 
-Leave `AZURE_COSMOSDB_CONTAINER_NAME` and `VECTOR_ALGORITHM` empty to run both containers automatically. The sample iterates over the known container names (`hotels_diskann_py` and `hotels_quantizedflat_py`) when no specific container is configured. If you set `VECTOR_ALGORITHM`, use one of these values:
+Leave `AZURE_COSMOSDB_CONTAINER_NAME` and `VECTOR_ALGORITHM` empty to run both containers automatically. The sample iterates over the known container names (`hotels_diskann` and `hotels_quantizedflat`) when no specific container is configured. If you set `VECTOR_ALGORITHM`, use one of these values:
 
 - `diskann`
 - `quantizedflat`
@@ -135,9 +139,9 @@ The sample demonstrates both goals in sequence:
 
 **Goal 1 - Control Plane (create containers with vector indexes):**
 1. Authenticates with `DefaultAzureCredential`
-2. Diagnoses the existing `HotelsCreateIndex` database
-3. Deletes and recreates the `hotels_diskann_py` container with DiskANN vector index on `/embedding`
-4. Deletes and recreates the `hotels_quantizedflat_py` container with QuantizedFlat vector index on `/embedding`
+2. Uses the Bicep-created `HotelsCreateIndex` database
+3. Deletes and recreates the `hotels_diskann` container with DiskANN vector index on `/embedding`
+4. Deletes and recreates the `hotels_quantizedflat` container with QuantizedFlat vector index on `/embedding`
 
 **Goal 2 - Data Plane (load and query with distance functions):**
 1. Loads pre-vectorized hotel documents from `./data/HotelsData_toCosmosDB_Vector_byRegion.json`
@@ -291,7 +295,7 @@ Database name: HotelsCreateIndex
 === Control Plane ===
 
 === Phase 1: Create Container with Vector Index ===
-  Container:      hotels_diskann_py
+  Container:      hotels_diskann
   Index type:     diskANN
   Dimensions:     1536
   Distance func:  cosine (queried with all 3 metrics)
@@ -300,7 +304,7 @@ Database name: HotelsCreateIndex
   Vector index is IMMUTABLE — cannot be changed after creation
 
 === Phase 1: Create Container with Vector Index ===
-  Container:      hotels_quantizedflat_py
+  Container:      hotels_quantizedflat
   Index type:     QuantizedFlat
   Dimensions:     1536
   Distance func:  cosine (queried with all 3 metrics)
@@ -316,24 +320,24 @@ Processing in batches of 50...
   Region 'Northeast': 10 documents
   Region 'South': 14 documents
   Region 'West': 16 documents
-  ✓ hotels_diskann_py: 50 inserted (5243.72 RUs)
+  ✓ hotels_diskann: 50 inserted (5243.72 RUs)
 ✓ Region validation passed. Found regions: ['Midwest', 'Northeast', 'South', 'West']
   Region 'Midwest': 10 documents
   Region 'Northeast': 10 documents
   Region 'South': 14 documents
   Region 'West': 16 documents
-  ✓ hotels_quantizedflat_py: 50 inserted (2621.86 RUs)
+  ✓ hotels_quantizedflat: 50 inserted (2621.86 RUs)
 
 Query: "hotel near the ocean"
 Embedding generated (1536 dimensions)
 
 Running searches (top 5 results for each distance function)...
-  ✓ hotels_diskann_py queried (4.73 RUs)
-  ✓ hotels_diskann_py queried (4.73 RUs)
-  ✓ hotels_diskann_py queried (4.73 RUs)
-  ✓ hotels_quantizedflat_py queried (4.73 RUs)
-  ✓ hotels_quantizedflat_py queried (4.73 RUs)
-  ✓ hotels_quantizedflat_py queried (4.73 RUs)
+  ✓ hotels_diskann queried (4.73 RUs)
+  ✓ hotels_diskann queried (4.73 RUs)
+  ✓ hotels_diskann queried (4.73 RUs)
+  ✓ hotels_quantizedflat queried (4.73 RUs)
+  ✓ hotels_quantizedflat queried (4.73 RUs)
+  ✓ hotels_quantizedflat queried (4.73 RUs)
 
 | Index Type     | Distance Function | Top 1 Result               | Score  | Top 2 Result               | Score  | Diff   |
 |----------------|-------------------|----------------------------|--------|----------------------------|--------|--------|
@@ -345,8 +349,8 @@ Running searches (top 5 results for each distance function)...
 | QuantizedFlat  | Euclidean         | City Center Summer Wind Re | 1.0934 | Red Tide Hotel             | 1.0957 | -0.0023 |
 
 === Phase 4: Cleanup ===
-  ✓ Deleted hotels_diskann_py
-  ✓ Deleted hotels_quantizedflat_py
+  ✓ Deleted hotels_diskann
+  ✓ Deleted hotels_quantizedflat
 
 Complete
 ```
@@ -361,8 +365,30 @@ Complete
 | `ValueError: Embedding dimensions do not match` | The deployment returns a different vector size than the container expects (1536). Verify you're using `text-embedding-3-small` without dimension truncation. |
 | `openai.AuthenticationError: 401` | Confirm your identity has the **Cognitive Services OpenAI User** role on the Azure OpenAI resource. |
 
+## Authentication and permissions
+
+All Azure clients use `DefaultAzureCredential`. For local runs, sign in with `az login` or `azd auth login`. Hosted execution can use managed identity. The selected identity needs management-plane permission to create and delete the two configured containers, Cosmos DB data-plane access to insert and query documents, and the Cognitive Services OpenAI User role. Keys and connection strings aren't supported.
+
+## Validate and clean generated artifacts
+
+From the repository root, validate this sample with the shared validator:
+
+```powershell
+pwsh -NoProfile -File .github\skills\sample-validate-nosql-create-index\scripts\validate-create-index-samples.ps1 -Language Python
+```
+
+Preview and then remove generated local artifacts:
+
+```powershell
+pwsh -NoProfile -File .github\scripts\clean-all-create-index.ps1 -Language Python -WhatIf
+pwsh -NoProfile -File .github\scripts\clean-all-create-index.ps1 -Language Python
+```
+
 ## Next steps
 
 - Review the sample output in `output/sample-output.txt`.
 - Try `VECTOR_ALGORITHM=diskann` or `VECTOR_ALGORITHM=quantizedflat` to focus on one container.
 - Learn more about Azure Cosmos DB vector search at `/azure/cosmos-db/nosql/vector-search`.
+
+> [!WARNING]
+> The sample deletes `hotels_diskann` and `hotels_quantizedflat` before creation and during cleanup. Custom container names require `AZURE_COSMOSDB_CREATE_INDEX_ALLOW_DESTRUCTIVE_OPERATIONS=true`.

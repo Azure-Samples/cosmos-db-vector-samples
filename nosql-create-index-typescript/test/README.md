@@ -4,8 +4,7 @@ These tests are live integration tests. They use real Azure resources and call t
 
 ## Prerequisites
 
-- Create the required Azure resources with `scripts/create-resources.sh`
-- Do **not** use `azd up` for this sample; setup is driven by the bash script
+- Create the required Azure resources from the repository root with `azd up`
 - Make sure a valid `.env` file exists before running the tests
 
 ## Run the tests

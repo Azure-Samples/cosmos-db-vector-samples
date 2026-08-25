@@ -1,69 +1,72 @@
 """Control-plane operations for Cosmos DB SQL (NoSQL) API using ARM SDK.
 
-Uses raw JSON payloads to work around ARM SDK limitations with vector types.
+Uses the typed request models provided by azure-mgmt-cosmosdb v10.
 """
 
 from __future__ import annotations
 
-import json
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from azure.core.exceptions import HttpResponseError
 from azure.identity import DefaultAzureCredential
 from azure.mgmt.cosmosdb import CosmosDBManagementClient
+from azure.mgmt.cosmosdb.models import (
+    ContainerPartitionKey,
+    ExcludedPath,
+    IncludedPath,
+    IndexingPolicy,
+    SqlContainerCreateUpdateParameters,
+    SqlContainerResource,
+    VectorEmbedding,
+    VectorEmbeddingPolicy,
+    VectorIndex,
+)
 
 if TYPE_CHECKING:
     from .config import SampleConfig
 
 
-def _build_container_payload(
+def _build_container_create_parameters(
     container_name: str,
     partition_key_path: str,
     embedding_field: str,
     dimensions: int,
-    index_type: str
-) -> dict[str, Any]:
-    """Build container creation payload with vector index configuration.
-    
-    Args:
-        container_name: Name of the container
-        partition_key_path: Path to partition key field (e.g., "/HotelId")
-        embedding_field: Path to embedding field (e.g., "/embedding")
-        dimensions: Vector embedding dimensions
-        index_type: Vector index type ("diskANN" or "quantizedflat")
-    
-    Returns:
-        Container resource payload as dictionary
-    """
-    return {
-        "id": container_name,
-        "partitionKey": {
-            "paths": [partition_key_path],
-            "kind": "Hash"
-        },
-        "indexingPolicy": {
-            "indexingMode": "Consistent",
-            "automatic": True,
-            "includedPaths": [{"path": "/*"}],
-            "excludedPaths": [{"path": "/_etag/?"}, {"path": f"{embedding_field}/*"}],
-            "vectorIndexes": [
-                {
-                    "path": embedding_field,
-                    "type": index_type
-                }
-            ]
-        },
-        "vectorEmbeddingPolicy": {
-            "vectorEmbeddings": [
-                {
-                    "path": embedding_field,
-                    "dataType": "float32",
-                    "dimensions": dimensions,
-                    "distanceFunction": "cosine"
-                }
-            ]
-        }
-    }
+    index_type: str,
+    location: str,
+) -> SqlContainerCreateUpdateParameters:
+    resource = SqlContainerResource(
+        id=container_name,
+        partition_key=ContainerPartitionKey(
+            paths=[partition_key_path],
+            kind="Hash",
+        ),
+        indexing_policy=IndexingPolicy(
+            indexing_mode="Consistent",
+            automatic=True,
+            included_paths=[IncludedPath(path="/*")],
+            excluded_paths=[
+                ExcludedPath(path="/_etag/?"),
+                ExcludedPath(path=f"{embedding_field}/*"),
+            ],
+            vector_indexes=[
+                VectorIndex(path=embedding_field, type=index_type),
+            ],
+        ),
+        vector_embedding_policy=VectorEmbeddingPolicy(
+            vector_embeddings=[
+                VectorEmbedding(
+                    path=embedding_field,
+                    data_type="float32",
+                    dimensions=dimensions,
+                    distance_function="cosine",
+                ),
+            ],
+        ),
+    )
+    return SqlContainerCreateUpdateParameters(
+        resource=resource,
+        location=location,
+    )
 
 
 def create_containers(credential: DefaultAzureCredential, config: SampleConfig) -> None:
@@ -73,6 +76,9 @@ def create_containers(credential: DefaultAzureCredential, config: SampleConfig) 
         credential: Azure credential for authentication
         config: Sample configuration with resource details
     """
+    from .config import validate_container_deletion_targets
+
+    validate_container_deletion_targets(config)
     client = CosmosDBManagementClient(
         credential=credential,
         subscription_id=config.subscription_id
@@ -80,8 +86,8 @@ def create_containers(credential: DefaultAzureCredential, config: SampleConfig) 
 
     embedding_path = f"/{config.embedding_field_name}"
     containers_config = [
-        {"type": "diskANN", "container_name": "hotels_diskann_py"},
-        {"type": "QuantizedFlat", "container_name": "hotels_quantizedflat_py"},
+        {"type": "diskANN", "container_name": config.diskann_container_name},
+        {"type": "quantizedFlat", "container_name": config.quantizedflat_container_name},
     ]
 
     for container_config in containers_config:
@@ -106,20 +112,14 @@ def create_containers(credential: DefaultAzureCredential, config: SampleConfig) 
             else:
                 raise
 
-        # Build container payload with vector index
-        container_payload = _build_container_payload(
+        params = _build_container_create_parameters(
             container_name=container_config["container_name"],
             partition_key_path="/Region",
             embedding_field=embedding_path,
             dimensions=config.expected_dimensions,
-            index_type=container_config["type"]
+            index_type=container_config["type"],
+            location=config.location,
         )
-
-        # Create container using raw payload
-        # The ARM SDK accepts the payload as a dict, which it serializes to JSON
-        params = {
-            "resource": container_payload
-        }
 
         client.sql_resources.begin_create_update_sql_container(
             resource_group_name=config.resource_group,
@@ -140,13 +140,18 @@ def delete_containers(credential: DefaultAzureCredential, config: SampleConfig) 
         credential: Azure credential for authentication
         config: Sample configuration with resource details
     """
+    from .config import validate_container_deletion_targets
+
+    validate_container_deletion_targets(config)
     client = CosmosDBManagementClient(
         credential=credential,
         subscription_id=config.subscription_id
     )
 
-    # Always try to delete both containers, regardless of which one is active
-    container_names = ["hotels_diskann_py", "hotels_quantizedflat_py"]
+    container_names = [
+        config.diskann_container_name,
+        config.quantizedflat_container_name,
+    ]
 
     for container_name in container_names:
         try:

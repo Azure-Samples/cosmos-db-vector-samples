@@ -1,0 +1,90 @@
+{
+  "$schema": "../../schema/sample-set-manifest.schema.json",
+  "schemaVersion": 1,
+  "name": "offline-integration",
+  "runner": {
+    "path": ".github/skills/sample-validate-set/tests/fixtures/fake-runner.ps1",
+    "arguments": [
+      "-Selection",
+      "{selection}"
+    ],
+    "allSelection": "All"
+  },
+  "evidence": {
+    "root": ".github/skills/sample-validate-set/tests/.work/evidence",
+    "directoryPrefix": "validation-",
+    "runnerLog": "runner.txt",
+    "summary": "summary.txt"
+  },
+  "samples": [
+    {
+      "name": "Sample",
+      "selection": "Sample",
+      "directory": ".github/skills/sample-validate-set/tests/.work/sample",
+      "outputDirectory": "output",
+      "runDirectoryPattern": "fake-run-*",
+      "runFile": "run-sample.txt",
+      "reference": "reference-output.txt"
+    }
+  ],
+  "validation": {
+    "table": {
+      "headerAliases": {
+        "indextype": [
+          "container",
+          "index",
+          "indextype"
+        ],
+        "distancefunction": [
+          "distancefunction",
+          "distancemetric",
+          "metric"
+        ]
+      },
+      "keyColumns": [
+        "indextype",
+        "distancefunction"
+      ],
+      "valueAliases": {
+        "indextype": {
+          "diskann": "DiskANN",
+          "hotelsdiskann": "DiskANN",
+          "quantizedflat": "QuantizedFlat",
+          "hotelsquantizedflat": "QuantizedFlat"
+        },
+        "distancefunction": {
+          "cosine": "Cosine",
+          "dotproduct": "DotProduct",
+          "euclidean": "Euclidean"
+        }
+      },
+      "expectedKeys": [
+        [
+          "DiskANN",
+          "Cosine"
+        ],
+        [
+          "DiskANN",
+          "DotProduct"
+        ],
+        [
+          "DiskANN",
+          "Euclidean"
+        ],
+        [
+          "QuantizedFlat",
+          "Cosine"
+        ],
+        [
+          "QuantizedFlat",
+          "DotProduct"
+        ],
+        [
+          "QuantizedFlat",
+          "Euclidean"
+        ]
+      ],
+      "exactRowCount": 6
+    }
+  }
+}

@@ -1,0 +1,10 @@
+Reference output
+
+| Index Type | Distance Function | Result |
+|---|---|---|
+| DiskANN | Cosine | A |
+| DiskANN | DotProduct | B |
+| DiskANN | Euclidean | C |
+| QuantizedFlat | Cosine | D |
+| QuantizedFlat | DotProduct | E |
+| QuantizedFlat | Euclidean | F |

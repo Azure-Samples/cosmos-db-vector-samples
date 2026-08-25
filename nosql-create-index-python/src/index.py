@@ -79,7 +79,7 @@ def main() -> None:
                     query_embedding=query_embedding,
                     distance_function=distance_function,
                 )
-                label = algorithm_label(container_name)
+                label = algorithm_label(container_name, config)
                 print("  ✓ {0} queried ({1:.2f} RUs)".format(container_name, summary.request_charge))
                 all_results.append((label, distance_function, summary))
 

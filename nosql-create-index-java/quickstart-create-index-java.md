@@ -12,7 +12,7 @@ ms.date: 2026-06-22
 
 In this quickstart, you run the Java create-index sample for Azure Cosmos DB for NoSQL to demonstrate two key goals:
 
-- **Goal 1 (Control Plane):** Use the ARM SDK to recreate two vector-indexed containers in the existing `HotelsCreateIndex` database: `hotels_diskann_java` (DiskANN approximate search) and `hotels_quantizedflat_java` (QuantizedFlat uses vector quantization techniques).
+- **Goal 1 (Control Plane):** Use the ARM SDK to recreate two vector-indexed containers in the existing `HotelsCreateIndex` database: `hotels_diskann` (DiskANN approximate search) and `hotels_quantizedflat` (QuantizedFlat uses vector quantization techniques).
 - **Goal 2 (Distance Functions):** Compare how the same query embedding produces different scores and rankings when using different vector distance functions: Cosine, DotProduct, and Euclidean.
 
 ## Prerequisites
@@ -26,13 +26,14 @@ In this quickstart, you run the Java create-index sample for Azure Cosmos DB for
   - **Cosmos DB Built-in Data Contributor**
   - **Cognitive Services OpenAI User**
 - An Azure OpenAI resource with a `text-embedding-3-small` deployment.
+- To enable infrastructure provisioning for the create-index scenario, set `AZURE_COSMOSDB_CREATE_INDEX_DATABASENAME=HotelsCreateIndex` before running `azd up`. The infrastructure creates the database selected by the deployment scenario. For the create-index scenario, it creates `HotelsCreateIndex`.
 
 > [!IMPORTANT]
 > **Two Phases:**
 >
 > 1. **Control Plane (Goal 1):** The sample uses the ARM SDK (azure-resourcemanager-cosmos 2.49.0) with `DefaultAzureCredential` to manage:
 >    - Uses the existing database: `HotelsCreateIndex`
->    - Deletes and recreates containers: `hotels_diskann_java` (DiskANN index) and `hotels_quantizedflat_java` (QuantizedFlat index)
+>    - Deletes and recreates containers: `hotels_diskann` (DiskANN index) and `hotels_quantizedflat` (QuantizedFlat index)
 >    - Partition key path: `/Region` (valid values: `Northeast`, `Midwest`, `South`, `West`)
 >    - Vector field path: `/embedding` (1536 dimensions, float32)
 >
@@ -92,7 +93,7 @@ Both phases use `DefaultAzureCredential` for authentication, so you don't need t
    **Otherwise**, copy the template and fill in values from the Azure portal:
 
    ```bash
-   cp sample.env .env
+    cp .env.example .env
    ```
 
 2. Update `.env` with your Azure resource values:
@@ -150,8 +151,8 @@ The sample demonstrates both goals in sequence:
 2. Authenticates with `DefaultAzureCredential`
 3. Creates an Azure Resource Manager client
 4. Uses the existing `HotelsCreateIndex` database
-5. Deletes any existing `hotels_diskann_java` container, then creates it with DiskANN vector index on `/embedding`
-6. Deletes any existing `hotels_quantizedflat_java` container, then creates it with QuantizedFlat vector index on `/embedding`
+5. Deletes any existing `hotels_diskann` container, then creates it with DiskANN vector index on `/embedding`
+6. Deletes any existing `hotels_quantizedflat` container, then creates it with QuantizedFlat vector index on `/embedding`
 
 **Goal 2 - Data Plane (load and query with distance functions):**
 1. Creates a Cosmos DB data plane client using `DefaultAzureCredential`
@@ -175,7 +176,6 @@ nosql-create-index-java/
 │   └── sample-output.txt
 ├── pom.xml
 ├── README.md
-├── sample.env
 └── src/main/java/com/azure/cosmos/createindex/
     ├── App.java
     ├── Config.java
@@ -323,8 +323,30 @@ Scope the vector query to a single partition by passing the partition key throug
 
 The sample prints embedding validation, ingestion status, query results for each container, and cleanup status. A representative output file is included in `output/sample-output.txt`.
 
+## Authentication and permissions
+
+All Azure clients use `DefaultAzureCredential`. For local runs, sign in with `az login` or `azd auth login`. Hosted execution can use managed identity. The selected identity needs management-plane permission to create and delete the two configured containers, Cosmos DB data-plane access to insert and query documents, and the Cognitive Services OpenAI User role. Keys and connection strings aren't supported.
+
+## Validate and clean generated artifacts
+
+From the repository root, validate this sample with the shared validator:
+
+```powershell
+pwsh -NoProfile -File .github\skills\sample-validate-nosql-create-index\scripts\validate-create-index-samples.ps1 -Language Java
+```
+
+Preview and then remove generated local artifacts:
+
+```powershell
+pwsh -NoProfile -File .github\scripts\clean-all-create-index.ps1 -Language Java -WhatIf
+pwsh -NoProfile -File .github\scripts\clean-all-create-index.ps1 -Language Java
+```
+
 ## Next steps
 
 - Learn more about [Azure Cosmos DB for NoSQL vector search](/azure/cosmos-db/nosql/vector-search).
 - Review the full sample repo for other languages and scenarios.
 - If you haven't provisioned the shared infrastructure yet, run `azd up` from the repo root before rerunning the Java sample.
+
+> [!WARNING]
+> The sample deletes `hotels_diskann` and `hotels_quantizedflat` before creation and during cleanup. Custom container names require `AZURE_COSMOSDB_CREATE_INDEX_ALLOW_CUSTOM_CONTAINER_DELETION=true`.

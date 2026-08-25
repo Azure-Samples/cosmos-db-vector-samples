@@ -4,7 +4,7 @@ set -euo pipefail
 # ---------------------------------------------------------------------------
 # delete-resources.sh — Delete resource group and purge Azure OpenAI resource
 #
-# Reads .env (written by create-resources.sh) to get resource names.
+# Reads .env to get resource names.
 #
 # Usage:
 #   chmod +x scripts/delete-resources.sh

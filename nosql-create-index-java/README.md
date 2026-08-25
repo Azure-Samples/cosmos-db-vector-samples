@@ -6,12 +6,14 @@ It uses:
 - `DefaultAzureCredential` for Azure Cosmos DB and the Azure OpenAI client
 - an existing `HotelsCreateIndex` database created before running the sample
 - the local `.\data\HotelsData_toCosmosDB_Vector_byRegion.json` dataset
-- ARM SDK container creation and bulk upsert operations for `hotels_diskann_java` and `hotels_quantizedflat_java`
+- ARM SDK container creation and bulk upsert operations for `hotels_diskann` and `hotels_quantizedflat`
 - `VectorDistance()` SQL queries for similarity search
 - cleanup that deletes both sample containers
 
 > [!IMPORTANT]
-> This sample uses control-plane APIs to delete and recreate the sample containers with vector indexes. It assumes the `HotelsCreateIndex` database already exists; run `azd up` from the repo root or create the database before running this sample.
+> This sample uses control-plane APIs to delete and recreate the sample containers
+> with vector indexes. Bicep creates the configured database during `azd up` or
+> `azd provision`; the Java sample never creates or deletes the database.
 
 ## Prerequisites
 
@@ -24,12 +26,12 @@ It uses:
   - **Cognitive Services OpenAI User**
 
 The sample expects the `HotelsCreateIndex` database to exist. It deletes and recreates these sample containers:
-- `hotels_diskann_java`
-- `hotels_quantizedflat_java`
+- `hotels_diskann`
+- `hotels_quantizedflat`
 
 ## Set up the sample
 
-1. Populate environment variables.
+1. Create the environment variables file.
 
    **If you deployed with `azd up`:**
 
@@ -43,52 +45,50 @@ The sample expects the `HotelsCreateIndex` database to exist. It deletes and rec
    Copy-Item .env.example .env
    ```
 
-2. Verify `.env` has the required Azure resource, Azure Cosmos DB, and Azure OpenAI settings.
+   The `.env.example` file contains only the required settings for this sample. Add your subscription, resource group, account, Cosmos DB, and Azure OpenAI values to the copied `.env` file. Java reads process environment variables and does not load `.env` automatically, so export or set the values before running Maven.
 
-   ```dotenv
-   AZURE_SUBSCRIPTION_ID="<your-subscription-id>"
-   AZURE_RESOURCE_GROUP="<your-resource-group>"
-   AZURE_COSMOSDB_ACCOUNT_NAME="<your-account-name>"
-   AZURE_LOCATION="<your-account-location>"
-   AZURE_COSMOSDB_ENDPOINT="https://<your-account>.documents.azure.com:443/"
-   AZURE_COSMOSDB_CREATE_INDEX_DATABASENAME="HotelsCreateIndex"
-   AZURE_OPENAI_EMBEDDING_ENDPOINT="https://<your-openai-resource>.openai.azure.com/"
-   AZURE_OPENAI_EMBEDDING_DEPLOYMENT="text-embedding-3-small"
-   ```
-
-   Notes:
-   - The code reads `AZURE_COSMOSDB_CREATE_INDEX_DATABASENAME` for the database name.
-   - Leave `AZURE_COSMOSDB_CONTAINER_NAME` empty to run all supported containers.
-   - Leave `VECTOR_ALGORITHM` empty to run both algorithms.
-   - Set `VECTOR_ALGORITHM` to `diskann` or `quantizedflat` to run one algorithm.
-   - Set `AZURE_COSMOSDB_CONTAINER_NAME` only if you want to target one container directly.
-
-3. Set up the data directory.
+2. Set up the data directory.
 
    ```powershell
    New-Item -ItemType Directory -Force .\data
    Copy-Item ..\HotelsData_toCosmosDB_Vector_byRegion.json .\data\
    ```
 
-4. Build the project.
+3. Build the project.
 
    ```powershell
    mvn compile
    ```
 
-## Run the sample
+## Load environment variables and run the sample
 
-**Load environment variables from `.env` first:**
+**⚠️ Important:** Environment variables MUST be loaded in your current session BEFORE running the sample. They are not passed via the `azd` command—they are read by `src/main/java/com/azure/cosmos/createindex/App.java` at runtime.
 
-```powershell
-# PowerShell (strips quotes from values)
-Get-Content .env | Where-Object { $_ -match '^[^#].*=' } | ForEach-Object { $k,$v = $_ -split '=',2; [Environment]::SetEnvironmentVariable($k.Trim(), $v.Trim().Trim('"').Trim("'")) }
-```
+| Action | PowerShell | Bash |
+|--------|-----------|------|
+| Load from `.env` file | `Get-Content .env \| ForEach-Object { if ($_ -match "^([^=]+)=(.*)$") { [Environment]::SetEnvironmentVariable($matches[1], $matches[2]) } }` | `export $(grep -v "^#" .env \| xargs)` |
+| Set single variable | `[Environment]::SetEnvironmentVariable("AZURE_COSMOSDB_ENDPOINT", "https://your-account.documents.azure.com:443/")` | `export AZURE_COSMOSDB_ENDPOINT="https://your-account.documents.azure.com:443/"` |
 
-```bash
-# Bash/Linux/Mac
-set -a; source .env; set +a
-```
+**Required environment variables for control plane operations** (creating and deleting containers with ARM SDK):
+- `AZURE_SUBSCRIPTION_ID` — Your Azure subscription ID
+- `AZURE_RESOURCE_GROUP` — Your Azure resource group name
+- `AZURE_COSMOSDB_ACCOUNT_NAME` — Your Cosmos DB account name
+- `AZURE_LOCATION` — Azure region where resources are deployed
+
+**Required environment variables for data plane operations** (querying and inserting data):
+- `AZURE_COSMOSDB_ENDPOINT` — Cosmos DB endpoint URL
+- `AZURE_COSMOSDB_CREATE_INDEX_DATABASENAME` — Database name (e.g., "HotelsCreateIndex")
+- `AZURE_OPENAI_EMBEDDING_ENDPOINT` — Azure OpenAI endpoint URL
+- `AZURE_OPENAI_EMBEDDING_DEPLOYMENT` — Deployment name (e.g., "text-embedding-3-small")
+
+**⚠️ Control Plane Requirement:** This sample uses the Azure Resource Manager (ARM) SDK to create and delete containers at runtime. All ARM SDK environment variables above (subscription ID, resource group, account name, location) MUST be set before running the sample. No defaults are provided for these values.
+
+**Optional environment variables:**
+- `VECTOR_ALGORITHM` — "diskann" or "quantizedflat"; leave empty to run **both** containers
+- `AZURE_COSMOSDB_CONTAINER_NAME` — Target container by name; leave empty to process all
+- `AZURE_COSMOSDB_CREATE_INDEX_DISKANN_CONTAINER_NAME` — Custom diskANN container name (default: "hotels_diskann")
+- `AZURE_COSMOSDB_CREATE_INDEX_QUANTIZEDFLAT_CONTAINER_NAME` — Custom quantizedFlat container name (default: "hotels_quantizedflat")
+- `AZURE_COSMOSDB_CREATE_INDEX_ALLOW_CUSTOM_CONTAINER_DELETION` — Set to `true` only when custom container names are intentional and safe to delete
 
 **Then run the sample:**
 
@@ -135,10 +135,28 @@ nosql-create-index-java/
 │   └── sample-output.txt
 ├── pom.xml
 ├── README.md
-├── sample.env
 └── src/main/java/com/azure/cosmos/createindex/
     ├── App.java
     ├── Config.java
     ├── ControlPlane.java
     └── DataPlane.java
+```
+
+## Authentication and permissions
+
+All Azure clients use `DefaultAzureCredential`. For local runs, sign in with `az login` or `azd auth login`. Hosted execution can use managed identity. The selected identity needs management-plane permission to create and delete the two configured containers, Cosmos DB data-plane access to insert and query documents, and the Cognitive Services OpenAI User role. Keys and connection strings aren't supported.
+
+## Validate and clean generated artifacts
+
+From the repository root, validate this sample with the shared validator:
+
+```powershell
+pwsh -NoProfile -File .github\skills\sample-validate-nosql-create-index\scripts\validate-create-index-samples.ps1 -Language Java
+```
+
+Preview and then remove generated local artifacts:
+
+```powershell
+pwsh -NoProfile -File .github\scripts\clean-all-create-index.ps1 -Language Java -WhatIf
+pwsh -NoProfile -File .github\scripts\clean-all-create-index.ps1 -Language Java
 ```

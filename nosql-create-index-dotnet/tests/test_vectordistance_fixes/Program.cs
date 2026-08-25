@@ -17,6 +17,7 @@ static async Task<int> RunAsync()
         await TestDocumentPreparationAsync();
         await TestRegionGroupingAsync();
         TestFieldNameValidation();
+        TestContainerConfigurationSafety();
         await TestQueryStructureAsync();
 
         Console.WriteLine();
@@ -37,6 +38,7 @@ static async Task<int> RunAsync()
         Console.WriteLine("     - Applies QueryRequestOptions.PartitionKey");
         return 0;
     }
+
     catch (Exception exception)
     {
         Console.WriteLine();
@@ -45,6 +47,62 @@ static async Task<int> RunAsync()
         Console.WriteLine(new string('=', 70));
         return 1;
     }
+}
+
+static void TestContainerConfigurationSafety()
+{
+    var loaded = Config.Load();
+    var defaults = loaded with
+    {
+        SubscriptionId = "subscription",
+        ResourceGroup = "resource-group",
+        AccountName = "account",
+        Location = "eastus2",
+        CosmosEndpoint = "https://account.documents.azure.com:443/",
+        DatabaseName = "HotelsCreateIndex",
+        OpenAIEmbeddingEndpoint = "https://openai.openai.azure.com/",
+        OpenAIEmbeddingDeployment = "embedding-deployment",
+        DiskANNContainerName = "hotels_diskann",
+        QuantizedFlatContainerName = "hotels_quantizedflat",
+        AllowCustomContainerDeletion = false
+    };
+    Config.Validate(defaults);
+
+    AssertThrows(
+        () => Config.Validate(defaults with { QuantizedFlatContainerName = "HOTELS_DISKANN" }),
+        "Duplicate container names should be rejected case-insensitively.");
+    AssertThrows(
+        () => Config.Validate(defaults with
+        {
+            DiskANNContainerName = "custom_diskann",
+            QuantizedFlatContainerName = "custom_quantizedflat"
+        }),
+        "Custom container names should require destructive-operation opt-in.");
+
+    var custom = defaults with
+    {
+        DiskANNContainerName = "custom-primary",
+        QuantizedFlatContainerName = "custom-secondary",
+        AllowCustomContainerDeletion = true
+    };
+    Config.Validate(custom);
+    Assert(Config.AlgorithmLabel("CUSTOM-PRIMARY", custom) == "DiskANN", "DiskANN label must use the configured name.");
+    Assert(Config.AlgorithmLabel("custom-secondary", custom) == "QuantizedFlat", "QuantizedFlat label must use the configured name.");
+    Assert(Config.AlgorithmLabel("contains-diskann", custom) == "contains-diskann", "Labels must not use substring matching.");
+
+    var powershellGenerator = File.ReadAllText(Path.Combine(loaded.SampleRoot, "scripts", "generate-appsettings.ps1"));
+    var bashGenerator = File.ReadAllText(Path.Combine(loaded.SampleRoot, "scripts", "generate-appsettings.sh"));
+    foreach (var generator in new[] { powershellGenerator, bashGenerator })
+    {
+        Assert(
+            generator.Contains("AZURE_COSMOSDB_CREATE_INDEX_DATABASENAME", StringComparison.Ordinal),
+            "Generator must read the create-index database variable.");
+        Assert(
+            generator.Contains("\"Location\"", StringComparison.Ordinal),
+            "Generator must write CosmosDbSettings.Location.");
+    }
+
+    Console.WriteLine("[PASS] Container names, labels, generators, and destructive-operation safety are validated");
 }
 
 static void TestPartitionKeyDefault()
@@ -185,4 +243,18 @@ static void Assert(bool condition, string message)
     {
         throw new InvalidOperationException(message);
     }
+}
+
+static void AssertThrows(Action action, string message)
+{
+    try
+    {
+        action();
+    }
+    catch (InvalidOperationException)
+    {
+        return;
+    }
+
+    throw new InvalidOperationException(message);
 }

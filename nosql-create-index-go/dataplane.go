@@ -19,7 +19,6 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
 	"github.com/Azure/azure-sdk-for-go/sdk/data/azcosmos"
-	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/cosmos/armcosmos"
 )
 
 // Set to 1 for sequential insertion (helps with index stability)
@@ -402,43 +401,6 @@ func algorithmLabel(containerName string) string {
 	default:
 		return containerName
 	}
-}
-
-func DeleteContainers(ctx context.Context, credential azcore.TokenCredential, cfg *Config) error {
-	// Initialize Cosmos management client
-	// Note: v1.0.0 uses a different API - direct client creation instead of factory pattern
-	sqlResourcesClient, err := armcosmos.NewSQLResourcesClient(cfg.SubscriptionID, credential, nil)
-	if err != nil {
-		return fmt.Errorf("failed to create SQL resources client: %w", err)
-	}
-
-	for _, containerName := range []string{"hotels_diskann_go", "hotels_quantizedflat_go"} {
-		// Delete container via ARM SDK
-		poller, err := sqlResourcesClient.BeginDeleteSQLContainer(ctx, cfg.ResourceGroup, cfg.AccountName, cfg.DatabaseName, containerName, nil)
-		if err != nil {
-			// 404 is expected if container doesn't exist on first run — skip silently
-			if strings.Contains(err.Error(), "404") {
-				fmt.Printf("  ✓ Deleted %s (was already removed)\n", containerName)
-				continue
-			}
-			return fmt.Errorf("failed to delete container %q: %w", containerName, err)
-		}
-
-		// Wait for operation to complete
-		_, err = poller.PollUntilDone(ctx, nil)
-		if err != nil {
-			// 404 is still expected on retry/completion
-			if strings.Contains(err.Error(), "404") {
-				fmt.Printf("  ✓ Deleted %s (was already removed)\n", containerName)
-				continue
-			}
-			return fmt.Errorf("failed to wait for container deletion %q: %w", containerName, err)
-		}
-
-		fmt.Printf("  ✓ Deleted %s\n", containerName)
-	}
-
-	return nil
 }
 
 func dashes(n int) string {

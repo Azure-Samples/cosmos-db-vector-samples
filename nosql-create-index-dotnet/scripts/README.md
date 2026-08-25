@@ -51,11 +51,11 @@ chmod +x generate-appsettings.sh
 The script expects the following to be set by `azd env get-values`:
 
 - `AZURE_COSMOSDB_ENDPOINT` — Cosmos DB account endpoint URL
-- `AZURE_OPENAI_ENDPOINT` — Azure OpenAI resource endpoint URL
+- `AZURE_OPENAI_EMBEDDING_ENDPOINT` — Azure OpenAI resource endpoint URL
 
 Optional but recommended:
 
-- `AZURE_COSMOSDB_DATABASENAME` — Database name (defaults to "HotelsCreateIndex")
+- `AZURE_COSMOSDB_CREATE_INDEX_DATABASENAME` — Database name (defaults to "HotelsCreateIndex")
 - `AZURE_COSMOSDB_CONTAINER_NAME` — Specific container name (leave empty to use both)
 - `AZURE_OPENAI_EMBEDDING_DEPLOYMENT` — Deployment name (defaults to "text-embedding-3-small")
 - `AZURE_OPENAI_EMBEDDING_API_VERSION` — API version (defaults to "2024-08-01-preview")
@@ -107,7 +107,7 @@ azd up        # Deploy resources (creates env automatically)
 
 Check that your `.env` file in the azd environment root contains both:
 - `AZURE_COSMOSDB_ENDPOINT`
-- `AZURE_OPENAI_ENDPOINT`
+- `AZURE_OPENAI_EMBEDDING_ENDPOINT`
 
 If one is missing, either:
 1. Re-run `azd up` to redeploy infrastructure

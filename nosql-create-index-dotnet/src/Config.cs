@@ -7,8 +7,11 @@ public sealed record SampleConfig(
     string SubscriptionId,
     string ResourceGroup,
     string AccountName,
+    string Location,
     string CosmosEndpoint,
     string DatabaseName,
+    string DiskANNContainerName,
+    string QuantizedFlatContainerName,
     string? ContainerName,
     string OpenAIEmbeddingEndpoint,
     string OpenAIEmbeddingDeployment,
@@ -19,13 +22,14 @@ public sealed record SampleConfig(
     string PartitionKeyValue,
     string QueryText,
     int ExpectedDimensions,
-    int TopCount)
+    int TopCount,
+    bool AllowCustomContainerDeletion)
 {
-    public static readonly IReadOnlyDictionary<string, string> KnownContainers =
+    public IReadOnlyDictionary<string, string> KnownContainers =>
         new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
-            ["diskann"] = "hotels_diskann_dotnet",
-            ["quantizedflat"] = "hotels_quantizedflat_dotnet"
+            ["diskann"] = DiskANNContainerName,
+            ["quantizedflat"] = QuantizedFlatContainerName
         };
 }
 
@@ -37,6 +41,9 @@ public static class Config
     private const string DefaultEmbeddingFieldName = "embedding";
     private const string DefaultPartitionKeyValue = "Northeast";
     private const string DefaultOpenAIEmbeddingApiVersion = "2024-08-01-preview";
+    private const string DefaultDiskANNContainerName = "hotels_diskann";
+    private const string DefaultQuantizedFlatContainerName = "hotels_quantizedflat";
+    private const string AllowCustomContainerDeletionKey = "AZURE_COSMOSDB_CREATE_INDEX_ALLOW_CUSTOM_CONTAINER_DELETION";
 
     public static SampleConfig Load()
     {
@@ -55,7 +62,6 @@ public static class Config
 
         var dataFileValue =
             GetValue("DATA_FILE_WITH_VECTORS_AND_REGIONS", "DataFilePath")
-            ?? GetValue("DATA_FILE_WITH_VECTORS")
             ?? DefaultDataFile;
 
         return new SampleConfig(
@@ -63,8 +69,11 @@ public static class Config
             SubscriptionId: GetValue("AZURE_SUBSCRIPTION_ID", "CosmosDbSettings:SubscriptionId") ?? string.Empty,
             ResourceGroup: GetValue("AZURE_RESOURCE_GROUP", "CosmosDbSettings:ResourceGroup") ?? string.Empty,
             AccountName: GetValue("AZURE_COSMOSDB_ACCOUNT_NAME", "CosmosDbSettings:AccountName") ?? string.Empty,
+            Location: GetValue("AZURE_LOCATION", "CosmosDbSettings:Location") ?? string.Empty,
             CosmosEndpoint: GetValue("AZURE_COSMOSDB_ENDPOINT", "CosmosDbSettings:Endpoint") ?? string.Empty,
             DatabaseName: GetValue("AZURE_COSMOSDB_CREATE_INDEX_DATABASENAME", "CosmosDbSettings:DatabaseName") ?? "HotelsCreateIndex",
+            DiskANNContainerName: GetValue("AZURE_COSMOSDB_CREATE_INDEX_DISKANN_CONTAINER_NAME", "CosmosDbSettings:DiskANNContainerName") ?? DefaultDiskANNContainerName,
+            QuantizedFlatContainerName: GetValue("AZURE_COSMOSDB_CREATE_INDEX_QUANTIZEDFLAT_CONTAINER_NAME", "CosmosDbSettings:QuantizedFlatContainerName") ?? DefaultQuantizedFlatContainerName,
             ContainerName: GetValue("AZURE_COSMOSDB_CONTAINER_NAME", "CosmosDbSettings:ContainerName"),
             OpenAIEmbeddingEndpoint: GetValue("AZURE_OPENAI_EMBEDDING_ENDPOINT", "OpenAiSettings:Endpoint")
                                     ?? GetValue("AZURE_OPENAI_ENDPOINT")
@@ -77,7 +86,10 @@ public static class Config
             PartitionKeyValue: GetValue("PARTITION_KEY_VALUE", "CosmosDbSettings:PartitionKeyValue") ?? DefaultPartitionKeyValue,
             QueryText: DefaultQueryText,
             ExpectedDimensions: 1536,
-            TopCount: 5);
+            TopCount: 5,
+            AllowCustomContainerDeletion: GetBoolean(
+                GetValue(AllowCustomContainerDeletionKey, "CosmosDbSettings:AllowCustomContainerDeletion"),
+                AllowCustomContainerDeletionKey));
     }
 
     public static void Validate(SampleConfig config)
@@ -87,27 +99,50 @@ public static class Config
         if (string.IsNullOrWhiteSpace(config.DatabaseName)) missing.Add("AZURE_COSMOSDB_CREATE_INDEX_DATABASENAME");
         if (string.IsNullOrWhiteSpace(config.OpenAIEmbeddingEndpoint)) missing.Add("AZURE_OPENAI_EMBEDDING_ENDPOINT");
         if (string.IsNullOrWhiteSpace(config.OpenAIEmbeddingDeployment)) missing.Add("AZURE_OPENAI_EMBEDDING_DEPLOYMENT");
+        // ARM SDK variables required for control plane operations
+        if (string.IsNullOrWhiteSpace(config.SubscriptionId)) missing.Add("AZURE_SUBSCRIPTION_ID");
+        if (string.IsNullOrWhiteSpace(config.ResourceGroup)) missing.Add("AZURE_RESOURCE_GROUP");
+        if (string.IsNullOrWhiteSpace(config.AccountName)) missing.Add("AZURE_COSMOSDB_ACCOUNT_NAME");
+        if (string.IsNullOrWhiteSpace(config.Location)) missing.Add("AZURE_LOCATION");
 
         if (missing.Count > 0)
         {
             throw new InvalidOperationException(
-                $"Missing required configuration: {string.Join(", ", missing)}. " +
+                $"Missing required environment variables for control plane operations: {string.Join(", ", missing)}. " +
                 "Set values in appsettings.json or as environment variables.");
         }
 
-        if (config.VectorAlgorithm is not null && !SampleConfig.KnownContainers.ContainsKey(config.VectorAlgorithm))
+        if (string.Equals(
+                config.DiskANNContainerName,
+                config.QuantizedFlatContainerName,
+                StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException(
+                "DiskANN and QuantizedFlat container names must be different (case-insensitive).");
+        }
+
+        var usesDefaultContainerNames =
+            string.Equals(config.DiskANNContainerName, DefaultDiskANNContainerName, StringComparison.Ordinal) &&
+            string.Equals(config.QuantizedFlatContainerName, DefaultQuantizedFlatContainerName, StringComparison.Ordinal);
+        if (!usesDefaultContainerNames && !config.AllowCustomContainerDeletion)
+        {
+            throw new InvalidOperationException(
+                $"Custom container names require {AllowCustomContainerDeletionKey}=true because the sample overwrites and deletes its configured containers.");
+        }
+
+        if (config.VectorAlgorithm is not null && !config.KnownContainers.ContainsKey(config.VectorAlgorithm))
         {
             throw new InvalidOperationException("VECTOR_ALGORITHM must be one of: diskann, quantizedflat.");
         }
 
-        if (config.ContainerName is not null && !SampleConfig.KnownContainers.Values.Contains(config.ContainerName, StringComparer.OrdinalIgnoreCase))
+        if (config.ContainerName is not null && !config.KnownContainers.Values.Contains(config.ContainerName, StringComparer.OrdinalIgnoreCase))
         {
-            throw new InvalidOperationException("AZURE_COSMOSDB_CONTAINER_NAME must be one of: hotels_diskann_dotnet, hotels_quantizedflat_dotnet.");
+            throw new InvalidOperationException($"AZURE_COSMOSDB_CONTAINER_NAME must be one of: {string.Join(", ", config.KnownContainers.Values)}.");
         }
 
         if (config.ContainerName is not null && config.VectorAlgorithm is not null)
         {
-            var expectedContainer = SampleConfig.KnownContainers[config.VectorAlgorithm];
+            var expectedContainer = config.KnownContainers[config.VectorAlgorithm];
             if (!string.Equals(config.ContainerName, expectedContainer, StringComparison.OrdinalIgnoreCase))
             {
                 throw new InvalidOperationException("AZURE_COSMOSDB_CONTAINER_NAME and VECTOR_ALGORITHM refer to different containers.");
@@ -134,20 +169,25 @@ public static class Config
 
         if (!string.IsNullOrWhiteSpace(config.VectorAlgorithm))
         {
-            return new[] { SampleConfig.KnownContainers[config.VectorAlgorithm] };
+            return new[] { config.KnownContainers[config.VectorAlgorithm] };
         }
 
-        return SampleConfig.KnownContainers.Values.ToArray();
+        return config.KnownContainers.Values.ToArray();
     }
 
-    public static string AlgorithmLabel(string containerName)
+    public static string AlgorithmLabel(string containerName, SampleConfig config)
     {
-        return containerName switch
+        if (string.Equals(containerName, config.DiskANNContainerName, StringComparison.OrdinalIgnoreCase))
         {
-            "hotels_diskann_dotnet" => "DiskANN",
-            "hotels_quantizedflat_dotnet" => "QuantizedFlat",
-            _ => containerName
-        };
+            return "DiskANN";
+        }
+
+        if (string.Equals(containerName, config.QuantizedFlatContainerName, StringComparison.OrdinalIgnoreCase))
+        {
+            return "QuantizedFlat";
+        }
+
+        return containerName;
     }
 
     private static string ResolveSampleRoot()
@@ -199,5 +239,20 @@ public static class Config
     {
         var trimmed = value?.Trim();
         return string.IsNullOrWhiteSpace(trimmed) ? null : trimmed;
+    }
+
+    private static bool GetBoolean(string? value, string key)
+    {
+        if (value is null)
+        {
+            return false;
+        }
+
+        if (bool.TryParse(value, out var parsed))
+        {
+            return parsed;
+        }
+
+        throw new InvalidOperationException($"{key} must be true or false.");
     }
 }

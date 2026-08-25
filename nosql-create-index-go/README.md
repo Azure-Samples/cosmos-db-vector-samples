@@ -14,7 +14,10 @@ products:
 
 ## Overview
 
-This sample demonstrates the full `nosql-create-index` scenario in Go. The sample uses the ARM SDK control plane to create the `HotelsCreateIndex` database and the `hotels_diskann_go` and `hotels_quantizedflat_go` containers with vector indexes, then uses data-plane operations to:
+This sample demonstrates the full `nosql-create-index` scenario in Go. Bicep
+creates the configured `HotelsCreateIndex` database. The sample uses the ARM
+SDK control plane to create the `hotels_diskann` and `hotels_quantizedflat`
+containers with vector indexes, then uses data-plane operations to:
 
 - authenticate with `DefaultAzureCredential`
 - load hotel documents from the shared dataset
@@ -31,7 +34,7 @@ The sample creates and deletes containers in code by using the Azure Cosmos DB A
 - Go 1.23 or later
 - Azure CLI with a signed-in account: `az login`
 - An Azure Cosmos DB for NoSQL account with vector search enabled
-- Permissions for your identity to create and delete SQL databases and containers in the Azure Cosmos DB account
+- Permissions for your identity to create and delete the configured SQL containers in the Azure Cosmos DB account
 - Cosmos DB data-plane access to create and query items
 - An Azure OpenAI embedding deployment for `text-embedding-3-small`
 
@@ -43,7 +46,7 @@ The sample creates and deletes containers in code by using the Azure Cosmos DB A
    Set-Location .\nosql-create-index-go
    ```
 
-2. Populate environment variables. The Go code calls `os.Getenv` directly and doesn't load `.env` files automatically, so export or set these values in your shell before running the sample.
+2. Create the environment variables file.
 
    **If you deployed with `azd up`:**
 
@@ -57,37 +60,45 @@ The sample creates and deletes containers in code by using the Azure Cosmos DB A
    Copy-Item .env.example .env
    ```
 
-3. Set the canonical environment variables:
-
-   | Variable | Example value |
-   |---|---|
-   | `AZURE_COSMOSDB_ENDPOINT` | `https://<account>.documents.azure.com:443/` |
-   | `AZURE_COSMOSDB_CREATE_INDEX_DATABASENAME` | `HotelsCreateIndex` |
-   | `AZURE_COSMOSDB_CONTAINER_NAME` | Optional. `hotels_diskann_go` or `hotels_quantizedflat_go` |
-   | `AZURE_OPENAI_EMBEDDING_ENDPOINT` | `https://<resource>.openai.azure.com/` |
-   | `AZURE_OPENAI_EMBEDDING_DEPLOYMENT` | `text-embedding-3-small` |
-   | `VECTOR_ALGORITHM` | Optional. `diskann` or `quantizedflat` |
-   | `AZURE_COSMOSDB_CREATE_INDEX_EMBEDDED_FIELD` | `embedding` |
-   | `DATA_FILE_WITH_VECTORS_AND_REGIONS` | `..\data\HotelsData_toCosmosDB_Vector_byRegion.json` |
-   | `AZURE_SUBSCRIPTION_ID` | Your Azure subscription ID |
-   | `AZURE_RESOURCE_GROUP` | Resource group for the Cosmos DB account |
-   | `AZURE_COSMOSDB_ACCOUNT_NAME` | Cosmos DB account name |
-   | `AZURE_LOCATION` | Azure region for the database and containers |
-
-   Leave both `AZURE_COSMOSDB_CONTAINER_NAME` and `VECTOR_ALGORITHM` empty to run both containers. If you set both, they must match:
-
-   - `diskann` → `hotels_diskann_go`
-   - `quantizedflat` → `hotels_quantizedflat_go`
-
-4. Download dependencies:
+3. Download dependencies:
 
    ```powershell
    go mod download
    ```
 
-## Run
+## Load environment variables and run the sample
 
-**Load environment variables from `.env`:**
+**⚠️ Important:** Go does NOT automatically load `.env` files. Environment variables MUST be exported in your current session BEFORE running the sample.
+
+**Load environment variables from `.env` into your session:**
+
+| Action | PowerShell | Bash |
+|--------|-----------|------|
+| Load from `.env` file | `Get-Content .env \| ForEach-Object { if ($_ -match "^([^=]+)=(.*)$") { [Environment]::SetEnvironmentVariable($matches[1], $matches[2]) } }` | `export $(grep -v "^#" .env \| xargs)` |
+| Set single variable | `[Environment]::SetEnvironmentVariable("AZURE_COSMOSDB_ENDPOINT", "https://your-account.documents.azure.com:443/")` | `export AZURE_COSMOSDB_ENDPOINT="https://your-account.documents.azure.com:443/"` |
+
+**Required environment variables for control plane operations** (creating and deleting containers with ARM SDK):
+- `AZURE_SUBSCRIPTION_ID` — Your Azure subscription ID
+- `AZURE_RESOURCE_GROUP` — Your Azure resource group name
+- `AZURE_COSMOSDB_ACCOUNT_NAME` — Your Cosmos DB account name
+- `AZURE_LOCATION` — Azure region where resources are deployed
+
+**Required environment variables for data plane operations** (querying and inserting data):
+- `AZURE_COSMOSDB_ENDPOINT` — Cosmos DB endpoint URL
+- `AZURE_COSMOSDB_CREATE_INDEX_DATABASENAME` — Database name (e.g., "HotelsCreateIndex")
+- `AZURE_OPENAI_EMBEDDING_ENDPOINT` — Azure OpenAI endpoint URL
+- `AZURE_OPENAI_EMBEDDING_DEPLOYMENT` — Deployment name (e.g., "text-embedding-3-small")
+
+**⚠️ Control Plane Requirement:** This sample uses the Azure Resource Manager (ARM) SDK to create and delete containers at runtime. All ARM SDK environment variables above (subscription ID, resource group, account name, location) MUST be set before running the sample. No defaults are provided for these values.
+
+**Optional environment variables:**
+- `VECTOR_ALGORITHM` — "diskann" or "quantizedflat"; leave empty to run **both** containers
+- `AZURE_COSMOSDB_CONTAINER_NAME` — Target container by name; leave empty to process all
+- `AZURE_COSMOSDB_CREATE_INDEX_DISKANN_CONTAINER_NAME` — Custom diskANN container name (default: "hotels_diskann")
+- `AZURE_COSMOSDB_CREATE_INDEX_QUANTIZEDFLAT_CONTAINER_NAME` — Custom quantizedFlat container name (default: "hotels_quantizedflat")
+- `AZURE_COSMOSDB_CREATE_INDEX_ALLOW_DESTRUCTIVE_OPERATIONS` — Set to `true` only when custom container names are intentional and safe to delete
+
+**Run the sample:**
 
 ```bash
 # Bash/Linux/Mac
@@ -96,10 +107,12 @@ export $(grep -v '^#' .env | xargs) && go run .
 
 ```powershell
 # PowerShell
-Get-Content .env | Where-Object { $_ -match '^[^#].*=' } | ForEach-Object { $k,$v = $_ -split '=',2; [Environment]::SetEnvironmentVariable($k.Trim(), $v.Trim()) }; go run .
+Get-Content .env | ForEach-Object { if ($_ -match "^([^=]+)=(.*)$") { [Environment]::SetEnvironmentVariable($matches[1], $matches[2]) } }; go run .
 ```
 
-The sample creates the database and containers, loads the shared dataset, writes documents to both containers, queries both vector indexes with the same embedding, and deletes both containers during cleanup.
+The sample uses the Bicep-created database, creates both containers, loads the
+shared dataset, queries both vector indexes, and waits for both container
+deletions during cleanup.
 
 ## Build
 
@@ -112,12 +125,7 @@ go build -o create-index-go .
 Then run the binary:
 
 ```bash
-# Bash/Linux/Mac
-export $(grep -v '^#' .env | xargs) && ./create-index-go
-```
-
-```powershell
-# PowerShell (load env then run)
+# Bash/Linux/Mac (load env then run)
 Get-Content .env | Where-Object { $_ -match '^[^#].*=' } | ForEach-Object { $k,$v = $_ -split '=',2; [Environment]::SetEnvironmentVariable($k.Trim(), $v.Trim()) }; .\create-index-go.exe
 ```
 
@@ -135,11 +143,11 @@ Using Azure OpenAI Embedding Deployment/Model: text-embedding-3-small
 Reading JSON file from C:\project-dina-data-ai\repos\cosmos-db-vector-samples-2\nosql-create-index-go\data\HotelsData_toCosmosDB_Vector_byRegion.json
 Loaded 50 documents
 
-=== Phase 1: Create Database ===
+=== Phase 1: Use Configured Database ===
   Database: HotelsCreateIndex
-  ✓ Database created or already exists
+  ✓ Using existing database
 
-=== Creating Container: hotels_diskann_go ===
+=== Creating Container: hotels_diskann ===
   Index type:     diskANN
   Embedding path: /embedding
   Dimensions:     1536
@@ -157,7 +165,7 @@ Loaded 50 documents
     - Path: /embedding
     - Type: diskANN
 
-=== Creating Container: hotels_quantizedflat_go ===
+=== Creating Container: hotels_quantizedflat ===
   Index type:     quantizedFlat
   Embedding path: /embedding
   Dimensions:     1536
@@ -177,9 +185,9 @@ Loaded 50 documents
 
 ✓ All containers created successfully
 Processing in batches of 50...
-  ✓ hotels_diskann_go: 50 inserted (5243.74 RUs)
+  ✓ hotels_diskann: 50 inserted (5243.74 RUs)
   ✓ Verified: 10 documents in partition 'Northeast'
-  ✓ hotels_quantizedflat_go: 50 inserted (2621.83 RUs)
+  ✓ hotels_quantizedflat: 50 inserted (2621.83 RUs)
   ✓ Verified: 10 documents in partition 'Northeast'
 
 ⏳ Waiting 5 seconds for index stabilization...
@@ -188,27 +196,46 @@ Query: "hotel near the ocean"
 Embedding generated (1536 dimensions)
 
 Running search (top 5 results for each distance function)...
-  ✓ hotels_diskann_go queried (3.65 RUs)
-  ✓ hotels_diskann_go queried (3.65 RUs)
-  ✓ hotels_diskann_go queried (3.65 RUs)
-  ✓ hotels_quantizedflat_go queried (3.65 RUs)
-  ✓ hotels_quantizedflat_go queried (3.65 RUs)
-  ✓ hotels_quantizedflat_go queried (3.65 RUs)
+  ✓ hotels_diskann queried (3.65 RUs)
+  ✓ hotels_diskann queried (3.65 RUs)
+  ✓ hotels_diskann queried (3.65 RUs)
+  ✓ hotels_quantizedflat queried (3.65 RUs)
+  ✓ hotels_quantizedflat queried (3.65 RUs)
+  ✓ hotels_quantizedflat queried (3.65 RUs)
 
 | Container            | Metric     | Top 1 Result               | Score  | Top 2 Result               | Score  | Diff   |
 |----------------------|------------|----------------------------|--------|----------------------------|--------|--------|
-| hotels_diskann_go    | Cosine     | City Center Summer Wind... | 0.4025 | Red Tide Hotel             | 0.4000 | 0.0025 |
-| hotels_diskann_go    | DotProduct | City Center Summer Wind... | 0.4027 | Red Tide Hotel             | 0.4001 | 0.0025 |
-| hotels_diskann_go    | Euclidean  | City Center Summer Wind... | 1.0934 | Red Tide Hotel             | 1.0957 | -0.0023 |
+| hotels_diskann    | Cosine     | City Center Summer Wind... | 0.4025 | Red Tide Hotel             | 0.4000 | 0.0025 |
+| hotels_diskann    | DotProduct | City Center Summer Wind... | 0.4027 | Red Tide Hotel             | 0.4001 | 0.0025 |
+| hotels_diskann    | Euclidean  | City Center Summer Wind... | 1.0934 | Red Tide Hotel             | 1.0957 | -0.0023 |
 | hotels_quantizedf... | Cosine     | City Center Summer Wind... | 0.4025 | Red Tide Hotel             | 0.4000 | 0.0025 |
 | hotels_quantizedf... | DotProduct | City Center Summer Wind... | 0.4027 | Red Tide Hotel             | 0.4001 | 0.0025 |
 | hotels_quantizedf... | Euclidean  | City Center Summer Wind... | 1.0934 | Red Tide Hotel             | 1.0957 | -0.0023 |
 
 === Phase 4: Cleanup ===
-  ✓ Deleted hotels_diskann_go
-  ✓ Deleted hotels_quantizedflat_go
+  ✓ Deleted hotels_diskann
+  ✓ Deleted hotels_quantizedflat
 
 Complete
 ```
 
 The output includes control-plane creation, ingestion, per-metric query results, and cleanup. Query scores can vary between runs.
+
+## Authentication and permissions
+
+All Azure clients use `DefaultAzureCredential`. For local runs, sign in with `az login` or `azd auth login`. Hosted execution can use managed identity. The selected identity needs management-plane permission to create and delete the two configured containers, Cosmos DB data-plane access to insert and query documents, and the Cognitive Services OpenAI User role. Keys and connection strings aren't supported.
+
+## Validate and clean generated artifacts
+
+From the repository root, validate this sample with the shared validator:
+
+```powershell
+pwsh -NoProfile -File .github\skills\sample-validate-nosql-create-index\scripts\validate-create-index-samples.ps1 -Language Go
+```
+
+Preview and then remove generated local artifacts:
+
+```powershell
+pwsh -NoProfile -File .github\scripts\clean-all-create-index.ps1 -Language Go -WhatIf
+pwsh -NoProfile -File .github\scripts\clean-all-create-index.ps1 -Language Go
+```

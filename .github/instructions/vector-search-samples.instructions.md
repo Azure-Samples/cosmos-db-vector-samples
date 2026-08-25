@@ -1,11 +1,27 @@
 ---
 applyTo: "nosql-*/**"
 ---
-# Execution Patterns — Cosmos DB NoSQL Vector Search Samples
+# Execution patterns — Cosmos DB NoSQL vector-search samples
 
-## Two-Phase Execution Model
+> [!IMPORTANT]
+> This file governs `nosql-vector-search-*` samples, which are subject to
+> [QUICKSTART-CONSTITUTION.md](../QUICKSTART-CONSTITUTION.md) (Base) and
+> [VECTOR-SEARCH-CONSTITUTION.md](../docs/VECTOR-SEARCH-CONSTITUTION.md) (Scenario).
+>
+> For `nosql-create-index-*` samples, follow
+> [QUICKSTART-CONSTITUTION.md](../QUICKSTART-CONSTITUTION.md) (Base) and
+> [CREATE-INDEX-CONSTITUTION.md](../docs/CREATE-INDEX-CONSTITUTION.md) (Scenario).
+> Create-index samples have a separate lifecycle and intentionally create and
+> delete containers through control-plane SDKs.
 
-Cosmos DB NoSQL vector samples use an **infra-first** pattern. Infrastructure and application code have completely separate responsibilities.
+The execution model, container rules, and failure guidance below apply only to
+vector-search samples.
+
+## Two-phase execution model for vector-search samples
+
+Cosmos DB NoSQL vector-search samples use an **infra-first** pattern.
+Infrastructure and application code have completely separate
+responsibilities. Create-index samples are governed by the constitution.
 
 ### Phase 1: Infrastructure Deployment (`azd up`)
 
@@ -20,7 +36,10 @@ Handled entirely by Bicep/ARM templates. The application code NEVER performs any
 | 5. Create vector index | Algorithm-specific index matching embedding policy | **YES — immutable** |
 | 6. Assign RBAC | Custom role "Write to Azure Cosmos DB for NoSQL data plane" with specific data actions (defined in Bicep) | — |
 
-**Critical:** Once a container's vector embedding policy is set, it CANNOT be changed. Containers are infrastructure — not disposable resources.
+**Critical:** Once a container's vector embedding policy is set, it CANNOT be
+changed. For vector-search samples, containers are infrastructure and are not
+disposable application resources. Create-index container lifecycle is defined
+by the constitution.
 
 ### Phase 2: Application Runtime
 
@@ -47,7 +66,8 @@ Application starts
   → Role: Custom "Write to Azure Cosmos DB for NoSQL data plane" role (defined in Bicep)
 ```
 
-The code supports both key-based and passwordless auth paths. For deployed infrastructure (`disableKeyBasedAuth: true`), only the passwordless path works. New code should always use `DefaultAzureCredential`.
+The code uses passwordless authentication through `DefaultAzureCredential`.
+Account keys and connection strings aren't supported.
 
 ## Container Reference Pattern
 
@@ -113,7 +133,7 @@ Two containers — one per algorithm:
 - **Partition key:** `/HotelId`
 - **Embedding field naming:** Use generic `DescriptionVector` or `vector` — NOT model-specific names (e.g., not `text_embedding_ada_002`)
 
-## What the Code NEVER Does
+## What vector-search code never does
 
 | Operation | Why Not |
 |-----------|---------|
@@ -131,7 +151,7 @@ Two containers — one per algorithm:
 | `createIndexes` command at runtime | Indexes exist from `azd up` |
 | Single collection per run | 2 containers always present |
 | `mongosh` cleanup possible | `delete:all` scripts clean up inserted documents |
-| Connection string supported | Passwordless auth preferred; key-based supported but disabled in deployed infra |
+| Connection string pattern | Passwordless authentication with `DefaultAzureCredential` |
 
 ## Failure Modes
 

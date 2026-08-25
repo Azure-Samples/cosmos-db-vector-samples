@@ -22,6 +22,9 @@ func baseEnv() []string {
 		"AZURE_COSMOSDB_ENDPOINT=",
 		"AZURE_COSMOSDB_DATABASENAME=",
 		"AZURE_COSMOSDB_CONTAINER_NAME=",
+		"AZURE_COSMOSDB_CREATE_INDEX_DISKANN_CONTAINER_NAME=",
+		"AZURE_COSMOSDB_CREATE_INDEX_QUANTIZEDFLAT_CONTAINER_NAME=",
+		"AZURE_COSMOSDB_CREATE_INDEX_ALLOW_DESTRUCTIVE_OPERATIONS=",
 		"AZURE_OPENAI_EMBEDDING_ENDPOINT=",
 		"AZURE_OPENAI_EMBEDDING_DEPLOYMENT=",
 		"AZURE_SUBSCRIPTION_ID=",
@@ -84,7 +87,7 @@ func TestContainerAlgorithmMismatchFailsFast(t *testing.T) {
 	cmd.Env = append(baseEnv(),
 		"AZURE_COSMOSDB_ENDPOINT=https://example.documents.azure.com:443/",
 		"AZURE_COSMOSDB_DATABASENAME=Hotels",
-		"AZURE_COSMOSDB_CONTAINER_NAME=hotels_quantizedflat_go",
+		"AZURE_COSMOSDB_CONTAINER_NAME=hotels_quantizedflat",
 		"AZURE_OPENAI_EMBEDDING_ENDPOINT=https://example.openai.azure.com/",
 		"AZURE_OPENAI_EMBEDDING_DEPLOYMENT=text-embedding-3-small",
 		"AZURE_SUBSCRIPTION_ID=sub-id",
@@ -100,7 +103,7 @@ func TestContainerAlgorithmMismatchFailsFast(t *testing.T) {
 		t.Fatalf("expected go run to fail, output: %s", string(output))
 	}
 
-	if !strings.Contains(string(output), `VECTOR_ALGORITHM="diskann" must use AZURE_COSMOSDB_CONTAINER_NAME="hotels_diskann_go"`) {
+	if !strings.Contains(string(output), `VECTOR_ALGORITHM="diskann" must use AZURE_COSMOSDB_CONTAINER_NAME="hotels_diskann"`) {
 		t.Fatalf("unexpected output: %s", string(output))
 	}
 }

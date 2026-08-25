@@ -5,39 +5,31 @@ import java.util.List;
 import java.util.Map;
 
 public final class Config {
-    private static final Map<String, String> KNOWN_CONTAINERS = Map.of(
-            "diskann", "hotels_diskann_java",
-            "quantizedflat", "hotels_quantizedflat_java"
-    );
-    private static final List<String> TARGET_CONTAINERS = List.of("hotels_diskann_java", "hotels_quantizedflat_java");
+    // Default container names (non-language-specific)
+    private static final String DEFAULT_DISKANN_CONTAINER = "hotels_diskann";
+    private static final String DEFAULT_QUANTIZEDFLAT_CONTAINER = "hotels_quantizedflat";
+    private static final String ALLOW_CUSTOM_CONTAINER_DELETION =
+            "AZURE_COSMOSDB_CREATE_INDEX_ALLOW_CUSTOM_CONTAINER_DELETION";
 
-    private static final String DEFAULT_DATABASE_NAME = "HotelsCreateIndex";
-    private static final String DEFAULT_LOCATION = "West US 3";
     private static final String DEFAULT_API_VERSION = "2024-08-01-preview";
-    private static final String DEFAULT_QUERY_TEXT = "hotel near the ocean";
-    private static final String DEFAULT_DATA_FILE = "./data/HotelsData_toCosmosDB_Vector_byRegion.json";
-    private static final String DEFAULT_EMBEDDING_FIELD = "embedding";
-    private static final int DEFAULT_TOP_COUNT = 5;
-    private static final int EXPECTED_DIMENSIONS = 1536;
-    private static final String DEFAULT_PARTITION_KEY_VALUE = "Northeast";
 
     private Config() {
     }
 
     public static SampleConfig load() {
-        String databaseName = read("AZURE_COSMOSDB_CREATE_INDEX_DATABASENAME", DEFAULT_DATABASE_NAME);
+        String databaseName = read("AZURE_COSMOSDB_CREATE_INDEX_DATABASENAME", "HotelsCreateIndex");
+        String diskannContainerName = read("AZURE_COSMOSDB_CREATE_INDEX_DISKANN_CONTAINER_NAME", DEFAULT_DISKANN_CONTAINER);
+        String quantizedflatContainerName = read("AZURE_COSMOSDB_CREATE_INDEX_QUANTIZEDFLAT_CONTAINER_NAME", DEFAULT_QUANTIZEDFLAT_CONTAINER);
         String containerName = read("AZURE_COSMOSDB_CONTAINER_NAME", null);
-        String location = read("AZURE_LOCATION", DEFAULT_LOCATION);
+        String location = read("AZURE_LOCATION", null);
+        boolean allowCustomContainerDeletion = readBoolean(ALLOW_CUSTOM_CONTAINER_DELETION, false);
         String vectorAlgorithm = read("VECTOR_ALGORITHM", null);
         if (vectorAlgorithm != null) {
             vectorAlgorithm = vectorAlgorithm.toLowerCase();
         }
 
         Path sampleRoot = Path.of("").toAbsolutePath().normalize();
-        String dataFileSetting = read("DATA_FILE_WITH_VECTORS_AND_REGIONS", null);
-        if (dataFileSetting == null) {
-            dataFileSetting = read("DATA_FILE_WITH_VECTORS", DEFAULT_DATA_FILE);
-        }
+        String dataFileSetting = read("DATA_FILE_WITH_VECTORS_AND_REGIONS", "./data/HotelsData_toCosmosDB_Vector_byRegion.json");
         Path dataFile = sampleRoot.resolve(dataFileSetting).normalize();
 
         return new SampleConfig(
@@ -47,17 +39,20 @@ public final class Config {
                 read("AZURE_COSMOSDB_ENDPOINT", null),
                 databaseName,
                 containerName,
+                diskannContainerName,
+                quantizedflatContainerName,
                 location,
                 read("AZURE_OPENAI_EMBEDDING_ENDPOINT", null),
                 read("AZURE_OPENAI_EMBEDDING_DEPLOYMENT", null),
-                read("AZURE_OPENAI_EMBEDDING_API_VERSION", DEFAULT_API_VERSION),
+                read("AZURE_OPENAI_EMBEDDING_API_VERSION", "2024-08-01-preview"),
                 vectorAlgorithm,
                 dataFile,
-                DEFAULT_QUERY_TEXT,
-                read("AZURE_COSMOSDB_CREATE_INDEX_EMBEDDED_FIELD", DEFAULT_EMBEDDING_FIELD),
-                DEFAULT_TOP_COUNT,
-                EXPECTED_DIMENSIONS,
-                read("PARTITION_KEY_VALUE", DEFAULT_PARTITION_KEY_VALUE)
+                "hotel near the ocean",
+                read("AZURE_COSMOSDB_CREATE_INDEX_EMBEDDED_FIELD", "embedding"),
+                5,
+                1536,
+                read("PARTITION_KEY_VALUE", "Northeast"),
+                allowCustomContainerDeletion
         );
     }
 
@@ -76,24 +71,46 @@ public final class Config {
             throw new IllegalArgumentException("Missing required environment variables: " + missing);
         }
 
-        if (config.vectorAlgorithm() != null && !KNOWN_CONTAINERS.containsKey(config.vectorAlgorithm())) {
+        if (config.diskannContainerName().equalsIgnoreCase(config.quantizedflatContainerName())) {
+            throw new IllegalArgumentException(
+                    "DiskANN and QuantizedFlat container names must be different (case-insensitive).");
+        }
+
+        boolean usesDefaultContainerNames =
+                DEFAULT_DISKANN_CONTAINER.equals(config.diskannContainerName())
+                        && DEFAULT_QUANTIZEDFLAT_CONTAINER.equals(config.quantizedflatContainerName());
+        if (!usesDefaultContainerNames && !config.allowCustomContainerDeletion()) {
+            throw new IllegalArgumentException(
+                    "Custom container names require "
+                            + ALLOW_CUSTOM_CONTAINER_DELETION
+                            + "=true because the sample overwrites and deletes its configured containers.");
+        }
+
+        Map<String, String> knownContainers = Map.of(
+                "diskann", config.diskannContainerName(),
+                "quantizedflat", config.quantizedflatContainerName()
+        );
+
+        if (config.vectorAlgorithm() != null && !knownContainers.containsKey(config.vectorAlgorithm())) {
             throw new IllegalArgumentException("VECTOR_ALGORITHM must be one of: diskann, quantizedflat.");
         }
 
-        if (config.containerName() != null && !TARGET_CONTAINERS.contains(config.containerName())) {
-            throw new IllegalArgumentException("AZURE_COSMOSDB_CONTAINER_NAME must be one of: hotels_diskann_java, hotels_quantizedflat_java.");
+        List<String> targetContainers = List.of(config.diskannContainerName(), config.quantizedflatContainerName());
+        if (config.containerName() != null
+                && targetContainers.stream().noneMatch(name -> name.equalsIgnoreCase(config.containerName()))) {
+            throw new IllegalArgumentException("AZURE_COSMOSDB_CONTAINER_NAME must match AZURE_COSMOSDB_CREATE_INDEX_DISKANN_CONTAINER_NAME or AZURE_COSMOSDB_CREATE_INDEX_QUANTIZEDFLAT_CONTAINER_NAME.");
         }
 
         if (config.containerName() != null && config.vectorAlgorithm() != null) {
-            String expectedContainer = KNOWN_CONTAINERS.get(config.vectorAlgorithm());
-            if (!config.containerName().equals(expectedContainer)) {
+            String expectedContainer = knownContainers.get(config.vectorAlgorithm());
+            if (!config.containerName().equalsIgnoreCase(expectedContainer)) {
                 throw new IllegalArgumentException(
                         "AZURE_COSMOSDB_CONTAINER_NAME and VECTOR_ALGORITHM refer to different containers.");
             }
         }
 
         if (!config.dataFileWithVectors().toFile().exists()) {
-            throw new IllegalArgumentException("DATA_FILE_WITH_VECTORS_AND_REGIONS (or DATA_FILE_WITH_VECTORS) does not exist: " + config.dataFileWithVectors());
+            throw new IllegalArgumentException("DATA_FILE_WITH_VECTORS_AND_REGIONS does not exist: " + config.dataFileWithVectors());
         }
     }
 
@@ -102,17 +119,36 @@ public final class Config {
             return List.of(config.containerName());
         }
         if (config.vectorAlgorithm() != null) {
-            return List.of(KNOWN_CONTAINERS.get(config.vectorAlgorithm()));
+            String containerName = config.vectorAlgorithm().equals("diskann") 
+                    ? config.diskannContainerName() 
+                    : config.quantizedflatContainerName();
+            return List.of(containerName);
         }
-        return TARGET_CONTAINERS;
+        return List.of(config.diskannContainerName(), config.quantizedflatContainerName());
     }
 
-    public static String algorithmLabel(String containerName) {
-        return switch (containerName) {
-            case "hotels_diskann_java" -> "DiskANN";
-            case "hotels_quantizedflat_java" -> "QuantizedFlat";
-            default -> containerName;
-        };
+    public static String algorithmLabel(String containerName, SampleConfig config) {
+        if (containerName.equalsIgnoreCase(config.diskannContainerName())) {
+            return "DiskANN";
+        }
+        if (containerName.equalsIgnoreCase(config.quantizedflatContainerName())) {
+            return "QuantizedFlat";
+        }
+        return containerName;
+    }
+
+    private static boolean readBoolean(String name, boolean defaultValue) {
+        String value = read(name, null);
+        if (value == null) {
+            return defaultValue;
+        }
+        if ("true".equalsIgnoreCase(value)) {
+            return true;
+        }
+        if ("false".equalsIgnoreCase(value)) {
+            return false;
+        }
+        throw new IllegalArgumentException(name + " must be true or false.");
     }
 
     private static String read(String name, String defaultValue) {
@@ -155,6 +191,8 @@ record SampleConfig(
         String cosmosEndpoint,
         String databaseName,
         String containerName,
+        String diskannContainerName,
+        String quantizedflatContainerName,
         String location,
         String openAiEmbeddingEndpoint,
         String openAiEmbeddingDeployment,
@@ -165,5 +203,6 @@ record SampleConfig(
         String embeddingFieldName,
         int topCount,
         int expectedDimensions,
-        String partitionKeyValue) {
+        String partitionKeyValue,
+        boolean allowCustomContainerDeletion) {
 }
