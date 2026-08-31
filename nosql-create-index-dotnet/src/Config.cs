@@ -43,7 +43,7 @@ public static class Config
     private const string DefaultOpenAIEmbeddingApiVersion = "2024-08-01-preview";
     private const string DefaultDiskANNContainerName = "hotels_diskann";
     private const string DefaultQuantizedFlatContainerName = "hotels_quantizedflat";
-    private const string AllowCustomContainerDeletionKey = "AZURE_COSMOSDB_CREATE_INDEX_ALLOW_CUSTOM_CONTAINER_DELETION";
+    private const string AllowCustomContainerDeletionKey = "AZURE_COSMOSDB_CREATE_INDEX_ALLOW_DESTRUCTIVE_OPERATIONS";
 
     public static SampleConfig Load()
     {

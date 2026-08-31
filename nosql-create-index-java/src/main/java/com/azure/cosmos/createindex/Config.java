@@ -9,7 +9,7 @@ public final class Config {
     private static final String DEFAULT_DISKANN_CONTAINER = "hotels_diskann";
     private static final String DEFAULT_QUANTIZEDFLAT_CONTAINER = "hotels_quantizedflat";
     private static final String ALLOW_CUSTOM_CONTAINER_DELETION =
-            "AZURE_COSMOSDB_CREATE_INDEX_ALLOW_CUSTOM_CONTAINER_DELETION";
+            "AZURE_COSMOSDB_CREATE_INDEX_ALLOW_DESTRUCTIVE_OPERATIONS";
 
     private static final String DEFAULT_API_VERSION = "2024-08-01-preview";
 

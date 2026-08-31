@@ -40,7 +40,7 @@ class ConfigTest {
                 () -> Config.validate(config("custom_diskann", "custom_quantizedflat", "eastus2", false)));
 
         assertTrue(exception.getMessage().contains(
-                "AZURE_COSMOSDB_CREATE_INDEX_ALLOW_CUSTOM_CONTAINER_DELETION=true"));
+                "AZURE_COSMOSDB_CREATE_INDEX_ALLOW_DESTRUCTIVE_OPERATIONS=true"));
         assertDoesNotThrow(
                 () -> Config.validate(config("custom_diskann", "custom_quantizedflat", "eastus2", true)));
     }

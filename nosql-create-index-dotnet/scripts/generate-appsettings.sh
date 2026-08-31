@@ -54,7 +54,7 @@ database_name="${env_values[AZURE_COSMOSDB_CREATE_INDEX_DATABASENAME]:-HotelsCre
 container_name="${env_values[AZURE_COSMOSDB_CONTAINER_NAME]:-}"
 diskann_container_name="${env_values[AZURE_COSMOSDB_CREATE_INDEX_DISKANN_CONTAINER_NAME]:-hotels_diskann}"
 quantizedflat_container_name="${env_values[AZURE_COSMOSDB_CREATE_INDEX_QUANTIZEDFLAT_CONTAINER_NAME]:-hotels_quantizedflat}"
-allow_custom_container_deletion="${env_values[AZURE_COSMOSDB_CREATE_INDEX_ALLOW_CUSTOM_CONTAINER_DELETION]:-false}"
+allow_custom_container_deletion="${env_values[AZURE_COSMOSDB_CREATE_INDEX_ALLOW_DESTRUCTIVE_OPERATIONS]:-false}"
 embedded_field="${env_values[AZURE_COSMOSDB_CREATE_INDEX_EMBEDDED_FIELD]:-embedding}"
 open_ai_endpoint="${env_values[AZURE_OPENAI_EMBEDDING_ENDPOINT]:-${env_values[AZURE_OPENAI_ENDPOINT]:-}}"
 open_ai_deployment="${env_values[AZURE_OPENAI_EMBEDDING_DEPLOYMENT]:-text-embedding-3-small}"
@@ -80,7 +80,7 @@ missing_fields=()
 [[ -z "$data_file" ]] && missing_fields+=("DATA_FILE_WITH_VECTORS_AND_REGIONS")
 
 if [[ ! "$allow_custom_container_deletion" =~ ^([Tt][Rr][Uu][Ee]|[Ff][Aa][Ll][Ss][Ee])$ ]]; then
-    echo "ERROR: AZURE_COSMOSDB_CREATE_INDEX_ALLOW_CUSTOM_CONTAINER_DELETION must be true or false."
+    echo "ERROR: AZURE_COSMOSDB_CREATE_INDEX_ALLOW_DESTRUCTIVE_OPERATIONS must be true or false."
     exit 1
 fi
 allow_custom_container_deletion="${allow_custom_container_deletion,,}"
@@ -91,7 +91,7 @@ fi
 if [[ "$diskann_container_name" != "hotels_diskann" ||
       "$quantizedflat_container_name" != "hotels_quantizedflat" ]] &&
    [[ "$allow_custom_container_deletion" != "true" ]]; then
-    echo "ERROR: Custom container names require AZURE_COSMOSDB_CREATE_INDEX_ALLOW_CUSTOM_CONTAINER_DELETION=true."
+    echo "ERROR: Custom container names require AZURE_COSMOSDB_CREATE_INDEX_ALLOW_DESTRUCTIVE_OPERATIONS=true."
     exit 1
 fi
 

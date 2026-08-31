@@ -531,4 +531,4 @@ pwsh -NoProfile -File .github\scripts\clean-all-create-index.ps1 -Language DotNe
 - [Vector indexes in Azure Cosmos DB for NoSQL](/azure/cosmos-db/nosql/vector-index)
 
 > [!WARNING]
-> The sample deletes `hotels_diskann` and `hotels_quantizedflat` before creation and during cleanup. Custom container names require `AZURE_COSMOSDB_CREATE_INDEX_ALLOW_CUSTOM_CONTAINER_DELETION=true`.
+> The sample deletes `hotels_diskann` and `hotels_quantizedflat` before creation and during cleanup. Custom container names require `AZURE_COSMOSDB_CREATE_INDEX_ALLOW_DESTRUCTIVE_OPERATIONS=true`.

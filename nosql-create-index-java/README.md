@@ -88,7 +88,7 @@ The sample expects the `HotelsCreateIndex` database to exist. It deletes and rec
 - `AZURE_COSMOSDB_CONTAINER_NAME` — Target container by name; leave empty to process all
 - `AZURE_COSMOSDB_CREATE_INDEX_DISKANN_CONTAINER_NAME` — Custom diskANN container name (default: "hotels_diskann")
 - `AZURE_COSMOSDB_CREATE_INDEX_QUANTIZEDFLAT_CONTAINER_NAME` — Custom quantizedFlat container name (default: "hotels_quantizedflat")
-- `AZURE_COSMOSDB_CREATE_INDEX_ALLOW_CUSTOM_CONTAINER_DELETION` — Set to `true` only when custom container names are intentional and safe to delete
+- `AZURE_COSMOSDB_CREATE_INDEX_ALLOW_DESTRUCTIVE_OPERATIONS` — Set to `true` only when custom container names are intentional and safe to delete
 
 **Then run the sample:**
 
