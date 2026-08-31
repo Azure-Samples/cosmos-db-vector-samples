@@ -29,45 +29,107 @@ The sample expects the `HotelsCreateIndex` database to exist. It deletes and rec
 - `hotels_diskann`
 - `hotels_quantizedflat`
 
-## Set up the sample
+## Getting Started
 
-1. Create the environment variables file.
+### 1. Configure environment variables
 
-   **If you deployed with `azd up`:**
+If you provisioned resources with Azure Developer CLI (`azd`), generate your `.env` file from the deployed environment:
 
-   ```powershell
-   azd env get-values > .env
-   ```
+**Bash:**
 
-   **Otherwise**, copy the template and fill in values from the Azure portal:
+```bash
+azd env get-values > .env
+```
 
-   ```powershell
-   Copy-Item .env.example .env
-   ```
+**PowerShell:**
 
-   The `.env.example` file contains only the required settings for this sample. Add your subscription, resource group, account, Cosmos DB, and Azure OpenAI values to the copied `.env` file. Java reads process environment variables and does not load `.env` automatically, so export or set the values before running Maven.
+```powershell
+azd env get-values > .env
+```
 
-2. Set up the data directory.
+Otherwise, copy the template and fill in your Azure resource values manually:
 
-   ```powershell
-   New-Item -ItemType Directory -Force .\data
-   Copy-Item ..\HotelsData_toCosmosDB_Vector_byRegion.json .\data\
-   ```
+**Bash:**
 
-3. Build the project.
+```bash
+cp .env.example .env
+```
 
-   ```powershell
-   mvn compile
-   ```
+**PowerShell:**
 
-## Load environment variables and run the sample
+```powershell
+Copy-Item .env.example .env
+```
 
-**⚠️ Important:** Environment variables MUST be loaded in your current session BEFORE running the sample. They are not passed via the `azd` command—they are read by `src/main/java/com/azure/cosmos/createindex/App.java` at runtime.
+Then load the variables into your shell:
 
-| Action | PowerShell | Bash |
-|--------|-----------|------|
-| Load from `.env` file | `Get-Content .env \| ForEach-Object { if ($_ -match "^([^=]+)=(.*)$") { [Environment]::SetEnvironmentVariable($matches[1], $matches[2]) } }` | `export $(grep -v "^#" .env \| xargs)` |
-| Set single variable | `[Environment]::SetEnvironmentVariable("AZURE_COSMOSDB_ENDPOINT", "https://your-account.documents.azure.com:443/")` | `export AZURE_COSMOSDB_ENDPOINT="https://your-account.documents.azure.com:443/"` |
+**Bash:**
+
+```bash
+set -a && source .env && set +a
+```
+
+**PowerShell:**
+
+```powershell
+Get-Content .env | ForEach-Object {
+  if ($_ -match '^\s*([^#][^=]*)=(.*)$') {
+    $name = $matches[1].Trim()
+    $value = $matches[2].Trim().Trim('"')
+    [Environment]::SetEnvironmentVariable($name, $value, 'Process')
+  }
+}
+```
+
+### 2. Build the project
+
+**Bash:**
+
+```bash
+mvn compile
+```
+
+**PowerShell:**
+
+```powershell
+mvn compile
+```
+
+### 3. Run the sample
+
+**Bash:**
+
+```bash
+# Both containers (default)
+unset VECTOR_ALGORITHM
+mvn exec:java
+
+# DiskANN only
+export VECTOR_ALGORITHM=diskann
+mvn exec:java
+
+# QuantizedFlat only
+export VECTOR_ALGORITHM=quantizedflat
+mvn exec:java
+```
+
+**PowerShell:**
+
+```powershell
+# Both containers (default)
+Remove-Item Env:VECTOR_ALGORITHM -ErrorAction SilentlyContinue
+mvn exec:java
+
+# DiskANN only
+$env:VECTOR_ALGORITHM = 'diskann'
+mvn exec:java
+
+# QuantizedFlat only
+$env:VECTOR_ALGORITHM = 'quantizedflat'
+mvn exec:java
+```
+
+## Environment variables
 
 **Required environment variables for control plane operations** (creating and deleting containers with ARM SDK):
 - `AZURE_SUBSCRIPTION_ID` — Your Azure subscription ID
@@ -90,30 +152,9 @@ The sample expects the `HotelsCreateIndex` database to exist. It deletes and rec
 - `AZURE_COSMOSDB_CREATE_INDEX_QUANTIZEDFLAT_CONTAINER_NAME` — Custom quantizedFlat container name (default: "hotels_quantizedflat")
 - `AZURE_COSMOSDB_CREATE_INDEX_ALLOW_DESTRUCTIVE_OPERATIONS` — Set to `true` only when custom container names are intentional and safe to delete
 
-**Then run the sample:**
-
-```powershell
-mvn exec:java
-```
-
 ### Note about SLF4J logging
 
 The sample includes the `slf4j-nop` runtime dependency so Azure SDK internal logs are suppressed by default. You shouldn't see the `StaticLoggerBinder` warning when you run `mvn exec:java`. If you remove `slf4j-nop` and don't add another SLF4J backend, that warning can appear. To see SDK logs, replace `slf4j-nop` with an SLF4J binding such as `slf4j-simple` or `logback-classic`.
-
-Examples:
-
-```powershell
-# Run both containers (default)
-mvn exec:java
-
-# Run only DiskANN
-$env:VECTOR_ALGORITHM = 'diskann'
-mvn exec:java
-
-# Run only QuantizedFlat
-$env:VECTOR_ALGORITHM = 'quantizedflat'
-mvn exec:java
-```
 
 ## Expected output
 
