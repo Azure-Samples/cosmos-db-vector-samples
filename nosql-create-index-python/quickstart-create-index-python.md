@@ -21,7 +21,7 @@ Find the sample code on GitHub in [`nosql-create-index-python`](https://github.c
 
 - An Azure subscription. If you don't have one, create a [free account](https://azure.microsoft.com/free/).
 - [Azure CLI](/cli/azure/install-azure-cli) installed and signed in with `az login`.
-- [Python 3.9 or later](https://www.python.org/downloads/).
+- [Python 3.10 or later](https://www.python.org/downloads/).
 - An Azure Cosmos DB for NoSQL account with vector search enabled.
 - Microsoft Entra ID roles for your identity:
   - **Cosmos DB Built-in Data Contributor**
