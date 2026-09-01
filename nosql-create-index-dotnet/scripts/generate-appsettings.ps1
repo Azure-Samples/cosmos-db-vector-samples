@@ -81,7 +81,7 @@ $databaseName = $envValues['AZURE_COSMOSDB_CREATE_INDEX_DATABASENAME'] ?? "Hotel
 $containerName = $envValues['AZURE_COSMOSDB_CONTAINER_NAME'] ?? ""
 $diskannContainerName = $envValues['AZURE_COSMOSDB_CREATE_INDEX_DISKANN_CONTAINER_NAME'] ?? "hotels_diskann"
 $quantizedFlatContainerName = $envValues['AZURE_COSMOSDB_CREATE_INDEX_QUANTIZEDFLAT_CONTAINER_NAME'] ?? "hotels_quantizedflat"
-$allowCustomContainerDeletion = ($envValues['AZURE_COSMOSDB_CREATE_INDEX_ALLOW_CUSTOM_CONTAINER_DELETION'] ?? "false")
+$allowCustomContainerDeletion = ($envValues['AZURE_COSMOSDB_CREATE_INDEX_ALLOW_DESTRUCTIVE_OPERATIONS'] ?? "false")
 $embeddedField = $envValues['AZURE_COSMOSDB_CREATE_INDEX_EMBEDDED_FIELD'] ?? "embedding"
 $openAiEndpoint = $envValues['AZURE_OPENAI_EMBEDDING_ENDPOINT'] ?? ($envValues['AZURE_OPENAI_ENDPOINT'] ?? "")
 $openAiDeployment = $envValues['AZURE_OPENAI_EMBEDDING_DEPLOYMENT'] ?? "text-embedding-3-small"
@@ -106,7 +106,7 @@ if ([string]::IsNullOrWhiteSpace($accountName)) { $missingFields += "AZURE_COSMO
 if ([string]::IsNullOrWhiteSpace($location)) { $missingFields += "AZURE_LOCATION" }
 if ([string]::IsNullOrWhiteSpace($dataFile)) { $missingFields += "DATA_FILE_WITH_VECTORS_AND_REGIONS" }
 if ($allowCustomContainerDeletion -notmatch '^(?i:true|false)$') {
-    Write-Host "ERROR: AZURE_COSMOSDB_CREATE_INDEX_ALLOW_CUSTOM_CONTAINER_DELETION must be true or false." -ForegroundColor Red
+    Write-Host "ERROR: AZURE_COSMOSDB_CREATE_INDEX_ALLOW_DESTRUCTIVE_OPERATIONS must be true or false." -ForegroundColor Red
     exit 1
 }
 if ($diskannContainerName -ieq $quantizedFlatContainerName) {
@@ -117,7 +117,7 @@ $usesDefaultContainerNames =
     $diskannContainerName -ceq "hotels_diskann" -and
     $quantizedFlatContainerName -ceq "hotels_quantizedflat"
 if (-not $usesDefaultContainerNames -and $allowCustomContainerDeletion -ine "true") {
-    Write-Host "ERROR: Custom container names require AZURE_COSMOSDB_CREATE_INDEX_ALLOW_CUSTOM_CONTAINER_DELETION=true." -ForegroundColor Red
+    Write-Host "ERROR: Custom container names require AZURE_COSMOSDB_CREATE_INDEX_ALLOW_DESTRUCTIVE_OPERATIONS=true." -ForegroundColor Red
     exit 1
 }
 

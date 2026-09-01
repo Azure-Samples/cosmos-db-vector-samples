@@ -146,7 +146,7 @@ dotnet run --project .\nosql-create-index-dotnet.csproj
 - `CosmosDbSettings:PartitionKeyValue` must be one of `Northeast`, `Midwest`, `South`, or `West`.
 - `OpenAiSettings:ApiVersion` is kept for cross-language consistency with the other samples.
 - Container names come from environment variables: `AZURE_COSMOSDB_CREATE_INDEX_DISKANN_CONTAINER_NAME` (default: `hotels_diskann`) and `AZURE_COSMOSDB_CREATE_INDEX_QUANTIZEDFLAT_CONTAINER_NAME` (default: `hotels_quantizedflat`).
-- Custom container names require `AZURE_COSMOSDB_CREATE_INDEX_ALLOW_CUSTOM_CONTAINER_DELETION=true`; the default names don't require opt-in.
+- Custom container names require `AZURE_COSMOSDB_CREATE_INDEX_ALLOW_DESTRUCTIVE_OPERATIONS=true`; the default names don't require opt-in.
 
 ## Expected output
 

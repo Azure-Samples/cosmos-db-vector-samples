@@ -349,4 +349,4 @@ pwsh -NoProfile -File .github\scripts\clean-all-create-index.ps1 -Language Java
 - If you haven't provisioned the shared infrastructure yet, run `azd up` from the repo root before rerunning the Java sample.
 
 > [!WARNING]
-> The sample deletes `hotels_diskann` and `hotels_quantizedflat` before creation and during cleanup. Custom container names require `AZURE_COSMOSDB_CREATE_INDEX_ALLOW_CUSTOM_CONTAINER_DELETION=true`.
+> The sample deletes `hotels_diskann` and `hotels_quantizedflat` before creation and during cleanup. Custom container names require `AZURE_COSMOSDB_CREATE_INDEX_ALLOW_DESTRUCTIVE_OPERATIONS=true`.
