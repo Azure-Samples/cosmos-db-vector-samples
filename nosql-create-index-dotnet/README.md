@@ -19,7 +19,7 @@ DiskANN is graph-based. QuantizedFlat uses vector quantization techniques.
 
 ## Prerequisites
 
-- .NET 8.0 SDK
+- .NET 10.0 SDK
 - Azure CLI installed and signed in with `az login`
 - An Azure Cosmos DB for NoSQL account with vector search enabled and an existing `HotelsCreateIndex` database
 - Your Azure subscription ID, resource group name, and Cosmos DB account name

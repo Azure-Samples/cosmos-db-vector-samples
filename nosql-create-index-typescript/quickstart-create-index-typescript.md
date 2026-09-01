@@ -21,7 +21,7 @@ In this quickstart, you run the TypeScript create-index sample for Azure Cosmos 
 ## Prerequisites
 
 - An Azure subscription. If you don't have one, create a [free account](https://azure.microsoft.com/free/).
-- [Node.js 20 or later](https://nodejs.org/download/)
+- [Node.js 22 or later](https://nodejs.org/download/)
 - [Azure CLI](/cli/azure/install-azure-cli) installed and signed in
 - [Git](https://git-scm.com/downloads)
 - To enable infrastructure provisioning for the create-index scenario, set `AZURE_COSMOSDB_CREATE_INDEX_DATABASENAME=HotelsCreateIndex` before running `azd up`. The infrastructure creates the database selected by the deployment scenario. For the create-index scenario, it creates `HotelsCreateIndex`.

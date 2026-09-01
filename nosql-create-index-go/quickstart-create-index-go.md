@@ -19,7 +19,7 @@ In this quickstart, you run the Go create-index sample for Azure Cosmos DB for N
 
 - An Azure subscription. [Create a free account](https://azure.microsoft.com/free/).
 - [Azure CLI](/cli/azure/install-azure-cli) installed and signed in (`az login`).
-- [Go 1.23 or later](https://go.dev/dl/) installed.
+- [Go 1.24 or later](https://go.dev/dl/) installed.
 - An Azure Cosmos DB for NoSQL account with vector search enabled.
 - Microsoft Entra ID roles for your identity:
   - Management-plane permission to create and delete the configured SQL containers in the Azure Cosmos DB account

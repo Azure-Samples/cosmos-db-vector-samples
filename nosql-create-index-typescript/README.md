@@ -17,7 +17,7 @@ All authentication uses Microsoft Entra ID via `DefaultAzureCredential` — no A
 To complete this quickstart, you need:
 
 - An Azure account with an active subscription — [create one for free](https://azure.microsoft.com/free/)
-- [Node.js LTS](https://nodejs.org/)
+- [Node.js 22 or later](https://nodejs.org/)
 - [Azure CLI](/cli/azure/install-azure-cli) installed and logged in (`az login`)
 - [Git](https://git-scm.com/downloads)
 

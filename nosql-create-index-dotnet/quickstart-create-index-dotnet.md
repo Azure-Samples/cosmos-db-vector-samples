@@ -20,7 +20,7 @@ The sample uses a hotel dataset in a JSON file with pre-calculated vectors from 
 - An Azure subscription. If you don't have one, create a [free account](https://azure.microsoft.com/free/).
 - [Azure CLI](/cli/azure/install-azure-cli) installed.
 - [Azure Developer CLI (azd)](/azure/developer/azure-developer-cli/install-azd) installed.
-- [.NET 8.0 SDK](https://dotnet.microsoft.com/download/dotnet/8.0) or later.
+- [.NET 10.0 SDK](https://dotnet.microsoft.com/download/dotnet/10.0) or later.
 - An Azure Cosmos DB for NoSQL account with vector search enabled and the following RBAC roles assigned to your signed-in identity:
     - Control plane: **Cosmos DB Operator** — grants ARM permission to create, update, and delete SQL containers and vector indexes via Azure Resource Manager.
     - Data plane: **Cosmos DB Built-in Data Contributor**

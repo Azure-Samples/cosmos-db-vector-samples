@@ -9,7 +9,7 @@
     <name>Azure Cosmos DB NoSQL Create Index - Java</name>
 
     <properties>
-        <maven.compiler.release>17</maven.compiler.release>
+        <maven.compiler.release>21</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
 
@@ -29,10 +29,12 @@
         <dependency>
             <groupId>com.azure</groupId>
             <artifactId>azure-cosmos</artifactId>
+            <version>4.69.0</version>
         </dependency>
         <dependency>
             <groupId>com.azure</groupId>
             <artifactId>azure-identity</artifactId>
+            <version>1.18.1</version>
         </dependency>
         <dependency>
             <groupId>com.azure.resourcemanager</groupId>

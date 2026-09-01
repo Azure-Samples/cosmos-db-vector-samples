@@ -21,17 +21,16 @@
   "license": "MIT",
   "dependencies": {
     "@azure/arm-cosmosdb": "^16.2.0",
-    "@azure/cosmos": "^4.0.0",
-    "@azure/identity": "^4.11.1",
+    "@azure/cosmos": "^4.5.1",
+    "@azure/identity": "^4.13.1",
     "openai": "^5.20.1"
   },
   "engines": {
-    "node": ">=20.0.0"
+    "node": ">=22.0.0"
   },
   "devDependencies": {
     "@types/node": "^24.3.0",
     "cross-env": "^10.1.0",
-    "dotenv": "^17.4.2",
     "typescript": "^5.9.2",
     "vitest": "^4.1.0"
   }

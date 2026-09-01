@@ -17,7 +17,7 @@ It uses:
 
 ## Prerequisites
 
-- Java 17 LTS or later
+- Java 21 LTS or later
 - Maven 3.9 or later
 - Azure CLI installed and signed in with `az login`
 - Azure resources already provisioned by `azd up`

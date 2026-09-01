@@ -18,7 +18,7 @@ In this quickstart, you run the Java create-index sample for Azure Cosmos DB for
 ## Prerequisites
 
 - An Azure subscription. If you don't have one, create a [free account](https://azure.microsoft.com/free/).
-- [Java 17 LTS](https://learn.microsoft.com/java/openjdk/download)
+- [Java 21 LTS](https://learn.microsoft.com/java/openjdk/download)
 - [Apache Maven 3.9](https://maven.apache.org/download.cgi) or later
 - [Azure CLI](/cli/azure/install-azure-cli) installed and signed in with `az login`.
 - An Azure Cosmos DB for NoSQL account with vector search enabled.
