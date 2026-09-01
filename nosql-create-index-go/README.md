@@ -31,7 +31,7 @@ The sample creates and deletes containers in code by using the Azure Cosmos DB A
 
 ## Prerequisites
 
-- Go 1.24 or later
+- Go 1.27 or later
 - Azure CLI with a signed-in account: `az login`
 - An Azure Cosmos DB for NoSQL account with vector search enabled
 - Permissions for your identity to create and delete the configured SQL containers in the Azure Cosmos DB account

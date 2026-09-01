@@ -1,6 +1,6 @@
 module github.com/Azure/cosmos-db-vector-samples/nosql-create-index-go
 
-go 1.24.0
+go 1.27.0
 
 require (
 	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.20.0

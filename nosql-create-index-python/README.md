@@ -15,7 +15,7 @@ The sample:
 
 ## Prerequisites
 
-- Python 3.9+
+- Python 3.10+
 - Azure CLI installed and signed in with `az login`
 - An Azure Cosmos DB for NoSQL account and existing database
 - Azure subscription ID, resource group name, and Cosmos DB account name for the control-plane container create/delete step
